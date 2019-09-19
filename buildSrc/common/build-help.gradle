@@ -18,6 +18,10 @@
 task buildTestsHelp {
   group = 'Help (Build Documentation)'
   description = "How to run Lucene and Solr tests and the options that are available to you."
+
+  doLast {
+    println file("${project(':buildSrc').projectDir}/common/help-text/testHelp.txt").text
+  }
 }
 
 task buildDependenciesHelp {
