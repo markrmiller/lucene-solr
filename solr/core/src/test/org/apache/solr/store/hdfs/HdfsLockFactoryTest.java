@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @ThreadLeakFilters(defaultFilters = true, filters = {
     SolrIgnoredThreadsFilter.class,
@@ -41,6 +42,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 @Nightly
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsLockFactoryTest extends SolrTestCaseJ4 {
   
   private static MiniDFSCluster dfsCluster;

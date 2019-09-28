@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.client.solrj.cloud.autoscaling.Preference;
 import org.apache.solr.client.solrj.cloud.autoscaling.ReplicaInfo;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -53,10 +54,11 @@ import org.slf4j.LoggerFactory;
 /**
  * This test compares the cluster state of a real cluster and a simulated one.
  */
+@LuceneTestCase.Slow
 public class TestSimClusterStateProvider extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static int NODE_COUNT = 3;
+  private static int NODE_COUNT = TEST_NIGHTLY ? 1 : 3;
   private static boolean simulated;
 
   private static SolrCloudManager cloudManager;

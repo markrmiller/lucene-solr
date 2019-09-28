@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrQuery.ORDER;
@@ -53,6 +54,7 @@ import org.junit.Test;
  *
  * Snippets surrounded by "tag" and "end" comments are extracted and used in the Solr Reference Guide.
  */
+@LuceneTestCase.Slow
 public class UsingSolrJRefGuideExamplesTest extends SolrCloudTestCase {
 
   private static final int NUM_INDEXED_DOCUMENTS = 3;

@@ -126,7 +126,7 @@ public class SSLTestConfig {
 
   /** All other settings on this object are ignored unless this is true */
   public boolean isSSLMode() {
-    return useSsl;
+    return Boolean.getBoolean("tests.nightly") ? useSsl : false;
   }
 
   public boolean isClientAuthMode() {

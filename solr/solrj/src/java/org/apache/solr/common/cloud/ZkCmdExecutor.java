@@ -16,8 +16,12 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
+import org.apache.solr.common.util.TimeSource;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
@@ -65,9 +69,7 @@ public class ZkCmdExecutor {
     KeeperException exception = null;
     for (int i = 0; i < retryCount; i++) {
       try {
-        if (i > 0 && isClosed()) {
-          throw new AlreadyClosedException();
-        }
+        checkClosed();
         return (T) operation.execute();
       } catch (KeeperException.ConnectionLossException e) {
         if (exception == null) {
@@ -123,7 +125,31 @@ public class ZkCmdExecutor {
    *          the number of the attempts performed so far
    */
   protected void retryDelay(int attemptCount) throws InterruptedException {
-    Thread.sleep((attemptCount + 1) * retryDelay);
+    System.out.println("retryDelay - attempt:" + attemptCount + " timeout:" + timeouts + "s");
+    TimeOut timeout = new TimeOut((long) timeouts, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+    long delay = (attemptCount + 1) * retryDelay;
+    checkClosed();
+    
+    if (delay == 0) return;
+    
+    if (delay < 5000) {
+      System.out.println("Sleep for the first delay: " + delay);
+      Thread.sleep(delay);
+      checkClosed();
+      return;
+    }
+    checkClosed();
+    while (!timeout.hasTimedOut()) {
+      System.out.println("Short sleep on way to " + timeouts + " elapsed:" + timeout.timeElapsed(TimeUnit.SECONDS));
+      Thread.sleep(retryDelay);
+      checkClosed();
+    }
+  }
+
+  private void checkClosed() {
+    if (isClosed()) {
+      throw new AlreadyClosedException();
+    }
   }
 
 }

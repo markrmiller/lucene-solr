@@ -38,6 +38,10 @@
     
   <dataDir>${solr.data.dir:}</dataDir>
 
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
+  
   <!-- an update processor the explicitly excludes distrib to test
        clean errors when people attempt atomic updates w/o it
   -->

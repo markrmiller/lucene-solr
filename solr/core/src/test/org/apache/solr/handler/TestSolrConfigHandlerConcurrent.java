@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
@@ -48,13 +49,15 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Arrays.asList;
 
-
+@LuceneTestCase.Slow
 public class TestSolrConfigHandlerConcurrent extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Test
   public void test() throws Exception {
+    waitForRecoveriesToFinish(false);
+    
     Map editable_prop_map = (Map) Utils.fromJSONResource("EditableSolrConfigAttributes.json");
     Map caches = (Map) editable_prop_map.get("query");
 

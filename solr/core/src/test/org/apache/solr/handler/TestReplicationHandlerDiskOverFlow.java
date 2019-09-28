@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
@@ -40,6 +41,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.util.LogLevel;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +54,7 @@ import static org.apache.solr.handler.TestReplicationHandler.invokeReplicationCo
 
 @LogLevel("org.apache.solr.handler.IndexFetcher=DEBUG")
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class TestReplicationHandlerDiskOverFlow extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -65,6 +68,12 @@ public class TestReplicationHandlerDiskOverFlow extends SolrTestCaseJ4 {
 
   static String context = "/solr";
 
+  
+  @BeforeClass
+  public static void setupClass() throws Exception {
+    System.setProperty("socketTimeout", "20000");
+  }
+  
   @Before
   public void setUp() throws Exception {
     originalDiskSpaceprovider = IndexFetcher.usableDiskSpaceProvider;
@@ -119,10 +128,10 @@ public class TestReplicationHandlerDiskOverFlow extends SolrTestCaseJ4 {
     invokeReplicationCommand(slaveJetty.getLocalPort(), "disablepoll");
     //index docs
     log.info("Indexing to MASTER");
-    int docsInMaster = 1000;
+    int docsInMaster =  TEST_NIGHTLY ? 1000 : 15;
     long szMaster = indexDocs(masterClient, docsInMaster, 0);
     log.info("Indexing to SLAVE");
-    long szSlave = indexDocs(slaveClient, 1200, 1000);
+    long szSlave = indexDocs(slaveClient, 1200, TEST_NIGHTLY ? 1000 : 15);
 
     IndexFetcher.usableDiskSpaceProvider = new Function<String, Long>() {
       @Override
@@ -156,7 +165,7 @@ public class TestReplicationHandlerDiskOverFlow extends SolrTestCaseJ4 {
     
     new Thread(() -> {
         try {
-          for (int i = 0; i < 100; i++) {
+          for (int i = 0; i < 30; i++) {
             final CyclicBarrier barrier = commonBarrier.get();
             assertNotNull("why is query thread still looping if barrier has already been cleared?",
                           barrier);
@@ -164,7 +173,7 @@ public class TestReplicationHandlerDiskOverFlow extends SolrTestCaseJ4 {
               QueryResponse rsp = slaveClient.query(new SolrQuery()
                                                     .setQuery("*:*")
                                                     .setRows(0));
-              Thread.sleep(200);
+              Thread.sleep(300);
             } catch (SolrException e) {
               if (e.code() == SolrException.ErrorCode.SERVICE_UNAVAILABLE.code
                   && e.getMessage().contains(expectedErr)

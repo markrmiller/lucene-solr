@@ -24,6 +24,7 @@ import java.util.Map;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrResourceLoader;
@@ -34,6 +35,7 @@ import org.junit.Test;
 /**
  * Test {@link OperatingSystemMetricSet} and proper JVM metrics registration.
  */
+@LuceneTestCase.Slow
 public class JvmMetricsTest extends SolrJettyTestBase {
 
   static final String[] STRING_OS_METRICS = {
@@ -57,6 +59,7 @@ public class JvmMetricsTest extends SolrJettyTestBase {
 
   @BeforeClass
   public static void beforeTest() throws Exception {
+    enableMetricsForNonNightly();
     createAndStartJetty(legacyExampleCollection1SolrHome());
   }
 

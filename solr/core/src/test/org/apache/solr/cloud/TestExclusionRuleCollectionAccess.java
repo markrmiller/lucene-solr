@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.junit.BeforeClass;
@@ -40,7 +41,7 @@ public class TestExclusionRuleCollectionAccess extends SolrCloudTestCase {
         .commit(cluster.getSolrClient(), "css33");
 
     assertEquals("Should have returned 1 result", 1,
-        cluster.getSolrClient().query("css33", params("q", "*:*", "collection", "css33")).getResults().getNumFound());
+        cluster.getSolrClient().query("css33", SolrTestCaseJ4.params("q", "*:*", "collection", "css33")).getResults().getNumFound());
 
   }
   

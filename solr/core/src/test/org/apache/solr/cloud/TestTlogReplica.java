@@ -41,6 +41,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.util.LuceneTestCase.AwaitsFix;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -363,7 +364,7 @@ public class TestTlogReplica extends SolrCloudTestCase {
       try (HttpSolrClient client = getHttpSolrClient(rAdd.getCoreUrl(), httpClient)) {
         SolrDocumentList allIdsResult = client.getById(ids);
         if (previousAllIdsResult != null) {
-          assertTrue(compareSolrDocumentList(previousAllIdsResult, allIdsResult));
+          assertTrue(SolrTestCaseJ4.compareSolrDocumentList(previousAllIdsResult, allIdsResult));
         } else {
           // set the first response here
           previousAllIdsResult = allIdsResult;

@@ -275,8 +275,7 @@ public final class ManagedIndexSchema extends IndexSchema {
 
       Thread.currentThread().interrupt();
     } finally {
-      if (!parallelExecutor.isShutdown())
-        parallelExecutor.shutdown();
+      ExecutorUtil.shutdownAndAwaitTermination(parallelExecutor);
     }
 
     log.info("Took {}ms for {} replicas to apply schema update version {} for collection {}",

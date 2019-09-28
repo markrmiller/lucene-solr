@@ -24,6 +24,7 @@ import java.util.SortedSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -34,6 +35,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Slowest
 public class TestSkipOverseerOperations extends SolrCloudTestCase {
 
   @Before
@@ -123,6 +125,7 @@ public class TestSkipOverseerOperations extends SolrCloudTestCase {
     CollectionAdminResponse resp2 = CollectionAdminRequest.getOverseerStatus().process(cluster.getSolrClient());
     assertEquals(getNumLeaderOpeations(resp), getNumLeaderOpeations(resp2));
     CollectionAdminRequest.deleteCollection(collection).process(cluster.getSolrClient());
+    cluster.waitForRemovedCollection(collection);
   }
 
   @Test
@@ -190,6 +193,7 @@ public class TestSkipOverseerOperations extends SolrCloudTestCase {
     // 2 for recovering state, 4 for active state
     assertEquals(getNumStateOpeations(resp) + 6, getNumStateOpeations(resp2));
     CollectionAdminRequest.deleteCollection(collection).process(cluster.getSolrClient());
+    cluster.waitForRemovedCollection(collection);
   }
 
   private int getNumLeaderOpeations(CollectionAdminResponse resp) {

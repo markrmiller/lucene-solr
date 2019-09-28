@@ -44,11 +44,11 @@ public class LegacyAbstractAnalyticsCloudTest extends SolrCloudTestCase {
 
   @Before
   public void setupCollection() throws Exception {
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 2)
         .addConfig("conf", configset("cloud-analytics"))
         .configure();
 
-    CollectionAdminRequest.createCollection(COLLECTIONORALIAS, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTIONORALIAS, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTIONORALIAS, 2, 2);
   }
 

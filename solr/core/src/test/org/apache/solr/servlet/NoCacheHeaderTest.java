@@ -22,6 +22,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.cookie.DateUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -29,6 +30,7 @@ import org.junit.Test;
 /**
  * A test case for the several HTTP cache headers emitted by Solr
  */
+@LuceneTestCase.Slow
 public class NoCacheHeaderTest extends CacheHeaderTestBase {
   // TODO: fix this test not to directly use the test-files copied to build/
   // as its home. it could interfere with other tests!

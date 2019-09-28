@@ -56,6 +56,13 @@ public class TestTrieFacet extends SolrTestCaseJ4 {
     // we need DVs on point fields to compute stats & facets
     if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
 
+    
+    System.setProperty("solr.tests.IntegerFieldType", "solr.TrieIntField");
+    System.setProperty("solr.tests.FloatFieldType", "solr.TrieFloatField");
+    System.setProperty("solr.tests.LongFieldType", "solr.TrieLongField");
+    System.setProperty("solr.tests.DoubleFieldType", "solr.TrieDoubleField");
+    System.setProperty("solr.tests.DateFieldType", "solr.TrieDateField");
+    
     initCore("solrconfig-tlog.xml","schema.xml");
 
     // don't break the test

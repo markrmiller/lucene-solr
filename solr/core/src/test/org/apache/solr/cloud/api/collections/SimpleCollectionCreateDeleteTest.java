@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
@@ -32,6 +33,7 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.util.TimeOut;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SimpleCollectionCreateDeleteTest extends AbstractFullDistribZkTestBase {
 
   public SimpleCollectionCreateDeleteTest() {
@@ -62,6 +64,8 @@ public class SimpleCollectionCreateDeleteTest extends AbstractFullDistribZkTestB
       CollectionAdminRequest delete = CollectionAdminRequest.deleteCollection(collectionName);
       cloudClient.request(delete);
 
+      waitForRemovedCollection(collectionName);
+      
       assertFalse(cloudClient.getZkStateReader().getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName, false));
       
       // currently, removing a collection does not wait for cores to be unloaded

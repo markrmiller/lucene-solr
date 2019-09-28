@@ -16,10 +16,12 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.SpellingParams;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
 public class TestAnalyzeInfixSuggestions extends SolrTestCaseJ4  {
   static final String URI_DEFAULT = "/infix_suggest_analyzing";
   static final String URI_SUGGEST_DEFAULT = "/analyzing_infix_suggest";

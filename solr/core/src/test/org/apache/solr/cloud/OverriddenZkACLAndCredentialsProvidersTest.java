@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.cloud.DefaultZkCredentialsProvider;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+@LuceneTestCase.Slow
 public class OverriddenZkACLAndCredentialsProvidersTest extends SolrTestCaseJ4 {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

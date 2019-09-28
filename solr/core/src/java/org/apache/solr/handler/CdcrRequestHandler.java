@@ -432,7 +432,7 @@ public class CdcrRequestHandler extends RequestHandlerBase implements SolrCoreAw
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
           "Error while requesting shard's checkpoints", e);
     } finally {
-      parallelExecutor.shutdown();
+      ExecutorUtil.shutdownAndAwaitTermination(parallelExecutor);
     }
 
     rsp.add(CdcrParams.CHECKPOINT, checkpoint);

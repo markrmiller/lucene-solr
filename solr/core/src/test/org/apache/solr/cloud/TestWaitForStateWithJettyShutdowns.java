@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -40,6 +41,7 @@ import static org.apache.solr.cloud.SolrCloudTestCase.clusterShape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

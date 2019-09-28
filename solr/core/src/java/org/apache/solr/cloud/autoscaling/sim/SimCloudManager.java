@@ -986,6 +986,8 @@ public class SimCloudManager implements SolrCloudManager {
       Thread.currentThread().interrupt();
     }
     IOUtils.closeQuietly(objectCache);
+    
+    ExecutorUtil.shutdownAndAwaitTermination(simCloudManagerPool);
   }
 
   /**

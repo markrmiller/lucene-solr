@@ -48,10 +48,10 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
 
   }
 
-  public static JettySolrRunner jetty;
-  public static int port;
-  public static SolrClient client = null;
-  public static String context;
+  public volatile static JettySolrRunner jetty;
+  public volatile static int port;
+  public volatile static SolrClient client = null;
+  public volatile static String context;
 
   public static JettySolrRunner createAndStartJetty(String solrHome, String configFile, String schemaFile, String context,
                                             boolean stopAtShutdown, SortedMap<ServletHolder,String> extraServlets)
@@ -110,6 +110,10 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
     nodeProps.setProperty("coreRootDirectory", coresDir.toString());
     nodeProps.setProperty("configSetBaseDir", solrHome);
 
+    if (jetty != null) {
+      jetty.stop();
+    }
+    
     jetty = new JettySolrRunner(solrHome, nodeProps, jettyConfig);
     jetty.start();
     port = jetty.getLocalPort();

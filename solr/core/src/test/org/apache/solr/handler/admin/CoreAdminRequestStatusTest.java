@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
@@ -30,7 +31,7 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Slow
 public class CoreAdminRequestStatusTest extends SolrTestCaseJ4{
   @BeforeClass
   public static void beforeClass() throws Exception {

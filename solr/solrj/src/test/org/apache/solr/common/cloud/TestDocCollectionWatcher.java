@@ -28,24 +28,28 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** @see TestCollectionStateWatchers */
+@LuceneTestCase.Slowest
+@Ignore // too long
 public class TestDocCollectionWatcher extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final int CLUSTER_SIZE = 4;
+  private static final int CLUSTER_SIZE = TEST_NIGHTLY ? 4 : 2;
 
-  private static final int MAX_WAIT_TIMEOUT = 120; // seconds, only use for await -- NO SLEEP!!!
+  private static final int MAX_WAIT_TIMEOUT = 30; // seconds, only use for await -- NO SLEEP!!!
 
   private ExecutorService executor = null;
 
@@ -60,7 +64,7 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
   @After
   public void tearDownCluster() throws Exception {
     if (null!= executor) {
-      executor.shutdown();
+      ExecutorUtil.shutdownWithInterruptAndAwaitTermination(executor);
     }
     shutdownCluster();
     executor = null;
@@ -111,6 +115,8 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
     CloudSolrClient client = cluster.getSolrClient();
     CollectionAdminRequest.createCollection("currentstate", "config", 1, 1)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
+    
+    cluster.waitForActiveCollection("currentstate", 1, 1);
 
     final CountDownLatch latch = new CountDownLatch(1);
     client.registerDocCollectionWatcher("currentstate", (c) -> {
@@ -163,7 +169,7 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
     Future<Boolean> future = waitInBackground("delayed", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
                                               (c) -> (null != c));
 
-    CollectionAdminRequest.createCollection("delayed", "config", 1, 1)
+    CollectionAdminRequest.createCollection("delayed", "config", 1, 1).setMaxShardsPerNode(10)
       .processAndWait(cluster.getSolrClient(), MAX_WAIT_TIMEOUT);
 
     assertTrue("waitForState was not triggered by collection creation", future.get());
@@ -187,7 +193,7 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
   public void testWaitForStateWatcherIsRetainedOnPredicateFailure() throws Exception {
 
     CloudSolrClient client = cluster.getSolrClient();
-    CollectionAdminRequest.createCollection("falsepredicate", "config", 1, 1)
+    CollectionAdminRequest.createCollection("falsepredicate", "config", 1, 1).setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
 
     // create collection with 1 shard 1 replica...
@@ -223,13 +229,12 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
     // now add a 3rd replica...
     CollectionAdminRequest.addReplicaToShard("falsepredicate", "shard1")
       .processAndWait(client, MAX_WAIT_TIMEOUT);
-
+    
     // now confirm watcher is invoked & removed
     assertTrue("watcher never succeeded", future.get());
     assertTrue(runCountSnapshot < runCount.get());
     waitFor("DocCollectionWatcher should be removed", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
             () -> client.getZkStateReader().getStateWatchers("falsepredicate").size() == 0);
-    
   }
 
   @Test
@@ -263,9 +268,11 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
     CollectionAdminRequest.deleteCollection("tobedeleted").process(client);
 
     assertTrue("DocCollectionWatcher not notified of delete call", future.get());
+    cluster.waitForRemovedCollection("tobedeleted");
   }
   
   @Test
+  @Nightly
   public void testWatchesWorkForStateFormat1() throws Exception {
 
     final CloudSolrClient client = cluster.getSolrClient();

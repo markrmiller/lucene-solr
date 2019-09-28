@@ -20,6 +20,7 @@
 // Gradle needs permissions
 grant codeBase "file:${user.home}/.gradle/-" {
      permission java.security.AllPermission;
+//   TODO: what about jars in gradle cache having permissions?       
 //   permission java.net.SocketPermission "*", "accept,listen,connect,resolve";
 //   permission java.lang.reflect.ReflectPermission "*";
 //   permission java.util.logging.LoggingPermission "control";

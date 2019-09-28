@@ -153,7 +153,13 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
   public void run() {
     MDCLoggingContext.setNode(thisNode);
     log.debug("Process current queue of overseer operations");
-    LeaderStatus isLeader = amILeader();
+    LeaderStatus isLeader;
+    try {
+      isLeader = amILeader();
+    } catch (AlreadyClosedException e) {
+      return;
+    }
+    
     while (isLeader == LeaderStatus.DONT_KNOW) {
       log.debug("am_i_leader unclear {}", isLeader);
       isLeader = amILeader();  // not a no, not a yes, try ask again
@@ -421,6 +427,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     Timer.Context timerContext = stats.time(statsName);
     boolean success = true;
     String propsId = null;
+    if (isClosed()) throw new AlreadyClosedException();
     try {
       ZkNodeProps props = ZkNodeProps.load(zkStateReader.getZkClient().getData(
           Overseer.OVERSEER_ELECT + "/leader", null, null, true));
@@ -429,6 +436,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
         return LeaderStatus.YES;
       }
     } catch (KeeperException e) {
+      if (isClosed()) throw new AlreadyClosedException();
       success = false;
       if (e.code() == KeeperException.Code.CONNECTIONLOSS) {
         log.error("", e);
@@ -441,6 +449,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     } catch (InterruptedException e) {
       success = false;
       Thread.currentThread().interrupt();
+      if (isClosed()) throw new AlreadyClosedException();
     } finally {
       timerContext.stop();
       if (success)  {

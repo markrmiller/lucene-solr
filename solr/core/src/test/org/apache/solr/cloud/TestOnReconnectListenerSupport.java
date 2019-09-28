@@ -20,6 +20,8 @@ package org.apache.solr.cloud;
 import java.lang.invoke.MethodHandles;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.CursorPagingTest;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -36,15 +38,17 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
 
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
-public class TestOnReconnectListenerSupport extends AbstractFullDistribZkTestBase {
+public class TestOnReconnectListenerSupport extends SolrCloudBridgeTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  public TestOnReconnectListenerSupport() {
-    super();
+  
+  @BeforeClass
+  public static void beforeTestOnReconnectListenerSupport() throws Exception {
     sliceCount = 2;
-    fixShardCount(3);
+    numShards = 3;
+    solrconfigString = "solrconfig-managed-schema.xml";
   }
+
 
   @BeforeClass
   public static void initSysProperties() {
@@ -52,18 +56,20 @@ public class TestOnReconnectListenerSupport extends AbstractFullDistribZkTestBas
     System.setProperty("enable.update.log", "true");
   }
 
-  @Override
-  protected String getCloudSolrConfig() {
-    return "solrconfig-managed-schema.xml";
+  protected int getReplicaPort(Replica replica) {
+    String replicaNode = replica.getNodeName();
+    String tmp = replicaNode.substring(replicaNode.indexOf(':')+1);
+    if (tmp.indexOf('_') != -1)
+      tmp = tmp.substring(0,tmp.indexOf('_'));
+    return Integer.parseInt(tmp);
   }
-
+  
   @Test
-  public void test() throws Exception {
-    waitForThingsToLevelOut(30000);
+  public void testOnReconnectListener() throws Exception {
 
     String testCollectionName = "c8n_onreconnect_1x1";
     String shardId = "shard1";
-    createCollectionRetry(testCollectionName, "conf1", 1, 1, 1);
+    createCollection(testCollectionName, 1, 1, 10, null, null, "conf1");
     cloudClient.setDefaultCollection(testCollectionName);
 
     Replica leader = getShardLeader(testCollectionName, shardId, 30 /* timeout secs */);

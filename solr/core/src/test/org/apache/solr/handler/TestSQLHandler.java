@@ -20,9 +20,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.stream.ExceptionStream;
@@ -34,13 +34,19 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.TimeSource;
+import org.apache.solr.util.TimeOut;
+import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-@Slow
+@LuceneTestCase.Slow
 @SolrTestCaseJ4.SuppressSSL
 @LuceneTestCase.SuppressCodecs({"Lucene3x", "Lucene40","Lucene41","Lucene42","Lucene45"})
+@SolrTestCaseJ4.SuppressObjectReleaseTracker(reason = "Can't cleanly shutdown JDBCDriver ZkClients")
 public class TestSQLHandler extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";
@@ -51,23 +57,65 @@ public class TestSQLHandler extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 1)
         .addConfig("conf", configset("sql"))
         .configure();
 
     String collection;
-    useAlias = random().nextBoolean();
+    useAlias = TEST_NIGHTLY ? random().nextBoolean() : false;
     if (useAlias) {
       collection = COLLECTIONORALIAS + "_collection";
     } else {
       collection = COLLECTIONORALIAS;
     }
 
-    CollectionAdminRequest.createCollection(collection, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collection, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(collection, 2, 2);
     if (useAlias) {
       CollectionAdminRequest.createAlias(COLLECTIONORALIAS, collection).process(cluster.getSolrClient());
     }
+    
+    String baseUrl = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+COLLECTIONORALIAS;
+
+    SolrParams sParams = mapParams(CommonParams.QT, "/sql", "aggregationMode", "map_reduce",
+        "stmt", "select id, str_s from collection1 where text_t='XXXX' order by field_iff desc");
+
+    SolrStream solrStream = new SolrStream(baseUrl, sParams);
+    TimeOut timeout = new TimeOut(15, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+    while (!timeout.hasTimedOut()) {
+      try {
+        getTuple(new ExceptionStream(solrStream));
+        break;
+      } catch (IOException e) {
+        // the driver cloud client may take a moment to see things
+        Thread.sleep(500);
+      }
+    }
+    
+    if (timeout.hasTimedOut()) {
+      fail("Timeout waiting for driver solr client to see the world");
+    }
+    
+  }
+  
+  @AfterClass
+  public static void cleanup() throws IOException, InterruptedException {
+    // we can't close the zk clients started by the calcite solr driver, so we get creative
+    Thread thread = new Thread() {
+      public void run() {
+        ObjectReleaseTracker.tryClose();
+      }
+    };
+    thread.start();
+
+    interruptThreadsOnTearDown("Callback", false);
+    interruptThreadsOnTearDown("Callback", true);
+    thread.join(10000);
+  }
+  
+  @After
+  public void after() {
+
   }
 
   @Before
@@ -1919,7 +1967,7 @@ public class TestSQLHandler extends SolrCloudTestCase {
     return params;
   }
 
-  protected Tuple getTuple(TupleStream tupleStream) throws IOException {
+  protected static Tuple getTuple(TupleStream tupleStream) throws IOException {
     tupleStream.open();
     Tuple t = tupleStream.read();
     tupleStream.close();

@@ -18,6 +18,7 @@ package org.apache.solr.cloud.api.collections;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import com.carrotsearch.randomizedtesting.annotations.TimeoutSuite;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.LuceneTestCase.Slow;
@@ -37,6 +38,7 @@ import org.junit.BeforeClass;
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 @TimeoutSuite(millis = TimeUnits.HOUR)
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsCollectionsAPIDistributedZkTest extends CollectionsAPIDistributedZkTest {
   private static MiniDFSCluster dfsCluster;
 

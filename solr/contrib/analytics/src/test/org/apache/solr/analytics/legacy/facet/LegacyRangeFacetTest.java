@@ -19,10 +19,11 @@ package org.apache.solr.analytics.legacy.facet;
 
 import java.util.ArrayList;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Slow
 public class LegacyRangeFacetTest extends LegacyAbstractAnalyticsFacetTest {
   static String fileName = "rangeFacets.txt";
 

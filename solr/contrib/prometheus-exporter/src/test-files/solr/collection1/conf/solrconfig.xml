@@ -28,7 +28,7 @@
   <codecFactory class="solr.SchemaCodecFactory"/>
 
   <indexConfig>
-    <lockType>${solr.lock.type:native}</lockType>
+    <lockType>${solr.lock.type:single}</lockType>
   </indexConfig>
 
   <jmx />

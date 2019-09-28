@@ -28,6 +28,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -40,6 +42,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class ShardsWhitelistTest extends MultiSolrCloudTestCase {
 
   /**

@@ -363,30 +363,27 @@ public class ZkTestServer {
      */
     protected void shutdown() throws IOException {
 
-      // shutting down the cnxnFactory will close the zooKeeperServer
-      // zooKeeperServer.shutdown();
-
       ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
       try {
+        
         if (cnxnFactory != null) {
-          while (true) {
-            cnxnFactory.shutdown();
-            try {
-              cnxnFactory.join();
-              break;
-            } catch (InterruptedException e) {
-              // Thread.currentThread().interrupt();
-              // don't keep interrupted status
-            }
+          cnxnFactory.shutdown();
+
+          try {
+            cnxnFactory.join();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
           }
         }
+
         if (zkDb != null) {
-          zkDb.close();
+          try { 
+            zkDb.close();
+          } catch (Exception e) {
+            log.warn("", e);
+          }
         }
 
-        if (cnxnFactory != null && cnxnFactory.getLocalPort() != 0) {
-          waitForServerDown(getZkHost(), 30000);
-        }
       } finally {
 
         ObjectReleaseTracker.release(this);
@@ -571,6 +568,7 @@ public class ZkTestServer {
       };
 
       ObjectReleaseTracker.track(zooThread);
+      zooThread.setDaemon(true);
       zooThread.start();
 
       int cnt = 0;
@@ -596,6 +594,8 @@ public class ZkTestServer {
 
       waitForServerUp(getZkHost(), 30000);
 
+      
+      
       init(solrFormat);
     } catch (Exception e) {
       log.error("Error trying to run ZK Test Server", e);
@@ -605,36 +605,38 @@ public class ZkTestServer {
 
   public void shutdown() throws IOException, InterruptedException {
     log.info("Shutting down ZkTestServer.");
+    Thread thread = new Thread() {
+      @Override
+      public void run() {
+        IOUtils.closeQuietly(rootClient);
+        IOUtils.closeQuietly(chRootClient);
+      }
+    };
     try {
-      IOUtils.closeQuietly(rootClient);
-      IOUtils.closeQuietly(chRootClient);
-    } finally {
 
+      thread.start();
       // TODO: this can log an exception while trying to unregister a JMX MBean
       try {
         zkServer.shutdown();
       } catch (Exception e) {
-        log.error("Exception shutting down ZooKeeper Test Server",e);
-      }
-
-      if (zkDb != null) {
-        zkDb.close();
+        log.error("Exception shutting down ZooKeeper Test Server", e);
       }
 
       while (true) {
         try {
-          zooThread.join();
+          //zooThread.join();
           ObjectReleaseTracker.release(zooThread);
           zooThread = null;
           break;
-        } catch (InterruptedException e) {
-          // don't keep interrupted status
         } catch (NullPointerException e) {
           // okay
           break;
         }
       }
+    } finally {
+      thread.join();
     }
+
     ObjectReleaseTracker.release(this);
   }
 
@@ -655,7 +657,7 @@ public class ZkTestServer {
       try {
         Thread.sleep(250);
       } catch (InterruptedException e) {
-        // ignore
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -676,7 +678,7 @@ public class ZkTestServer {
         throw new RuntimeException("Time out waiting for ZooKeeper to startup!");
       }
       try {
-        Thread.sleep(250);
+        Thread.sleep(500);
       } catch (InterruptedException e) {
         // ignore
       }

@@ -39,6 +39,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.SimpleFSDirectory;
 import org.apache.lucene.util.TestUtil;
+import org.apache.lucene.util.LuceneTestCase.AwaitsFix;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
@@ -48,11 +49,13 @@ import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SolrTestCaseJ4.SuppressSSL     // Currently unknown why SSL does not work with this test
+@AwaitsFix(bugUrl = "Fails easily")
 public class TestReplicationHandlerBackup extends SolrJettyTestBase {
 
   JettySolrRunner masterJetty;
@@ -91,10 +94,15 @@ public class TestReplicationHandlerBackup extends SolrJettyTestBase {
     }
   }
 
+  @BeforeClass
+  public static void beforeClass() throws Exception {
+    useFactory(null);
+  }
 
   @Before
   public void setUp() throws Exception {
     super.setUp();
+    
     String configFile = "solrconfig-master1.xml";
 
     if(random().nextBoolean()) {

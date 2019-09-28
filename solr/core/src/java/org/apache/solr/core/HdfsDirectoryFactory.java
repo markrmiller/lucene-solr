@@ -134,13 +134,27 @@ public class HdfsDirectoryFactory extends CachingDirectoryFactory implements Sol
   
   @Override
   public void close() throws IOException {
-    super.close();
+    try {
+      super.close();
+    } catch (Throwable e) {
+      SolrException.log(log, e);
+      if (e instanceof Error) {
+        throw (Error) e;
+      }
+    }
     Collection<FileSystem> values = tmpFsCache.asMap().values();
     for (FileSystem fs : values) {
       IOUtils.closeQuietly(fs);
     }
-    tmpFsCache.invalidateAll();
-    tmpFsCache.cleanUp();
+    try {
+      tmpFsCache.invalidateAll();
+      tmpFsCache.cleanUp();
+    } catch (Throwable e) {
+      SolrException.log(log, e);
+      if (e instanceof Error) {
+        throw (Error) e;
+      }
+    }
   }
 
   private final static class LocalityHolder {

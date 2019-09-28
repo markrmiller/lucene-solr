@@ -27,6 +27,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.codahale.metrics.MetricRegistry;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ContentStream;
@@ -37,6 +39,7 @@ import org.apache.solr.request.LocalSolrQueryRequest;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class MBeansHandlerTest extends SolrTestCaseJ4 {
 
   @BeforeClass
@@ -130,6 +133,7 @@ public class MBeansHandlerTest extends SolrTestCaseJ4 {
   boolean runSnapshots;
 
   @Test
+  @Nightly
   public void testMetricsSnapshot() throws Exception {
     final CountDownLatch counter = new CountDownLatch(500);
     MetricRegistry registry = new MetricRegistry();
@@ -183,7 +187,7 @@ public class MBeansHandlerTest extends SolrTestCaseJ4 {
           fail("Exception getting metrics snapshot: " + e.toString());
         }
         try {
-          Thread.sleep(53);
+          Thread.sleep(10);
         } catch (InterruptedException e) {
           runSnapshots = false;
           break;
@@ -195,5 +199,7 @@ public class MBeansHandlerTest extends SolrTestCaseJ4 {
     reader.start();
     counter.await(30, TimeUnit.SECONDS);
     runSnapshots = false;
+    
+    reader.join();
   }
 }

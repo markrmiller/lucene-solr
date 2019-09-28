@@ -59,6 +59,7 @@ import org.apache.solr.cloud.AbstractDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.util.TestHarness;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -86,8 +87,7 @@ public class GraphExpressionTest extends SolrCloudTestCase {
         .configure();
 
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).process(cluster.getSolrClient());
-    AbstractDistribZkTestBase.waitForRecoveriesToFinish(COLLECTION, cluster.getSolrClient().getZkStateReader(),
-        false, true, TIMEOUT);
+    cluster.waitForActiveCollection(COLLECTION, 2, 2);
   }
 
   @Before
@@ -858,8 +858,6 @@ public class GraphExpressionTest extends SolrCloudTestCase {
         .add(id, "5", "from_s", "jim",  "to_s", "ann", "message_t", "Hello steve")
         .commit(cluster.getSolrClient(), COLLECTION);
 
-    commit();
-
     List<JettySolrRunner> runners = cluster.getJettySolrRunners();
     JettySolrRunner runner = runners.get(0);
     String url = runner.getBaseUrl().toString();
@@ -887,7 +885,7 @@ public class GraphExpressionTest extends SolrCloudTestCase {
     InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);
     String xml = readString(reader);
     //Validate the nodes
-    String error = h.validateXPath(xml,
+    String error = TestHarness.validateXPath(xml,
         "//graph/node[1][@id ='jim']",
         "//graph/node[2][@id ='max']",
         "//graph/node[3][@id ='sam']");
@@ -895,7 +893,7 @@ public class GraphExpressionTest extends SolrCloudTestCase {
       throw new Exception(error);
     }
     //Validate the edges
-    error = h.validateXPath(xml,
+    error = TestHarness.validateXPath(xml,
         "//graph/edge[1][@source ='bill']",
         "//graph/edge[1][@target ='jim']",
         "//graph/edge[2][@source ='bill']",

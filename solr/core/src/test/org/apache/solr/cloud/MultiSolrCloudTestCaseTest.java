@@ -17,9 +17,11 @@
 
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class MultiSolrCloudTestCaseTest extends MultiSolrCloudTestCase {
 
   private static int numClouds;

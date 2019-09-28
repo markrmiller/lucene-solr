@@ -23,6 +23,7 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -37,7 +38,9 @@ import org.junit.Test;
  *
  * @see org.apache.solr.handler.component.SuggestComponent
  */
-@Slow
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class DistributedSuggestComponentTest extends BaseDistributedSearchTestCase {
   
   public DistributedSuggestComponentTest() {

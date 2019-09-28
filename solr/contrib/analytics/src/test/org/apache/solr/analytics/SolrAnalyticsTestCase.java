@@ -32,7 +32,6 @@ import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.cloud.AbstractDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
@@ -43,16 +42,16 @@ public class SolrAnalyticsTestCase extends SolrCloudTestCase {
   private static final double DEFAULT_DELTA = .0000001;
 
   protected static final String COLLECTIONORALIAS = "collection1";
+  protected static final String COLLECTION2 = "collection2";
   protected static final int TIMEOUT = DEFAULT_TIMEOUT;
   protected static final String id = "id";
 
   private static UpdateRequest cloudReq;
 
+  private static UpdateRequest cloudReqSingle;
+
   @BeforeClass
   public static void setupCollection() throws Exception {
-    // Single-sharded core
-    initCore("solrconfig-analytics.xml", "schema-analytics.xml");
-    h.update("<delete><query>*:*</query></delete>");
 
     // Solr Cloud
     configureCluster(4)
@@ -60,18 +59,18 @@ public class SolrAnalyticsTestCase extends SolrCloudTestCase {
         .configure();
 
     CollectionAdminRequest.createCollection(COLLECTIONORALIAS, "conf", 2, 1).process(cluster.getSolrClient());
-    AbstractDistribZkTestBase.waitForRecoveriesToFinish(COLLECTIONORALIAS, cluster.getSolrClient().getZkStateReader(),
-        false, true, TIMEOUT);
 
-    new UpdateRequest()
-        .deleteByQuery("*:*")
-        .commit(cluster.getSolrClient(), COLLECTIONORALIAS);
+    
+    CollectionAdminRequest.createCollection(COLLECTION2, "conf", 1, 1).process(cluster.getSolrClient());
+    
+    cluster.waitForActiveCollection(COLLECTIONORALIAS, 2, 2);
+    cluster.waitForActiveCollection(COLLECTION2,  1, 1);
 
     cloudReq = new UpdateRequest();
+    cloudReqSingle = new UpdateRequest();
   }
 
   protected static void cleanIndex() throws Exception {
-    h.update("<delete><query>*:*</query></delete>");
 
     new UpdateRequest()
         .deleteByQuery("*:*")
@@ -79,12 +78,17 @@ public class SolrAnalyticsTestCase extends SolrCloudTestCase {
   }
 
   protected static void addDoc(List<String> fieldsAndValues) {
-    assertU(adoc(fieldsAndValues.toArray(new String[0])));
+    cloudReqSingle.add(fieldsAndValues.toArray(new String[0]));
     cloudReq.add(fieldsAndValues.toArray(new String[0]));
   }
 
   protected static void commitDocs() {
-    assertU(commit());
+    try {
+      cloudReqSingle.commit(cluster.getSolrClient(), COLLECTION2);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    cloudReqSingle = new UpdateRequest();
     try {
       cloudReq.commit(cluster.getSolrClient(), COLLECTIONORALIAS);
     } catch (Exception e) {
@@ -94,22 +98,23 @@ public class SolrAnalyticsTestCase extends SolrCloudTestCase {
   }
 
   private void testResults(SolrParams params, String analyticsRequest, String... tests) {
-    String coreJson = queryCoreJson(params);
-    Object cloudObj = queryCloudObject(params);
+    Object cloudObjSingle = queryCloudObject(COLLECTION2, params);
+
+    Object cloudObj = queryCloudObject(COLLECTIONORALIAS, params);
 
     for (String test : tests) {
       if (test == null || test.length()==0) continue;
       // Single-Sharded
-      String err = null;
+      Object err = null;
       try {
-        err = JSONTestUtil.match(coreJson, test, DEFAULT_DELTA);
+        err = JSONTestUtil.matchObj(cloudObjSingle, test, DEFAULT_DELTA);
       } catch (Exception e) {
         err = e.getMessage();
       } finally {
-        assertNull("query failed JSON validation. test= Single-Sharded Collection" +
+        assertNull("query failed JSON validation. test= Single Shard" +
             "\n error=" + err +
             "\n expected =" + test +
-            "\n response = " + coreJson +
+            "\n response = " + Utils.toJSONString(cloudObjSingle) +
             "\n analyticsRequest = " + analyticsRequest, err);
       }
 
@@ -129,20 +134,12 @@ public class SolrAnalyticsTestCase extends SolrCloudTestCase {
     }
   }
 
-  private String queryCoreJson(SolrParams params) {
-    try {
-      return JQ(req(params));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private Object queryCloudObject(SolrParams params) {
+  private Object queryCloudObject(String collection, SolrParams params) {
     QueryResponse resp;
     try {
       cluster.waitForAllNodes(10000);
       QueryRequest qreq = new QueryRequest(params);
-      resp = qreq.process(cluster.getSolrClient(), COLLECTIONORALIAS);
+      resp = qreq.process(cluster.getSolrClient(), collection);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

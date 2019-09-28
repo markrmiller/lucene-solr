@@ -16,6 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
@@ -45,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Test of {@link DocExpirationUpdateProcessorFactory} in a cloud setup */
-@Slow // Has to do some sleeping to wait for a future expiration
 public class DistribDocExpirationUpdateProcessorTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -60,8 +62,7 @@ public class DistribDocExpirationUpdateProcessorTest extends SolrCloudTestCase {
 
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1)
         .processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
-    cluster.getSolrClient().waitForState(COLLECTION, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-        (n, c) -> DocCollection.isFullyActive(n, c, 2, 1));
+    cluster.waitForActiveCollection(COLLECTION, 2, 2);
   }
 
   @Test
@@ -83,10 +84,10 @@ public class DistribDocExpirationUpdateProcessorTest extends SolrCloudTestCase {
     assertTrue("WTF? no versions?", 0 < initIndexVersions.size());
 
     // add a doc with a short TTL 
-    new UpdateRequest().add(sdoc("id", "999", "tTl_s","+30SECONDS")).commit(cluster.getSolrClient(), COLLECTION);
+    new UpdateRequest().add(sdoc("id", "999", "tTl_s","+3SECONDS")).commit(cluster.getSolrClient(), COLLECTION);
 
     // wait for one doc to be deleted
-    waitForNoResults(180, params("q","id:999","rows","0","_trace","did_it_expire_yet"));
+    waitForNoResults(20, params("q","id:999","rows","0","_trace","did_it_expire_yet"));
 
     // verify only one shard changed
     final Map<String,Long> finalIndexVersions = getIndexVersionOfAllReplicas();
@@ -179,7 +180,7 @@ public class DistribDocExpirationUpdateProcessorTest extends SolrCloudTestCase {
     final TimeOut timeout = new TimeOut(maxTimeLimitSeconds, TimeUnit.SECONDS, TimeSource.NANO_TIME);
     long numFound = cluster.getSolrClient().query(COLLECTION, params).getResults().getNumFound();
     while (0L < numFound && ! timeout.hasTimedOut()) {
-      Thread.sleep(Math.max(1, Math.min(5000, timeout.timeLeft(TimeUnit.MILLISECONDS))));
+      Thread.sleep(Math.max(1, Math.min(1000, timeout.timeLeft(TimeUnit.MILLISECONDS))));
       numFound = cluster.getSolrClient().query(COLLECTION, params).getResults().getNumFound();
     }
     assertEquals("Give up waiting for no results: " + params,

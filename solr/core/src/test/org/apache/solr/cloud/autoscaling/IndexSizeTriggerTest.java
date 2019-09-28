@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -80,6 +81,7 @@ import static org.apache.solr.common.cloud.ZkStateReader.SOLR_AUTOSCALING_CONF_P
  */
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG")
 @LuceneTestCase.Slow
+@Nightly // too slow
 public class IndexSizeTriggerTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -502,6 +504,7 @@ public class IndexSizeTriggerTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly // too slow for normal runs
   public void testMixedBounds() throws Exception {
     if (!realCluster) {
       log.info("This test doesn't work with a simulated cluster");
@@ -1021,13 +1024,17 @@ public class IndexSizeTriggerTest extends SolrCloudTestCase {
       log.info("This test doesn't work with a simulated cluster");
       return;
     }
+    
+    int shards = TEST_NIGHTLY ? 2 : 1;
+    int replicas = TEST_NIGHTLY ? 2 : 1;
+    
     String collectionName = "testEstimatedIndexSize_collection";
     CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName,
-        "conf", 2, 2).setMaxShardsPerNode(2);
+        "conf", shards, replicas).setMaxShardsPerNode(2);
     create.process(solrClient);
 
     CloudUtil.waitForState(cloudManager, "failed to create " + collectionName, collectionName,
-        CloudUtil.clusterShape(2, 2, false, true));
+        CloudUtil.clusterShape(shards, replicas, false, true));
 
     int NUM_DOCS = 20;
     for (int i = 0; i < NUM_DOCS; i++) {

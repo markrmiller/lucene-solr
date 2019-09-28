@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
  * then the counter of collection does not exist in Zk
  * TODO Remove in Solr 9.0
  */
+@LuceneTestCase.Slow
 public class AssignBackwardCompatibilityTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -47,7 +49,7 @@ public class AssignBackwardCompatibilityTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 1)
         .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-dynamic").resolve("conf"))
         .configure();
     CollectionAdminRequest.createCollection(COLLECTION, 1, 4)
@@ -61,7 +63,13 @@ public class AssignBackwardCompatibilityTest extends SolrCloudTestCase {
     Set<String> coreNames = new HashSet<>();
     Set<String> coreNodeNames = new HashSet<>();
 
-    int numOperations = random().nextInt(15) + 15;
+    int numOperations;
+    if (TEST_NIGHTLY) {
+      numOperations = random().nextInt(15) + 15;
+    } else {
+      numOperations = random().nextInt(3) + 1;
+    }
+
     int numLiveReplicas = 4;
 
     boolean clearedCounter = false;

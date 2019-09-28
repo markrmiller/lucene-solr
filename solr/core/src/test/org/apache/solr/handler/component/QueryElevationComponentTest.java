@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import com.carrotsearch.randomizedtesting.rules.SystemPropertiesRestoreRule;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.GroupParams;
@@ -48,6 +49,7 @@ import org.junit.rules.TestRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class QueryElevationComponentTest extends SolrTestCaseJ4 {
 
   @Rule

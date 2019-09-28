@@ -26,12 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.RestTestHarness;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.rest.schema.TestBulkSchemaAPI.getObj;
 import static org.apache.solr.rest.schema.TestBulkSchemaAPI.getSourceCopyFields;
 
+@LuceneTestCase.Slow
+@Ignore
 public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -55,7 +59,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
   @Test
   public void test() throws Exception {
 
-    final int threadCount = 5;
+    final int threadCount = TEST_NIGHTLY ? 5 : 1;
     setupRestTestHarnesses();
     Thread[] threads = new Thread[threadCount];
     final List<List> collectErrors = Collections.synchronizedList(new ArrayList<>());
@@ -142,7 +146,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
     RestTestHarness harness = randomRestTestHarness(r);
     try {
       long startTime = System.nanoTime();
-      long maxTimeoutMillis = 100000;
+      long maxTimeoutMillis = TEST_NIGHTLY ? 100000 : 2000;
       while (TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS) < maxTimeoutMillis) {
         errmessages.clear();
         Map m = getObj(harness, aField, "fields");
@@ -160,7 +164,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
         
         if (errmessages.isEmpty()) break;
         
-        Thread.sleep(10);
+        Thread.sleep(80);
       }
     } finally {
       harness.close();
@@ -212,7 +216,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
     RestTestHarness harness = randomRestTestHarness(r);
     try {
       long startTime = System.nanoTime();
-      long maxTimeoutMillis = 100000;
+      long maxTimeoutMillis = TEST_NIGHTLY ? 100000 : 2000;
       while (TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS) < maxTimeoutMillis) {
         errmessages.clear();
         Map m = getObj(harness, aField, "fields");
@@ -230,7 +234,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
 
         if (errmessages.isEmpty()) break;
 
-        Thread.sleep(10);
+        Thread.sleep(80);
       }
     } finally {
       harness.close();
@@ -274,7 +278,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
     RestTestHarness harness = randomRestTestHarness(r);
     try {
       long startTime = System.nanoTime();
-      long maxTimeoutMillis = 100000;
+      long maxTimeoutMillis = TEST_NIGHTLY ? 100000 : 2000;
       while (TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS) < maxTimeoutMillis) {
         errmessages.clear();
         Map m = getObj(harness, aField, "fields");
@@ -292,7 +296,7 @@ public class TestBulkSchemaConcurrent  extends AbstractFullDistribZkTestBase {
 
         if (errmessages.isEmpty()) break;
 
-        Thread.sleep(10);
+        Thread.sleep(80);
       }
     } finally {
       harness.close();

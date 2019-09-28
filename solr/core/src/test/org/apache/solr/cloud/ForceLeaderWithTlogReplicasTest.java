@@ -17,6 +17,14 @@
 
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
+
+import com.carrotsearch.randomizedtesting.annotations.Nightly;
+
+@Slow
+@Slowest
+@Nightly
 public class ForceLeaderWithTlogReplicasTest extends ForceLeaderTest {
 
   @Override

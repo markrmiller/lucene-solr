@@ -16,6 +16,8 @@
  */
 package org.apache.solr.search.facet;
 
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
@@ -29,7 +31,9 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -103,7 +107,7 @@ public class TestCloudJSONFacetSKG extends SolrCloudTestCase {
                (STR_FIELD_SUFFIXES.length < MAX_FIELD_NUM) && (INT_FIELD_SUFFIXES.length < MAX_FIELD_NUM));
     
     // we need DVs on point fields to compute stats & facets
-    if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
+    if (Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP)) System.setProperty(SolrTestCaseJ4.NUMERIC_DOCVALUES_SYSPROP,"true");
     
     // multi replicas should not matter...
     final int repFactor = usually() ? 1 : 2;
@@ -257,6 +261,7 @@ public class TestCloudJSONFacetSKG extends SolrCloudTestCase {
     }
   }
   
+  @Nightly
   public void testRandom() throws Exception {
 
     // since the "cost" of verifying the stats for each bucket is so high (see TODO in verifySKGResults())

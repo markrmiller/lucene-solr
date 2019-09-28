@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ import javax.management.MBeanServer;
 import javax.management.MBeanServerFactory;
 import javax.management.ObjectName;
 
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -76,7 +77,9 @@ import org.apache.solr.core.SolrInfoBean.Category;
 import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,110 +89,46 @@ import com.google.common.collect.ImmutableList;
 /**
  * Tests the Cloud Collections API.
  */
-@Slow
+@LuceneTestCase.Slowest
 public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
+  private static final String CLOUD_MINIMAL = "cloud-minimal";
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected String getConfigSet() {
-    return "cloud-minimal";
+    return CLOUD_MINIMAL;
   }
-
-  @Before
-  public void setupCluster() throws Exception {
+  
+  @BeforeClass
+  public static void setupCluster() throws Exception {
     // we don't want this test to have zk timeouts
     System.setProperty("zkClientTimeout", "60000");
-    System.setProperty("createCollectionWaitTimeTillActive", "5");
-    TestInjection.randomDelayInCoreCreation = "true:5";
+    System.setProperty("createCollectionWaitTimeTillActive", "3");
+    if (TEST_NIGHTLY) TestInjection.randomDelayInCoreCreation = "true:5";
     System.setProperty("validateAfterInactivity", "200");
+    if (TEST_NIGHTLY && random().nextBoolean()) useFactory(null);
 
-    configureCluster(4)
-        .addConfig("conf", configset(getConfigSet()))
-        .addConfig("conf2", configset(getConfigSet()))
+    cluster = configureCluster(TEST_NIGHTLY ? 4 : 2)
+        .addConfig("conf", configset(CLOUD_MINIMAL))
+        .addConfig("conf2", configset(CLOUD_MINIMAL))
         .withSolrXml(TEST_PATH().resolve("solr.xml"))
         .configure();
   }
+
+  @Before
+  public void beforeCollectionsAPIDistributedZkTest() throws Exception {
+  }
   
   @After
-  public void tearDownCluster() throws Exception {
+  public void after() throws Exception {
+  }
+  
+  @AfterClass
+  public static void tearDownCluster() throws Exception {
     try {
       shutdownCluster();
     } finally {
       System.clearProperty("createCollectionWaitTimeTillActive");
-      super.tearDown();
     }
-  }
-
-  @Test
-  public void testCreationAndDeletion() throws Exception {
-    String collectionName = "created_and_deleted";
-
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 1).process(cluster.getSolrClient());
-    assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient())
-                  .contains(collectionName));
-
-    CollectionAdminRequest.deleteCollection(collectionName).process(cluster.getSolrClient());
-    assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient())
-        .contains(collectionName));
-
-    assertFalse(cluster.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName, true));
-  }
-
-  @Test
-  public void deleteCollectionRemovesStaleZkCollectionsNode() throws Exception {
-    String collectionName = "out_of_sync_collection";
-
-    // manually create a collections zknode
-    cluster.getZkClient().makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName, true);
-
-    CollectionAdminRequest.deleteCollection(collectionName)
-        .process(cluster.getSolrClient());
-
-    assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient())
-                  .contains(collectionName));
-    
-    assertFalse(cluster.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName, true));
-  }
-
-  @Test
-  public void deletePartiallyCreatedCollection() throws Exception {
-    final String collectionName = "halfdeletedcollection";
-
-    assertEquals(0, CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
-        .setCreateNodeSet("")
-        .process(cluster.getSolrClient()).getStatus());
-    String dataDir = createTempDir().toFile().getAbsolutePath();
-    // create a core that simulates something left over from a partially-deleted collection
-    assertTrue(CollectionAdminRequest
-        .addReplicaToShard(collectionName, "shard1")
-        .setDataDir(dataDir)
-        .process(cluster.getSolrClient()).isSuccess());
-
-    CollectionAdminRequest.deleteCollection(collectionName)
-        .process(cluster.getSolrClient());
-
-    assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
-
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
-        .process(cluster.getSolrClient());
-
-    assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
-  }
-
-  @Test
-  public void deleteCollectionOnlyInZk() throws Exception {
-    final String collectionName = "onlyinzk";
-
-    // create the collections node, but nothing else
-    cluster.getZkClient().makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName, true);
-
-    // delete via API - should remove collections node
-    CollectionAdminRequest.deleteCollection(collectionName).process(cluster.getSolrClient());
-    assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
-    
-    // now creating that collection should work
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
-        .process(cluster.getSolrClient());
-    assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
   }
 
   @Test
@@ -307,7 +246,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
   @Test
   public void testCoresAreDistributedAcrossNodes() throws Exception {
-    CollectionAdminRequest.createCollection("nodes_used_collection", "conf", 2, 2)
+    CollectionAdminRequest.createCollection("nodes_used_collection", "conf", 2, 2).setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
 
     Set<String> liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
@@ -322,20 +261,6 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     }
 
     assertEquals(createNodeList.toString(), 0, createNodeList.size());
-  }
-
-  @Test
-  public void testDeleteNonExistentCollection() throws Exception {
-
-    expectThrows(SolrException.class, () -> {
-      CollectionAdminRequest.deleteCollection("unknown_collection").process(cluster.getSolrClient());
-    });
-
-    // create another collection should still work
-    CollectionAdminRequest.createCollection("acollectionafterbaddelete", "conf", 1, 2)
-        .process(cluster.getSolrClient());
-    waitForState("Collection creation after a bad delete failed", "acollectionafterbaddelete",
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
   }
 
   @Test
@@ -427,15 +352,8 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     }
 
     waitForStable(cnt, createRequests);
-
-    for (int i = 0; i < cluster.getJettySolrRunners().size(); i++) {
-      checkInstanceDirs(cluster.getJettySolrRunner(i));
-    }
     
     String collectionName = createRequests[random().nextInt(createRequests.length)].getCollectionName();
-    
-    // TODO: we should not need this...beast test well when trying to fix
-    Thread.sleep(1000);
     
     cluster.getSolrClient().getZkStateReader().forciblyRefreshAllClusterStateSlow();
 
@@ -453,25 +371,20 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         break;
       }
 
-      Thread.sleep(500);
+      Thread.sleep(300);
     }
     
     if (timeOut.hasTimedOut()) {
       fail("Timeout waiting to see 3 found, instead saw " + numFound + " for collection " + collectionName);
     }
 
-    checkNoTwoShardsUseTheSameIndexDir();
+    if (!"solr.RAMDirectoryFactory".equals(System.getProperty("solr.directoryFactory"))) checkNoTwoShardsUseTheSameIndexDir();
   }
 
   private void waitForStable(int cnt, CollectionAdminRequest.Create[] createRequests) throws InterruptedException {
     for (int i = 0; i < cnt; i++) {
       String collectionName = "awhollynewcollection_" + i;
       final int j = i;
-      waitForState("Expected to see collection " + collectionName, collectionName,
-          (n, c) -> {
-            CollectionAdminRequest.Create req = createRequests[j];
-            return DocCollection.isFullyActive(n, c, req.getNumShards(), req.getReplicationFactor());
-          });
       
       ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();
       // make sure we have leaders for each shard
@@ -484,7 +397,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testCollectionReload() throws Exception {
     final String collectionName = "reloaded_collection";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2).setMaxShardsPerNode(10).process(cluster.getSolrClient());
 
     // get core open times
     Map<String, Long> urlToTimeBefore = new HashMap<>();
@@ -508,11 +421,24 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
       Path expected = Paths.get(jetty.getSolrHome()).toAbsolutePath().resolve(core.getName());
 
-      assertTrue("Expected: " + expected + "\nFrom core stats: " + instancedir, Files.isSameFile(expected, instancedir));
+      TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+
+      while (!timeout.hasTimedOut()) {
+        try {
+          if (Files.isSameFile(expected, instancedir)) {
+            break;
+          }
+        } catch (NoSuchFileException e) {
+
+        }
+      }
+
+      assertTrue("Expected: " + expected + "\nFrom core stats: " + instancedir,
+          Files.isSameFile(expected, instancedir));
     }
   }
 
-  private boolean waitForReloads(String collectionName, Map<String,Long> urlToTimeBefore) throws SolrServerException, IOException {
+  private boolean waitForReloads(String collectionName, Map<String,Long> urlToTimeBefore) throws SolrServerException, IOException, InterruptedException {
     TimeOut timeout = new TimeOut(45, TimeUnit.SECONDS, TimeSource.NANO_TIME);
 
     boolean allTimesAreCorrect = false;
@@ -536,6 +462,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         allTimesAreCorrect = true;
         break;
       }
+      Thread.sleep(300);
     }
     return allTimesAreCorrect;
   }
@@ -619,6 +546,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     CollectionAdminResponse response = CollectionAdminRequest.addReplicaToShard(collectionName, "shard1")
         .setNode(nodeList.get(0))
         .process(cluster.getSolrClient());
+    
+    
+    cluster.waitForActiveCollection(collectionName, 2, 5);
     Replica newReplica = grabNewReplica(response, getCollectionState(collectionName));
 
     assertEquals("Replica should be created on the right node",

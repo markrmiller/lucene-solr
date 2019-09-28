@@ -27,7 +27,9 @@
     <!--<str name="managedSchemaResourceName">managed-schema</str>-->
   <!--</schemaFactory>-->
 
-  <codecFactory class="solr.SchemaCodecFactory"/>
+  <codecFactory class="solr.SchemaCodecFactory">
+    <str name="compressionMode">${tests.COMPRESSION_MODE:BEST_COMPRESSION}</str>
+  </codecFactory>chemaCodecFactory"/>
 
   <updateHandler>
     <updateLog enable="true">

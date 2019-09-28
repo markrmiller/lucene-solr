@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -101,7 +102,7 @@ public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
 
   @Test
   public void testEnsembleStatusMock() {
-    assumeWorkingMockito();
+    SolrTestCaseJ4.assumeWorkingMockito();
     ZookeeperStatusHandler zkStatusHandler = mock(ZookeeperStatusHandler.class);
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "ruok")).thenReturn(Arrays.asList("imok"));
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "mntr")).thenReturn(

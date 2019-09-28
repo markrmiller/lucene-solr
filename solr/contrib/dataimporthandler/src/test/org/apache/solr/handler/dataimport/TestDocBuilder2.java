@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.junit.BeforeClass;
 import org.junit.Ignore;

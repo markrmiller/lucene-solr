@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.core.CoreContainer;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class SolrSlf4jReporterTest extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

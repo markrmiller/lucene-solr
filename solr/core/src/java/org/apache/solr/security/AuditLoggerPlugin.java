@@ -43,6 +43,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.metrics.SolrMetricManager;
@@ -89,6 +90,10 @@ public abstract class AuditLoggerPlugin implements Closeable, Runnable, SolrInfo
   protected Timer requestTimes = new Timer();
   protected Timer queuedTime = new Timer();
   protected Counter totalTime = new Counter();
+  
+  public AuditLoggerPlugin() {
+    assert ObjectReleaseTracker.track(this);
+  }
 
   // Event types to be logged by default
   protected List<String> eventTypes = Arrays.asList(
@@ -326,6 +331,10 @@ public abstract class AuditLoggerPlugin implements Closeable, Runnable, SolrInfo
       log.info("Shutting down async Auditlogger background thread(s)");
       executorService.shutdownNow();
     }
+    
+    ExecutorUtil.shutdownAndAwaitTermination(executorService);
+    
+    assert ObjectReleaseTracker.release(this);
   }
 
   /**

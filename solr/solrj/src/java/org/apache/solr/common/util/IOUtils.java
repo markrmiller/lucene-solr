@@ -25,10 +25,20 @@ import org.slf4j.LoggerFactory;
 public class IOUtils {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  public static void closeQuietly(Closeable closeable) {
+  public static void closeQuietly(Closeable object) {
     try {
-      if (closeable != null) {
-        closeable.close();
+      if (object != null) {
+        object.close();
+      }
+    } catch (Exception e) {
+      log.error("Error while closing", e);
+    }
+  }
+  
+  public static void closeQuietly(AutoCloseable object) {
+    try {
+      if (object != null) {
+        object.close();
       }
     } catch (Exception e) {
       log.error("Error while closing", e);

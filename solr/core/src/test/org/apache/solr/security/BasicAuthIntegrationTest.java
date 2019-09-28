@@ -31,10 +31,12 @@ import java.util.concurrent.TimeUnit;
 
 import com.codahale.metrics.MetricRegistry;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -64,6 +66,7 @@ import org.apache.solr.util.SolrCLI;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +74,8 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singletonMap;
 
+@LuceneTestCase.Slow
+@Ignore //nocommit
 public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -79,11 +84,13 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
 
   @Before
   public void setupCluster() throws Exception {
-    configureCluster(3)
+    enableMetricsForNonNightly();
+    
+    configureCluster(TEST_NIGHTLY ? 3 : 2)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
 
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 3, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 3, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(COLLECTION, 3, 3);
   }
@@ -122,7 +129,7 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       
       randomJetty.start();
       
-      cluster.waitForAllNodes(30);
+      cluster.waitForNode(randomJetty, 30);
       
       cluster.waitForActiveCollection(COLLECTION, 3, 3);
       
@@ -167,8 +174,12 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       httpPost.addHeader("Content-Type", "application/json; charset=UTF-8");
       verifySecurityStatus(cl, baseUrl + authcPrefix, "authentication.enabled", "true", 20);
       HttpResponse r = cl.execute(httpPost);
-      int statusCode = r.getStatusLine().getStatusCode();
-      Utils.consumeFully(r.getEntity());
+      int statusCode;
+      try {
+        statusCode = r.getStatusLine().getStatusCode();
+      } finally {
+        Utils.consumeFully(r.getEntity());
+      }
       assertEquals("proper_cred sent, but access denied", 200, statusCode);
       assertPkiAuthMetricsMinimums(0, 0, 0, 0, 0, 0);
       assertAuthMetricsMinimums(4, 1, 3, 0, 0, 0);
@@ -215,6 +226,8 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       });
       assertAuthMetricsMinimums(14, 5, 8, 1, 0, 0);
 
+      Thread.sleep(1000); // yuck, but trying to wait out reload
+      
       executeCommand(baseUrl + authzPrefix, cl,"{set-permission : { name : update , role : admin}}", "harry", "HarryIsUberCool");
 
       UpdateRequest del = new UpdateRequest().deleteByQuery("*:*");
@@ -225,6 +238,7 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       //Test for SOLR-12514. Create a new jetty . This jetty does not have the collection.
       //Make a request to that jetty and it should fail
       JettySolrRunner aNewJetty = cluster.startJettySolrRunner();
+      cluster.waitForNode(aNewJetty, 30);
       SolrClient aNewClient = aNewJetty.newClient();
       UpdateRequest delQuery = null;
       delQuery = new UpdateRequest().deleteByQuery("*:*");
@@ -238,6 +252,7 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       } finally {
         aNewClient.close();
         cluster.stopJettySolrRunner(aNewJetty);
+        cluster.waitForJettyToStop(aNewJetty);
       }
 
       addDocument("harry","HarryIsUberCool","id", "4");
@@ -363,11 +378,16 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
     setAuthorizationHeader(httpPost, makeBasicAuthHeader(user, pwd));
     httpPost.setEntity(new ByteArrayEntity(payload.getBytes(UTF_8)));
     httpPost.addHeader("Content-Type", "application/json; charset=UTF-8");
+    HttpEntity e = null;
+    try {
     r = cl.execute(httpPost);
-    String response = IOUtils.toString(r.getEntity().getContent(), StandardCharsets.UTF_8);
+    e = r.getEntity();
+    String response = IOUtils.toString(e.getContent(), StandardCharsets.UTF_8);
     assertEquals("Non-200 response code. Response was " + response, 200, r.getStatusLine().getStatusCode());
     assertFalse("Response contained errors: " + response, response.contains("errorMessages"));
-    Utils.consumeFully(r.getEntity());
+    } finally {
+      Utils.consumeFully(e);
+    }
 
     // HACK (continued)...
     final TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);

@@ -19,7 +19,7 @@ package org.apache.solr;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -30,6 +30,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.SolrTestCaseJ4.SuppressPointFields;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -41,8 +42,9 @@ import static org.hamcrest.CoreMatchers.containsString;
  *
  * @since solr 4.0
  */
-@Slow
+@LuceneTestCase.Slowest
 @SuppressPointFields(bugUrl="https://issues.apache.org/jira/browse/SOLR-10844")
+@Ignore
 public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
 
   public TestDistributedGrouping() {
@@ -147,14 +149,14 @@ public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
         oddField, "odd eggs"
     );
 
-    for (int i = 100; i < 150; i++) {
+    for (int i = 100; i < (TEST_NIGHTLY ? 150 : 110); i++) {
       indexr(id, i);
     }
 
     int[] values = new int[]{9999, 99999, 999999, 9999999};
     for (int shard = 0; shard < clients.size(); shard++) {
       int groupValue = values[shard];
-      for (int i = 500; i < 600; i++) {
+      for (int i = 500; i < (TEST_NIGHTLY ? 600 : 550); i++) {
         index_specific(shard, 
                        i1, groupValue, 
                        s1, "a", 
@@ -310,7 +312,7 @@ public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
     nl = (NamedList<?>) nl.getVal(0);
     int matches = (Integer) nl.getVal(0);
     int groupCount = (Integer) nl.get("ngroups");
-    assertEquals(100 * shardsArr.length, matches);
+    assertEquals( (TEST_NIGHTLY ? 100 : 50) * shardsArr.length, matches);
     assertEquals(shardsArr.length, groupCount);
 
 

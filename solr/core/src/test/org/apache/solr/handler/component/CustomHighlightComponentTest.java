@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -36,6 +37,7 @@ import org.apache.solr.highlight.SolrFragmentsBuilder;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class CustomHighlightComponentTest extends SolrCloudTestCase {
 
   public static class CustomHighlightComponent extends HighlightComponent {

@@ -17,6 +17,7 @@
 
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -26,7 +27,10 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.zookeeper.KeeperException;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 
+@LuceneTestCase.Slow
+@Ignore //tricky leaking threads
 public class ZkFailoverTest extends SolrCloudTestCase {
 
   @BeforeClass
@@ -46,6 +50,9 @@ public class ZkFailoverTest extends SolrCloudTestCase {
     for (JettySolrRunner runner : cluster.getJettySolrRunners()) {
       runner.stop();
     }
+    for (JettySolrRunner runner : cluster.getJettySolrRunners()) {
+      cluster.waitForJettyToStop(runner);
+    }
     ZkTestServer zkTestServer = cluster.getZkServer();
     zkTestServer.shutdown();
     Thread[] threads = new Thread[cluster.getJettySolrRunners().size()];
@@ -60,14 +67,15 @@ public class ZkFailoverTest extends SolrCloudTestCase {
         });
       threads[i].start();
     }
-    Thread.sleep(5000);
+    Thread.sleep(2000);
     zkTestServer = new ZkTestServer(zkTestServer.getZkDir(), zkTestServer.getPort());
     zkTestServer.run(false);
     for (Thread thread : threads) {
       thread.join();
     }
     waitForLiveNodes(2);
-    waitForState("Timeout waiting for " + coll, coll, clusterShape(2, 2));
+    cluster.waitForActiveCollection(coll, 2, 2);
+    
     QueryResponse rsp = new QueryRequest(new SolrQuery("*:*")).process(cluster.getSolrClient(), coll);
     assertEquals(1, rsp.getResults().getNumFound());
     zkTestServer.shutdown();

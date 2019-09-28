@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -47,6 +48,7 @@ import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class TestCloudDeleteByQuery extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -124,6 +126,7 @@ public class TestCloudDeleteByQuery extends SolrCloudTestCase {
     collectionProperties.put("schema", "schema15.xml"); // string id for doc routing prefix
 
     CollectionAdminRequest.createCollection(COLLECTION_NAME, configName, NUM_SHARDS, REPLICATION_FACTOR)
+        .setMaxShardsPerNode(10)
         .setProperties(collectionProperties)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION_NAME, NUM_SHARDS, REPLICATION_FACTOR * NUM_SHARDS);

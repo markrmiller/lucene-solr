@@ -36,6 +36,7 @@ import org.apache.lucene.search.spell.SuggestMode;
 import org.apache.lucene.search.spell.SuggestWord;
 import org.apache.lucene.search.spell.SuggestWordFrequencyComparator;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.SuppressTempFileChecks;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.util.NamedList;
@@ -49,6 +50,7 @@ import org.junit.Test;
  * @since solr 1.3
  */
 @SuppressTempFileChecks(bugUrl = "https://issues.apache.org/jira/browse/SOLR-1877 Spellcheck IndexReader leak bug?")
+@LuceneTestCase.Slow
 public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
   protected static SpellingQueryConverter queryConverter;
 

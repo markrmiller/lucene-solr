@@ -23,6 +23,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -31,6 +32,7 @@ import org.apache.solr.search.SolrReturnFields;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestCSVResponseWriter extends SolrTestCaseJ4 {
   @BeforeClass
   public static void beforeClass() throws Exception {

@@ -34,7 +34,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.Test;
 
-@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 @SolrTestCaseJ4.SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
 public class SolrExampleStreamingBinaryHttp2Test extends SolrExampleStreamingHttp2Test {
 
@@ -49,7 +49,7 @@ public class SolrExampleStreamingBinaryHttp2Test extends SolrExampleStreamingHtt
     solrClient.setRequestWriter(new BinaryRequestWriter());
     ConcurrentUpdateHttp2SolrClient concurrentClient = new ErrorTrackingConcurrentUpdateSolrClient.Builder(url, solrClient)
         .withQueueSize(2)
-        .withThreadCount(5)
+        .withThreadCount(TEST_NIGHTLY ? 5 : 1)
         .build();
     return concurrentClient;
   }

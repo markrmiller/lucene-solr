@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hamcrest.core.IsInstanceOf;
-
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.schema.IndexSchema;
 import org.junit.BeforeClass;
@@ -44,6 +44,7 @@ import org.junit.BeforeClass;
  * Tests for the field mutating update processors
  * that parse Dates, Longs, Doubles, and Booleans.
  */
+@LuceneTestCase.Slow
 public class ParsingFieldUpdateProcessorsTest extends UpdateProcessorTestBase {
   private static final double EPSILON = 1E-15;
   private static final DateTimeFormatter isoDateOptionalTimeFormatter =

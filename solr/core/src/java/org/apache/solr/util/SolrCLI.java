@@ -667,6 +667,7 @@ public class SolrCLI implements CLIO {
    */
   public static Map<String,Object> getJson(HttpClient httpClient, String getUrl, int attempts, boolean isFirstAttempt) throws Exception {
     Map<String,Object> json = null;
+    int retryTime = Integer.parseInt(System.getProperty("solr.cli.retryTime", "5000"));
     if (attempts >= 1) {
       try {
         json = getJson(httpClient, getUrl);
@@ -679,7 +680,7 @@ public class SolrCLI implements CLIO {
             log.warn("Request to "+getUrl+" failed due to: "+exc.getMessage()+
                 ", sleeping for 5 seconds before re-trying the request ...");
           try {
-            Thread.sleep(5000);
+            Thread.sleep(retryTime);
           } catch (InterruptedException ie) { Thread.interrupted(); }
 
           // retry using recursion with one-less attempt available

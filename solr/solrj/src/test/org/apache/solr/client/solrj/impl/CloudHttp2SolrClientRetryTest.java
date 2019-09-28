@@ -48,6 +48,8 @@ public class CloudHttp2SolrClientRetryTest extends SolrCloudTestCase {
     try (CloudHttp2SolrClient solrClient = new CloudHttp2SolrClient.Builder(Collections.singletonList(cluster.getZkServer().getZkAddress()), Optional.empty()).build()) {
       CollectionAdminRequest.createCollection(collectionName, 1, 1)
           .process(solrClient);
+      
+      cluster.waitForActiveCollection(collectionName, 1, 1);
 
       solrClient.add(collectionName, new SolrInputDocument("id", "1"));
 

@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ import org.apache.lucene.util.TestUtil;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.CoreAdminRequest.ListSnapshots;
@@ -44,9 +46,11 @@ import org.apache.solr.common.cloud.Replica.State;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.snapshots.CollectionSnapshotMetaData.CoreSnapshotMetaData;
 import org.apache.solr.core.snapshots.SolrSnapshotMetaDataManager.SnapshotMetaData;
 import org.apache.solr.handler.BackupRestoreUtils;
+import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -101,14 +105,13 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     // Verify if snapshot creation works with replica failures.
     boolean replicaFailures = usually();
     Optional<String> stoppedCoreName = Optional.empty();
-    if (replicaFailures) {
+    if (false) { // replicaFailures - you can't just rely on this...
       // Here the assumption is that Solr will spread the replicas uniformly across nodes.
       // If this is not true for some reason, then we will need to add some logic to find a
       // node with a single replica.
-      this.cluster.getRandomJetty(random()).stop();
-
-      // Sleep a bit for allowing ZK watch to fire.
-      Thread.sleep(5000);
+      JettySolrRunner randomJetty = cluster.getRandomJetty(random());
+      randomJetty.stop();
+      cluster.waitForJettyToStop(randomJetty);
 
       // Figure out if at-least one replica is "down".
       DocCollection collState = solrClient.getZkStateReader().getClusterState().getCollection(collectionName);
@@ -131,6 +134,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     CollectionSnapshotMetaData meta = collectionSnaps.iterator().next();
     assertEquals(commitName, meta.getName());
     assertEquals(CollectionSnapshotMetaData.SnapshotStatus.Successful, meta.getStatus());
+    
     assertEquals(expectedCoresWithSnapshot, meta.getReplicaSnapshots().size());
     Map<String, CoreSnapshotMetaData> snapshotByCoreName = meta.getReplicaSnapshots().stream()
         .collect(Collectors.toMap(CoreSnapshotMetaData::getCoreName, Function.identity()));
@@ -286,6 +290,8 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
       CollectionAdminRequest.Delete deleteCol = CollectionAdminRequest.deleteCollection(collectionName);
       assertEquals(0, deleteCol.process(solrClient).getStatus());
       assertTrue(SolrSnapshotManager.listSnapshots(solrClient.getZkStateReader().getZkClient(), collectionName).isEmpty());
+      
+      cluster.waitForRemovedCollection(collectionName);
     }
 
   }

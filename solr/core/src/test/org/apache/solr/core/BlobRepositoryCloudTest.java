@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -36,6 +38,7 @@ import org.apache.solr.handler.TestBlobHandler;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class BlobRepositoryCloudTest extends SolrCloudTestCase {
 
   public static final Path TEST_PATH = getFile("solr/configsets").toPath();

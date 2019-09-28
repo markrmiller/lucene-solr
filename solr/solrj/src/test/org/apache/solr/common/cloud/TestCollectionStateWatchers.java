@@ -26,6 +26,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -33,18 +34,21 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** @see TestDocCollectionWatcher */
+@LuceneTestCase.Slowest
+@Ignore // needs to be broken up
 public class TestCollectionStateWatchers extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final int CLUSTER_SIZE = 4;
+  private static final int CLUSTER_SIZE = TEST_NIGHTLY ? 4 : 1;
 
-  private static final int MAX_WAIT_TIMEOUT = 120; // seconds, only use for await -- NO SLEEP!!!
+  private static final int MAX_WAIT_TIMEOUT = 45; // seconds, only use for await -- NO SLEEP!!!
 
   private ExecutorService executor = null;
 
@@ -58,9 +62,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
   
   @After
   public void tearDownCluster() throws Exception {
-    if (null != executor) {
-      executor.shutdown();
-    }
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
     shutdownCluster();
     executor = null;
   }
@@ -121,6 +123,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
 
     // note: one node in our cluster is unsed by collection
     CollectionAdminRequest.createCollection("testcollection", "config", CLUSTER_SIZE, 1)
+      .setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
 
     client.waitForState("testcollection", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
@@ -153,6 +156,9 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
     });
 
     cluster.stopJettySolrRunner(jettyToShutdown);
+    
+    if (extraJetty != null) cluster.waitForNode(extraJetty, 15000);
+    
     cluster.waitForJettyToStop(jettyToShutdown);
     
     assertTrue("CollectionStateWatcher was never notified of cluster change",
@@ -169,6 +175,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
 
     CloudSolrClient client = cluster.getSolrClient();
     CollectionAdminRequest.createCollection("currentstate", "config", 1, 1)
+      .setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
 
     final CountDownLatch latch = new CountDownLatch(1);
@@ -199,6 +206,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
 
     CloudSolrClient client = cluster.getSolrClient();
     CollectionAdminRequest.createCollection("waitforstate", "config", 1, 1)
+      .setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
 
     client.waitForState("waitforstate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
@@ -223,6 +231,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
                                               (n, c) -> DocCollection.isFullyActive(n, c, 1, 1));
 
     CollectionAdminRequest.createCollection("delayed", "config", 1, 1)
+      .setMaxShardsPerNode(10)
       .processAndWait(cluster.getSolrClient(), MAX_WAIT_TIMEOUT);
 
     assertTrue("waitForState was not triggered by collection creation", future.get());
@@ -243,14 +252,16 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void testWaitForStateWatcherIsRetainedOnPredicateFailure() throws Exception {
 
     CloudSolrClient client = cluster.getSolrClient();
-    CollectionAdminRequest.createCollection("falsepredicate", "config", 4, 1)
+    CollectionAdminRequest.createCollection("falsepredicate", "config", TEST_NIGHTLY ? 4 : 1, 1)
+      .setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
 
     client.waitForState("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
-                        (n, c) -> DocCollection.isFullyActive(n, c, 4, 1));
+                        (n, c) -> DocCollection.isFullyActive(n, c, TEST_NIGHTLY ? 4 : 1, 1));
 
     final CountDownLatch firstCall = new CountDownLatch(1);
 
@@ -263,18 +274,25 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
     Future<Boolean> future = waitInBackground("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
                                               (liveNodes, collectionState) -> {
           firstCall.countDown();
-          return DocCollection.isFullyActive(liveNodes, collectionState, 4, 1);
+          return DocCollection.isFullyActive(liveNodes, collectionState, TEST_NIGHTLY ? 4 : 1, 1);
         });
 
     // first, stop another node; the watch should not be fired after this!
-    JettySolrRunner node2 = cluster.stopJettySolrRunner(random().nextInt
-                                                        (cluster.getJettySolrRunners().size()));
+    JettySolrRunner node2 = null;
+    if (TEST_NIGHTLY) node2 = cluster.stopJettySolrRunner(random().nextInt(cluster.getJettySolrRunners().size()));
 
     // now start them both back up
     cluster.startJettySolrRunner(node1);
+    cluster.waitForNode(node1, 15000);
+    
     assertTrue("CollectionStateWatcher not called",
                firstCall.await(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS));
-    cluster.startJettySolrRunner(node2);
+    
+    if (TEST_NIGHTLY) {
+      cluster.waitForJettyToStop(node2);
+      cluster.startJettySolrRunner(node2);
+      cluster.waitForNode(node2, 15000);
+    }
 
     Boolean result = future.get();
     assertTrue("Did not see a fully active cluster", result);
@@ -301,12 +319,16 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
   @Test
   public void testDeletionsTriggerWatches() throws Exception {
     CollectionAdminRequest.createCollection("tobedeleted", "config", 1, 1)
+      .setMaxShardsPerNode(10)
       .process(cluster.getSolrClient());
     
     Future<Boolean> future = waitInBackground("tobedeleted", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
                                               (l, c) -> c == null);
 
     CollectionAdminRequest.deleteCollection("tobedeleted").process(cluster.getSolrClient());
+    
+    cluster.getSolrClient().getZkStateReader().waitForState("tobedeleted", 15000, TimeUnit.MILLISECONDS,
+        (n, c) -> c == null);
 
     assertTrue("CollectionStateWatcher not notified of delete call", future.get());
   }
@@ -315,7 +337,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
   public void testLiveNodeChangesTriggerWatches() throws Exception {
     final CloudSolrClient client = cluster.getSolrClient();
     
-    CollectionAdminRequest.createCollection("test_collection", "config", 1, 1).process(client);
+    CollectionAdminRequest.createCollection("test_collection", "config", 1, 1).setMaxShardsPerNode(10).process(client);
 
     Future<Boolean> future = waitInBackground("test_collection", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
                                               (l, c) -> (l.size() == 1 + CLUSTER_SIZE));
@@ -339,6 +361,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void testWatchesWorkForStateFormat1() throws Exception {
 
     final CloudSolrClient client = cluster.getSolrClient();
@@ -346,7 +369,7 @@ public class TestCollectionStateWatchers extends SolrCloudTestCase {
     Future<Boolean> future = waitInBackground("stateformat1", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
                                               (n, c) -> DocCollection.isFullyActive(n, c, 1, 1));
 
-    CollectionAdminRequest.createCollection("stateformat1", "config", 1, 1).setStateFormat(1)
+    CollectionAdminRequest.createCollection("stateformat1", "config", 1, 1).setStateFormat(1).setMaxShardsPerNode(10)
       .processAndWait(client, MAX_WAIT_TIMEOUT);
     assertTrue("CollectionStateWatcher not notified of stateformat=1 collection creation",
                future.get());

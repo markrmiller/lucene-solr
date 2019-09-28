@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class AddReplicaTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

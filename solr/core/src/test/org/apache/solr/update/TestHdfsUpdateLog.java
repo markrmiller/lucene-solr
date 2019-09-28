@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
@@ -35,12 +36,15 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @ThreadLeakFilters(defaultFilters = true, filters = {
     SolrIgnoredThreadsFilter.class,
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@LuceneTestCase.Slow
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class TestHdfsUpdateLog extends SolrTestCaseJ4 {
   private static MiniDFSCluster dfsCluster;
   private static String hdfsUri;

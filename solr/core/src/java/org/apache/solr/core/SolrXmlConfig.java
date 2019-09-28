@@ -512,6 +512,11 @@ public class SolrXmlConfig {
         // we don't require class in order to support predefined replica and node reporter classes
         PluginInfo info = new PluginInfo(nodes.item(i), "SolrMetricReporter", true, false);
         String clazz = info.className;
+        
+        if (Boolean.getBoolean("solr.disableJvmMetrics") && clazz.equals(SolrJmxReporter.class.getName())) {
+          continue;
+        }
+        
         if (clazz != null && clazz.equals(SolrJmxReporter.class.getName())) {
           hasJmxReporter = true;
         }

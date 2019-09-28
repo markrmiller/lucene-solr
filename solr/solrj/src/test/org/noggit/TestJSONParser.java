@@ -20,9 +20,11 @@ package org.noggit;
 import java.io.IOException;
 import java.io.StringReader;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestJSONParser extends SolrTestCaseJ4 {
 
   // these are to aid in debugging if an unexpected error occurs

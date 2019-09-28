@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @Slow
 @Nightly
@@ -37,6 +38,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsChaosMonkeyNothingIsSafeTest extends ChaosMonkeyNothingIsSafeTest {
   private static MiniDFSCluster dfsCluster;
   

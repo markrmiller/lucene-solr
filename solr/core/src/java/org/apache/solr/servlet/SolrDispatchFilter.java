@@ -182,7 +182,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
       SolrResourceLoader.ensureBlobsDir(solrHomePath);
       this.httpClient = coresInit.getUpdateShardHandler().getDefaultHttpClient();
-      setupJvmMetrics(coresInit);
+      if (!Boolean.getBoolean("solr.disableJvmMetrics")) setupJvmMetrics(coresInit);
       log.debug("user.dir=" + System.getProperty("user.dir"));
     }
     catch( Throwable t ) {

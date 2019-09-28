@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * burst a ZkStateReader detects the correct set.
  */
 @Slow
+@Nightly
 public class TestStressLiveNodes extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

@@ -36,6 +36,9 @@ import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FilterDirectory;
+import org.apache.lucene.store.LockFactory;
+import org.apache.lucene.store.NativeFSLockFactory;
+import org.apache.lucene.store.SimpleFSLockFactory;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.search.SolrIndexSearcher;
@@ -88,6 +91,9 @@ public abstract class AbstractLuceneSpellChecker extends SolrSpellChecker {
     if (indexDir != null)   {
       if (!new File(indexDir).isAbsolute()) {
         indexDir = core.getDataDir() + File.separator + indexDir;
+        if (!new File(indexDir).isAbsolute()) {
+          indexDir = core.getResourceLoader().getInstancePath().toString() + File.separator + core.getDataDir() + File.separator + indexDir;
+        }
       }
     }
     sourceLocation = (String) config.get(LOCATION);
@@ -221,7 +227,15 @@ public abstract class AbstractLuceneSpellChecker extends SolrSpellChecker {
       // Windows causes problems because deleted files can't be opened.  It would be better for SpellChecker to hold a single IW instance,
       // and close it on close, but Solr never seems to close its spell checkers.  Wrapping as FilterDirectory prevents IndexWriter from
       // catching the pending deletions:
-      index = new FilterDirectory(FSDirectory.open(new File(indexDir).toPath())) {
+      String lockFactoryProp = System.getProperty("solr.lock.type");
+      LockFactory lockFactory = null;
+      if (lockFactoryProp != null && lockFactoryProp.equals("simple")) {
+        lockFactory = SimpleFSLockFactory.INSTANCE;
+      } else {
+        lockFactory = NativeFSLockFactory.INSTANCE;
+      }
+      
+      index = new FilterDirectory(FSDirectory.open(new File(indexDir).toPath(), lockFactory)) {
       };
     } else {
       index = new ByteBuffersDirectory();

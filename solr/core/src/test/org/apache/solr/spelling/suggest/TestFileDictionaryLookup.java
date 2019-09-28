@@ -16,9 +16,12 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class TestFileDictionaryLookup extends SolrTestCaseJ4  {
   static final String REQUEST_URI = "/fuzzy_suggest_analyzing_with_file_dict";
   static final String DICT_NAME = "fuzzy_suggest_analyzing_with_file_dict";

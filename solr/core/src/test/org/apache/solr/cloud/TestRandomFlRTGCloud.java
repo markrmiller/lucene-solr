@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -58,6 +59,7 @@ import org.slf4j.LoggerFactory;
 
 /** @see TestCloudPseudoReturnFields */
 @RandomizeSSL(clientAuth=0.0,reason="client auth uses too much RAM")
+@LuceneTestCase.Slow
 public class TestRandomFlRTGCloud extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String DEBUG_LABEL = MethodHandles.lookup().lookupClass().getName();

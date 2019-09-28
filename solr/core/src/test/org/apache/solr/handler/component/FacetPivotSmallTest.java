@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.component;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -26,6 +27,7 @@ import org.junit.BeforeClass;
 /**
  * Single node testing of pivot facets
  */
+@LuceneTestCase.Slow
 public class FacetPivotSmallTest extends SolrTestCaseJ4 {
 
   @BeforeClass

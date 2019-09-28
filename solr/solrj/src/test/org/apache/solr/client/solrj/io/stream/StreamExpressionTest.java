@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -59,11 +58,13 @@ import org.apache.solr.core.SolrResourceLoader;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
-@Slow
 @SolrTestCaseJ4.SuppressSSL
 @LuceneTestCase.SuppressCodecs({"Lucene3x", "Lucene40","Lucene41","Lucene42","Lucene45"})
+@LuceneTestCase.Slowest
+@Ignore
 public class StreamExpressionTest extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";

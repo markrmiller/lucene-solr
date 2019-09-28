@@ -19,10 +19,12 @@ package org.apache.solr.analytics;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.facet.SolrAnalyticsFacetTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class OverallAnalyticsTest extends SolrAnalyticsFacetTestCase {
 
   @BeforeClass

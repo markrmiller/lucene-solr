@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.CommonParams;
@@ -43,6 +44,7 @@ import org.junit.Test;
  *
  *
  **/
+@LuceneTestCase.Slow
 public class ClusteringComponentTest extends AbstractClusteringTestCase {
 
   @Before

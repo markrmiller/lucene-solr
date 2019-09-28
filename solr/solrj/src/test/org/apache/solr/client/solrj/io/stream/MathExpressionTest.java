@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -35,10 +34,14 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
-@Slow
+
 @LuceneTestCase.SuppressCodecs({"Lucene3x", "Lucene40","Lucene41","Lucene42","Lucene45"})
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class MathExpressionTest extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";

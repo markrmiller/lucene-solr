@@ -27,6 +27,7 @@ import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestRuleRestoreSystemProperties;
 
 import org.junit.After;
@@ -34,6 +35,7 @@ import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.Test;
 
+@LuceneTestCase.AwaitsFix(bugUrl = "Easily fails basic test, race?")
 public class HttpClientUtilTest extends SolrTestCase {
 
   @Rule

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.DistributedQueue;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -38,15 +39,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class DeleteShardTest extends SolrCloudTestCase {
 
   // TODO: Custom hash slice deletion test
 
   @Before
   public void setupCluster() throws Exception {
-    configureCluster(2)
-        .addConfig("conf", configset("cloud-minimal"))
-        .configure();
+
   }
   
   @After
@@ -56,7 +56,10 @@ public class DeleteShardTest extends SolrCloudTestCase {
 
   @Test
   public void test() throws Exception {
-
+    configureCluster(2)
+        .addConfig("conf", configset("cloud-minimal"))
+        .configure();
+    
     final String collection = "deleteShard";
 
     CollectionAdminRequest.createCollection(collection, "conf", 2, 1)
@@ -110,8 +113,12 @@ public class DeleteShardTest extends SolrCloudTestCase {
 
   @Test
   // commented 4-Sep-2018  @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 09-Aug-2018
-  public void testDirectoryCleanupAfterDeleteShard() throws InterruptedException, IOException, SolrServerException {
-
+  public void testDirectoryCleanupAfterDeleteShard() throws Exception {
+    useFactory(null);
+    configureCluster(2)
+        .addConfig("conf", configset("cloud-minimal"))
+        .configure();
+    
     final String collection = "deleteshard_test";
     CollectionAdminRequest.createCollectionWithImplicitRouter(collection, "conf", "a,b,c", 1)
         .setMaxShardsPerNode(2)

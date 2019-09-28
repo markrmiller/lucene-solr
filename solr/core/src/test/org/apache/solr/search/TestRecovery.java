@@ -39,6 +39,8 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricRegistry;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.util.TimeSource;
@@ -52,7 +54,10 @@ import org.apache.solr.update.UpdateLog;
 import org.apache.solr.update.processor.DistributedUpdateProcessor.DistribPhase;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +65,9 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.search.TestRecovery.VersionProvider.getNextVersion;
 import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class TestRecovery extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -73,9 +81,8 @@ public class TestRecovery extends SolrTestCaseJ4 {
 
 
   @Before
-  public void beforeTest() throws Exception {
-    savedFactory = System.getProperty("solr.DirectoryFactory");
-    System.setProperty("solr.directoryFactory", "org.apache.solr.core.MockFSDirectoryFactory");
+  public void setupCore() throws Exception {
+    useFactory(null);
     randomizeUpdateLogImpl();
     initCore("solrconfig-tlog.xml","schema15.xml");
     
@@ -88,11 +95,6 @@ public class TestRecovery extends SolrTestCaseJ4 {
   
   @After
   public void afterTest() {
-    if (savedFactory == null) {
-      System.clearProperty("solr.directoryFactory");
-    } else {
-      System.setProperty("solr.directoryFactory", savedFactory);
-    }
     
     deleteCore();
   }
@@ -104,6 +106,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Nightly // can be very slow
   public void stressLogReplay() throws Exception {
     final int NUM_UPDATES = 150;
     try {
@@ -374,6 +377,8 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Slow
+  @Nightly // can be very slow
   public void testLogReplayWithReorderedDBQ() throws Exception {
     testLogReplayWithReorderedDBQWrapper(() -> {
           String v1010 = getNextVersion();
@@ -1184,6 +1189,8 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Slow
+  @Nightly // can be very slow
   public void testRemoveOldLogs() throws Exception {
     try {
       DirectUpdateHandler2.commitOnClose = false;
@@ -1219,7 +1226,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
       createCore();
 
       int numIndexed = 0;
-      int maxReq = 200;
+      int maxReq = TEST_NIGHTLY ? 200 : 20;
 
       LinkedList<Long> versions = new LinkedList<>();
 

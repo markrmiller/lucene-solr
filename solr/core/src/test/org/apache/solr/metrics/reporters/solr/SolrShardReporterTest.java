@@ -20,6 +20,8 @@ import java.lang.invoke.MethodHandles;
 import java.util.Map;
 
 import com.codahale.metrics.Metric;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.CloudDescriptor;
@@ -39,6 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class SolrShardReporterTest extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

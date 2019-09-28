@@ -19,6 +19,7 @@ package org.apache.solr.velocity;
 import java.io.IOException;
 import java.io.StringWriter;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
@@ -30,6 +31,7 @@ import org.apache.solr.response.VelocityResponseWriter;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class VelocityResponseWriterTest extends SolrTestCaseJ4 {
   @BeforeClass
   public static void beforeClass() throws Exception {

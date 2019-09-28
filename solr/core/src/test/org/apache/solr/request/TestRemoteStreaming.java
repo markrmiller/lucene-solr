@@ -47,6 +47,7 @@ import org.junit.Test;
  * See SOLR-2854.
  */
 @SuppressSSL     // does not yet work with ssl yet - uses raw java.net.URL API rather than HttpClient
+@LuceneTestCase.Slow
 public class TestRemoteStreaming extends SolrJettyTestBase {
   private static File solrHomeDirectory;
   

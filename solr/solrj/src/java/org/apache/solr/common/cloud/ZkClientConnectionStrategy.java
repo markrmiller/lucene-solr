@@ -106,6 +106,8 @@ public abstract class ZkClientConnectionStrategy {
 
   protected SolrZooKeeper createSolrZooKeeper(final String serverAddress, final int zkClientTimeout,
       final Watcher watcher) throws IOException {
+    log.info("Create new SolrZooKeeper client");
+
     SolrZooKeeper result = new SolrZooKeeper(serverAddress, zkClientTimeout, watcher);
 
     zkCredentialsToAddAutomaticallyUsed = true;

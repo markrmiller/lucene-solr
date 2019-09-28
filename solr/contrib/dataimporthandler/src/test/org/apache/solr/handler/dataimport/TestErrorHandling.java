@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -32,13 +33,14 @@ import org.junit.BeforeClass;
  *
  * @since solr 1.4
  */
+@LuceneTestCase.Slow
 public class TestErrorHandling extends AbstractDataImportHandlerTestCase {
 
   //TODO: fix this test to not require FSDirectory.
   static String savedFactory;
   @BeforeClass
   public static void beforeClass() throws Exception {
-    savedFactory = System.getProperty("solr.DirectoryFactory");
+    savedFactory = System.getProperty("solr.directoryFactory");
     System.setProperty("solr.directoryFactory", "solr.MockFSDirectoryFactory");
     initCore("dataimport-solrconfig.xml", "dataimport-schema.xml");
     ignoreException("Unexpected close tag");

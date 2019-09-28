@@ -20,6 +20,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.junit.BeforeClass;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+@LuceneTestCase.Slow
 public class TestGeoJSONResponseWriter extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

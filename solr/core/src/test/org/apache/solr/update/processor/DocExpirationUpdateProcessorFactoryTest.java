@@ -16,6 +16,7 @@
  */
 package org.apache.solr.update.processor;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 
 import org.apache.solr.update.UpdateCommand;
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Tests various configurations of DocExpirationUpdateProcessorFactory
  */
+@LuceneTestCase.Slow
 public class DocExpirationUpdateProcessorFactoryTest extends UpdateProcessorTestBase {
   
   public static final String CONFIG_XML = "solrconfig-doc-expire-update-processor.xml";

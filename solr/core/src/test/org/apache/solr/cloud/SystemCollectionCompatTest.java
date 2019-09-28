@@ -79,7 +79,7 @@ public class SystemCollectionCompatTest extends SolrCloudTestCase {
     cluster.waitForActiveCollection(CollectionAdminParams.SYSTEM_COLL,  1, 2);
     ZkController zkController = cluster.getJettySolrRunner(0).getCoreContainer().getZkController();
     cloudManager = zkController.getSolrCloudManager();
-    solrClient = new CloudSolrClientBuilder(Collections.singletonList(zkController.getZkServerAddress()),
+    solrClient = new CloudSolrClient.Builder(Collections.singletonList(zkController.getZkServerAddress()),
         Optional.empty()).build();
     // send a dummy doc to the .system collection
     SolrInputDocument doc = new SolrInputDocument(

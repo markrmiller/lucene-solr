@@ -26,6 +26,7 @@
 // Gradle needs permissions
 grant codeBase "file:${user.home}/.gradle/-" {
      permission java.security.AllPermission;
+//   TODO: what about jars in gradle cache having permissions?     
 //   permission java.net.SocketPermission "*", "accept,listen,connect,resolve";
 //   permission java.lang.reflect.ReflectPermission "*";
 //   permission java.util.logging.LoggingPermission "control";
@@ -34,9 +35,16 @@ grant codeBase "file:${user.home}/.gradle/-" {
 };
 
 
+grant codeBase "file:${user.home}/.gradle/caches/-" {
+     permission java.io.FilePermission "${common.dir}/-", "read,execute";
+     permission java.io.FilePermission "${build.dir}/temp/-", "read,execute,write,delete";
+};
+
 grant {
+  
   // permissions for file access, write access only to sandbox:
-  permission java.io.FilePermission "<<ALL FILES>>", "read,execute";
+  permission java.io.FilePermission "<<ALL FILES>>", "read,execute,write,delete";
+  permission java.io.FilePermission "${common.dir}/-", "read";
   permission java.io.FilePermission "${junit4.childvm.cwd}", "read,execute";
   permission java.io.FilePermission "${junit4.childvm.cwd}${/}temp", "read,execute,write,delete";
   permission java.io.FilePermission "${junit4.childvm.cwd}${/}temp${/}-", "read,execute,write,delete";
@@ -44,14 +52,16 @@ grant {
   permission java.io.FilePermission "${junit4.tempDir}${/}*", "read,execute,write,delete";
   permission java.io.FilePermission "${clover.db.dir}${/}-", "read,execute,write,delete";
   permission java.io.FilePermission "${tests.linedocsfile}", "read";
-  permission java.io.FilePermission "${user.home}${/}.gradle${/}-", "read";
   permission java.nio.file.LinkPermission "hard";
   
   // gradle build dir
-  permission java.io.FilePermission "${build.dir}${/}-", "execute";
-  permission java.io.FilePermission "${build.dir}${/}tests", "execute";
+  permission java.io.FilePermission "${build.dir}/-", "read,execute";
+  permission java.io.FilePermission "${build.dir}/tests", "execute";
+  permission java.io.FilePermission "/tmp${/}-", "read,execute,write,delete";
+  permission java.io.FilePermission "${build.dir}${/}temp${/}-", "read,execute,write,delete";
   permission java.io.FilePermission "${tempDir}", "read,write,delete,execute";
   permission java.io.FilePermission "${tempDir}${/}-", "read,write,delete,execute";
+  permission java.io.FilePermission "${java.io.tmpdir}${/}-", "read,write,delete,execute";
   
   // all possibilities of accepting/binding connections on localhost with ports >=1024:
   permission java.net.SocketPermission "localhost:1024-", "accept,listen";

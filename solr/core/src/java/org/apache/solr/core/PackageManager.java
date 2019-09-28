@@ -32,6 +32,7 @@ import org.apache.solr.api.Api;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ClusterPropertiesListener;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
@@ -239,9 +240,9 @@ public class PackageManager implements ClusterPropertiesListener {
         ZkStateReader zkStateReader = packageManager.coreContainer.getZkController().getZkStateReader();
         try {
           zkStateReader.forceRefreshClusterProps(v);
-        } catch (SolrException e) {
+        } catch (Exception e) {
           log.error("Error refreshing state ", e);
-          throw e;
+          throw new SolrException(ErrorCode.SERVER_ERROR, e);
         }
       }
       rsp.add("metadata", (MapWriter) ew -> ew.putIfNotNull(VERSION,

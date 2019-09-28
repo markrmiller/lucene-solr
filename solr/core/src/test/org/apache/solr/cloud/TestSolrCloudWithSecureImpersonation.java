@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.lucene.util.Constants;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -44,12 +45,15 @@ import org.apache.solr.servlet.SolrRequestParsers;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.apache.solr.security.HttpParamDelegationTokenPlugin.REMOTE_ADDRESS_PARAM;
 import static org.apache.solr.security.HttpParamDelegationTokenPlugin.REMOTE_HOST_PARAM;
 import static org.apache.solr.security.HttpParamDelegationTokenPlugin.USER_PARAM;
 
+@LuceneTestCase.Slow
+@Ignore
 public class TestSolrCloudWithSecureImpersonation extends SolrTestCaseJ4 {
   private static final int NUM_SERVERS = 2;
   private static MiniSolrCloudCluster miniCluster;
@@ -94,7 +98,7 @@ public class TestSolrCloudWithSecureImpersonation extends SolrTestCaseJ4 {
   @BeforeClass
   public static void startup() throws Exception {
     assumeFalse("Hadoop does not work on Windows", Constants.WINDOWS);
-    
+    SolrRequestParsers.DEFAULT.setAddRequestHeadersToContext(false);
     System.setProperty("authenticationPlugin", HttpParamDelegationTokenPlugin.class.getName());
     System.setProperty(KerberosPlugin.DELEGATION_TOKEN_ENABLED, "true");
 
@@ -180,7 +184,7 @@ public class TestSolrCloudWithSecureImpersonation extends SolrTestCaseJ4 {
         return msp;
       }
     };
-    create.setMaxShardsPerNode(1);
+    create.setMaxShardsPerNode(10);
     response = create.process(solrCluster.getSolrClient());
 
     miniCluster.waitForActiveCollection(name, 1, 1);

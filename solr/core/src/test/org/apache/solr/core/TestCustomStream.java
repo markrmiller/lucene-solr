@@ -19,6 +19,7 @@ package org.apache.solr.core;
 
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.handler.TestBlobHandler;
@@ -29,6 +30,7 @@ import org.junit.Test;
 /**
  * Created by caomanhdat on 6/3/16.
  */
+@LuceneTestCase.Slow
 public class TestCustomStream extends AbstractFullDistribZkTestBase {
 
   @BeforeClass

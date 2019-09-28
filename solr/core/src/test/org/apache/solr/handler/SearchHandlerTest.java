@@ -16,12 +16,14 @@
  */
 package org.apache.solr.handler;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
 /**
  * Most of the tests for {@link org.apache.solr.handler.component.SearchHandler} are in {@link org.apache.solr.ConvertedLegacyTest}.
  */
+@LuceneTestCase.Slow
 public class SearchHandlerTest extends SolrTestCaseJ4 {
   
   @BeforeClass

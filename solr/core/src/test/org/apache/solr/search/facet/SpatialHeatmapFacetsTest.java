@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.carrotsearch.randomizedtesting.annotations.Repeat;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrException;
@@ -31,11 +33,21 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /** Test Heatmap Facets (both impls) */
+@LuceneTestCase.Slowest
 public class SpatialHeatmapFacetsTest extends BaseDistributedSearchTestCase {
   private static final String FIELD = "srpt_quad";
 
+  
+  public SpatialHeatmapFacetsTest() {
+    if (!TEST_NIGHTLY) {
+      fixShardCount(1);
+    }
+  }
+  
   @BeforeClass
   public static void beforeSuperClass() throws Exception {
+
+    
     schemaString = "schema-spatial.xml";
     configString = "solrconfig-basic.xml";
 

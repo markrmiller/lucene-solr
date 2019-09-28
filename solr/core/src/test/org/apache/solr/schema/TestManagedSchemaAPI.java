@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -45,6 +46,8 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     configureCluster(2)
         .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-managed").resolve("conf"))
         .configure();
+    
+    cluster.getSolrClient().getZkStateReader().getZkClient().printLayoutToStream(System.out);
   }
 
   @Test
@@ -52,6 +55,7 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     String collection = "testschemaapi";
     CollectionAdminRequest.createCollection(collection, "conf1", 1, 2)
         .process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(collection, 15, TimeUnit.SECONDS, 1, 2);
     testModifyField(collection);
     testReloadAndAddSimple(collection);
     testAddFieldAndDocument(collection);

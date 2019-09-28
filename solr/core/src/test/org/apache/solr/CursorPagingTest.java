@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.SentinelIntSet;
 import org.apache.lucene.util.TestUtil;
 import org.apache.lucene.util.mutable.MutableValueInt;
@@ -51,6 +52,7 @@ import static org.apache.solr.common.util.Utils.fromJSONString;
 /**
  * Tests of deep paging using {@link CursorMark} and {@link CursorMarkParams#CURSOR_MARK_PARAM}.
  */
+@LuceneTestCase.Slow
 public class CursorPagingTest extends SolrTestCaseJ4 {
 
   /** solrconfig.xml file name, shared with other cursor related tests */

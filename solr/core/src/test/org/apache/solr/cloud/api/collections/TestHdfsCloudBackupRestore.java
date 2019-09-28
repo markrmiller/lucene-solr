@@ -27,8 +27,12 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.lucene.util.QuickPatchThreadsFilter;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -68,10 +72,13 @@ import static org.apache.solr.core.backup.BackupManager.ZK_STATE_DIR;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@Nightly
+@Slow
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class TestHdfsCloudBackupRestore extends AbstractCloudBackupRestoreTestCase {
   public static final String SOLR_XML = "<solr>\n" +
       "\n" +
-      "  <str name=\"shareSchema\">${shareSchema:false}</str>\n" +
+      "  <str name=\"shareSchema\">${shareSchemaHdfsNNFailoverTest:false}</str>\n" +
       "  <str name=\"configSetBaseDir\">${configSetBaseDir:configsets}</str>\n" +
       "  <str name=\"coreRootDirectory\">${coreRootDirectory:.}</str>\n" +
       "\n" +

@@ -19,6 +19,7 @@ package org.apache.solr.handler.component;
 import java.util.Arrays;
 import java.util.regex.Pattern;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.mutable.MutableValueDouble;
 import org.apache.lucene.util.mutable.MutableValueFloat;
 import org.apache.lucene.util.mutable.MutableValueInt;
@@ -32,7 +33,7 @@ import org.apache.solr.search.PointMerger;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Slow
 public class TermsComponentTest extends SolrTestCaseJ4 {
 
   @BeforeClass

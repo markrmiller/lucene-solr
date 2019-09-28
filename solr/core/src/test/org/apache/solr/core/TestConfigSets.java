@@ -70,7 +70,8 @@ public class TestConfigSets extends SolrTestCaseJ4 {
   }
 
   @Test
-  public void testConfigSetServiceFindsConfigSets() {
+  public void testConfigSetServiceFindsConfigSets() throws Exception {
+    useFactory(null);
     CoreContainer container = null;
     try {
       container = setupContainer(TEST_PATH().resolve("configsets").toString());

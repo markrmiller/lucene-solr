@@ -36,6 +36,9 @@ dependencies {
   implementation 'junit:junit:4.12'
   implementation 'org.apache.commons:commons-configuration2:2.5'
   implementation 'commons-beanutils:commons-beanutils:1.9.3'
+  
+  implementation ('org.ow2.asm:asm:7.1')
+  implementation ('org.ow2.asm:asm-commons:7.1')
 }
 
 configurations {
@@ -55,8 +58,17 @@ dependencies {
 }
 
 sourceSets {
+  main {
+    java.srcDir 'src/main/java'
+  }
+  
+//  main.java.srcDirs = ['src/main/java']
+//  main.resources.srcDirs = ['src/main/resources']
+//  test.java.srcDirs = ['src/main/test']
+//  test.resources.srcDirs = ['src/main/test-files']
+  
   ide {
-    resources.srcDirs = ['ide']
+    resources.srcDir 'ide'
     java.srcDirs = []
   }
   common {
@@ -72,6 +84,7 @@ sourceSets {
     java.srcDir 'src/buildTest/java'
     resources.srcDirs = ['src/buildTest/resources', 'build-wdocker-test']
   }
+  
   all {
     java {
       sourceCompatibility = '11'

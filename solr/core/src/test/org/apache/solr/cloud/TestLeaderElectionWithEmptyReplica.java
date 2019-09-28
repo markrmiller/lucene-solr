@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -40,11 +42,13 @@ import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
 /**
  * See SOLR-9504
  */
+@LuceneTestCase.Slowest
 public class TestLeaderElectionWithEmptyReplica extends SolrCloudTestCase {
   private static final String COLLECTION_NAME = "solr_9504";
 
   @BeforeClass
   public static void beforeClass() throws Exception {
+    System.out.println("TESTHOME:" + TEST_PATH());
     useFactory(null);
     configureCluster(2)
         .addConfig("config", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
@@ -81,16 +85,17 @@ public class TestLeaderElectionWithEmptyReplica extends SolrCloudTestCase {
 
     // kill the leader
     replicaJetty.stop();
+    
+    cluster.waitForJettyToStop(replicaJetty);
 
     // add a replica (asynchronously)
     CollectionAdminRequest.AddReplica addReplica = CollectionAdminRequest.addReplicaToShard(COLLECTION_NAME, "shard1");
     String asyncId = addReplica.processAsync(solrClient);
 
-    // wait a bit
-    Thread.sleep(1000);
-
     // bring the old leader node back up
     replicaJetty.start();
+    
+    cluster.waitForNode(replicaJetty, 30);
 
     // wait until everyone is active
     solrClient.waitForState(COLLECTION_NAME, DEFAULT_TIMEOUT, TimeUnit.SECONDS,

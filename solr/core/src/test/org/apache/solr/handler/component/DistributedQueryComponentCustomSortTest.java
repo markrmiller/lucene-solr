@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.component;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.junit.BeforeClass;
@@ -28,6 +29,7 @@ import java.nio.ByteBuffer;
  *
  * @see org.apache.solr.handler.component.QueryComponent
  */
+@LuceneTestCase.Slowest
 public class DistributedQueryComponentCustomSortTest extends BaseDistributedSearchTestCase {
 
   public DistributedQueryComponentCustomSortTest() {

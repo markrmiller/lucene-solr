@@ -21,10 +21,12 @@ import java.io.File;
 import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestOpenNLPExtractNamedEntitiesUpdateProcessorFactory extends UpdateProcessorTestBase {
 
   @BeforeClass

@@ -20,9 +20,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
@@ -32,9 +35,11 @@ import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.DelegationTokenResponse;
 import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -43,10 +48,16 @@ import org.junit.Test;
  *
  * @since solr 1.5
  */
-public class DistributedTermsComponentTest extends BaseDistributedSearchTestCase {
-
+@LuceneTestCase.Slow
+public class DistributedTermsComponentTest extends SolrCloudBridgeTestCase {
+  
+  @BeforeClass
+  public static void beforeDistributedTermsComponentTest() {
+    createControl = true;
+  }
+  
   @Test
-  public void test() throws Exception {
+  public void distTermsComponentTest() throws Exception {
 
     Random random = random();
     del("*:*");
@@ -61,7 +72,7 @@ public class DistributedTermsComponentTest extends BaseDistributedSearchTestCase
     commit();
 
     handle.clear();
-    handle.put("terms", UNORDERED);
+    handle.put("terms", BaseDistributedSearchTestCase.UNORDERED);
 
     query("qt", "/terms", "shards.qt", "/terms", "terms", "true", "terms.fl", "b_t");
     query("qt", "/terms", "shards.qt", "/terms", "terms.limit", 5, "terms", "true", "terms.fl", "b_t", "terms.lower", "s");
@@ -102,29 +113,19 @@ public class DistributedTermsComponentTest extends BaseDistributedSearchTestCase
   }
 
   @Override
-  protected QueryResponse query(boolean setDistribParams, SolrParams p) throws Exception {
-    QueryResponse queryResponse = super.query(setDistribParams, p);
-
+  protected QueryResponse query(SolrParams p) throws Exception {
+    QueryResponse queryResponse = super.query(p);
     final ModifiableSolrParams params = new ModifiableSolrParams(p);
-    // TODO: look into why passing true causes fails
-    params.set("distrib", "false");
-
     for (ResponseParser responseParser : getResponseParsers()) {
       final NamedList<Object> controlRsp = queryClient(controlClient, params, responseParser);
-      params.remove("distrib");
-      if (setDistribParams) {
-        setDistributedParams(params);
-      }
-
-      // query a random server
-      int which = r.nextInt(clients.size());
+      int which = random().nextInt(clients.size());
       SolrClient client = clients.get(which);
       NamedList<Object> rsp = queryClient(client, params, responseParser);
-
+      System.out.println("rsp:" + rsp);
       // flags needs to be called here since only terms response is passed to compare
       // other way is to pass whole response to compare
-      assertNull(compare(rsp.findRecursive("terms"),
-          controlRsp.findRecursive("terms"), flags(handle, "terms"), handle));
+      assertNull(BaseDistributedSearchTestCase.compare(rsp.findRecursive("terms"),
+          controlRsp.findRecursive("terms"), BaseDistributedSearchTestCase.flags(handle, "terms"), handle));
     }
     return queryResponse;
   }

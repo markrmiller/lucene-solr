@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
     BadZookeeperThreadsFilter.class // Zookeeper login leaks TGT renewal threads
 })
 
-@LuceneTestCase.Slow
 @ThreadLeakLingering(linger = 10000) // minikdc has some lingering threads
 public class TestSolrCloudWithKerberosAlt extends SolrCloudTestCase {
 

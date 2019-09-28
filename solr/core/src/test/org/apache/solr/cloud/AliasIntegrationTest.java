@@ -16,6 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.ignoreException;
+import static org.apache.solr.SolrTestCaseJ4.unIgnoreException;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,8 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -64,6 +69,8 @@ import org.junit.Test;
 
 import static org.apache.solr.common.cloud.ZkStateReader.ALIASES;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class AliasIntegrationTest extends SolrCloudTestCase {
 
   private CloseableHttpClient httpClient;
@@ -215,7 +222,7 @@ public class AliasIntegrationTest extends SolrCloudTestCase {
 
   @Test
   public void testModifyPropertiesV2() throws Exception {
-    final String aliasName = getSaferTestName();
+    final String aliasName = "myalias";
     ZkStateReader zkStateReader = createColectionsAndAlias(aliasName);
     final String baseUrl = cluster.getRandomJetty(random()).getBaseUrl().toString();
     //TODO fix Solr test infra so that this /____v2/ becomes /api/
@@ -519,6 +526,7 @@ public class AliasIntegrationTest extends SolrCloudTestCase {
   // While writing the above test I wondered what happens when an alias points to two collections and one of them
   // is deleted.
   @Test
+  @Nightly
   public void testDeleteOneOfTwoCollectionsAliased() throws Exception {
     CollectionAdminRequest.createCollection("collection_one", "conf", 2, 1).process(cluster.getSolrClient());
     CollectionAdminRequest.createCollection("collection_two", "conf", 1, 1).process(cluster.getSolrClient());

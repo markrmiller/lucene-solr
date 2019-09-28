@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.cloud.SolrCloudTestCase;
@@ -41,6 +42,7 @@ import org.junit.Test;
 /**
  * Test for {@link NodeAddedTrigger}
  */
+@LuceneTestCase.Slow
 public class NodeAddedTriggerTest extends SolrCloudTestCase {
   private static AtomicBoolean actionConstructorCalled = new AtomicBoolean(false);
   private static AtomicBoolean actionInitCalled = new AtomicBoolean(false);

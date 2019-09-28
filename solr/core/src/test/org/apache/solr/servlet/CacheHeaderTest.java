@@ -31,6 +31,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.cookie.DateUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.junit.AfterClass;
@@ -38,8 +39,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * A test case for the several HTTP cache headers emitted by Solr
+ * A test case 
+ * for the several HTTP cache headers emitted by Solr
  */
+@LuceneTestCase.Slow
 public class CacheHeaderTest extends CacheHeaderTestBase {
   private static File solrHomeDirectory;
     

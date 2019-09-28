@@ -28,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest.Create;
@@ -55,7 +56,8 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.cloud.Replica.State.DOWN;
 
-
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class DeleteReplicaTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -63,19 +65,17 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   @BeforeClass
   public static void setupCluster() throws Exception {
     System.setProperty("solr.zkclienttimeout", "45000");
-    System.setProperty("distribUpdateSoTimeout", "15000");
-
+    System.setProperty("distribUpdateSoTimeout", "10000");
+    System.setProperty("socketTimeout", "20000");
   }
   
   @Before
   @Override
   public void setUp() throws Exception {
     super.setUp();
-    System.setProperty("solr.zkclienttimeout", "45000");
-    System.setProperty("distribUpdateSoTimeout", "15000");
     
     // these tests need to be isolated, so we dont share the minicluster
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 2)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
@@ -94,6 +94,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     final String collectionName = "delLiveColl";
 
     Create req = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2);
+    req.setMaxShardsPerNode(10);
     req.process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -115,7 +116,11 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
           .process(cluster.getSolrClient());
     });
     assertTrue("Unexpected error message: " + e.getMessage(), e.getMessage().contains("state is 'active'"));
-    assertTrue("Data directory for " + replica.getName() + " should not have been deleted", Files.exists(dataDir));
+    
+    String solrDirectoryFactory = System.getProperty("solr.directoryFactory");
+    if (solrDirectoryFactory == null || !solrDirectoryFactory.equals("solr.RAMDirectoryFactory")) {
+      assertTrue("Data directory for " + replica.getName() + " should not have been deleted", Files.exists(dataDir));
+    }
 
     JettySolrRunner replicaJetty = cluster.getReplicaJetty(replica);
     ZkStateReaderAccessor accessor = new ZkStateReaderAccessor(replicaJetty.getCoreContainer().getZkController().getZkStateReader());
@@ -141,15 +146,21 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
         return (preDeleteWatcherCount - 1L == postDeleteWatcherCount);
       });
 
-    assertFalse("Data directory for " + replica.getName() + " should have been removed", Files.exists(dataDir));
 
+    if (solrDirectoryFactory == null || !solrDirectoryFactory.equals("solr.RAMDirectoryFactory")) {
+      assertFalse("Data directory for " + replica.getName() + " should have been removed", Files.exists(dataDir));
+    }
   }
 
   @Test
   public void deleteReplicaAndVerifyDirectoryCleanup() throws Exception {
-
+    String solrDirectoryFactory = System.getProperty("solr.directoryFactory");
+    if (solrDirectoryFactory != null && solrDirectoryFactory.equals("solr.RAMDirectoryFactory")) {
+      assumeFalse("Requires an FSDirectory", true);
+    }
+    
     final String collectionName = "deletereplica_test";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).setMaxShardsPerNode(10).process(cluster.getSolrClient());
 
     Replica leader = cluster.getSolrClient().getZkStateReader().getLeaderRetry(collectionName, "shard1");
 
@@ -175,7 +186,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
 
     final String collectionName = "deleteByCount";
 
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     waitForState("Expected a single shard with three replicas", collectionName, clusterShape(1, 3));
 
     CollectionAdminRequest.deleteReplicasFromShard(collectionName, "shard1", 2).process(cluster.getSolrClient());
@@ -198,6 +209,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
 
     final String collectionName = "deleteByCountNew";
     Create req = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2);
+    req.setMaxShardsPerNode(10);
     req.process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -210,12 +222,14 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void deleteReplicaFromClusterState() throws Exception {
     deleteReplicaFromClusterState("false");
     CollectionAdminRequest.setClusterProperty(ZkStateReader.LEGACY_CLOUD, null).process(cluster.getSolrClient());
   }
   
   @Test
+  @Nightly
   public void deleteReplicaFromClusterStateLegacy() throws Exception {
     deleteReplicaFromClusterState("true"); 
     CollectionAdminRequest.setClusterProperty(ZkStateReader.LEGACY_CLOUD, null).process(cluster.getSolrClient());
@@ -224,8 +238,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   private void deleteReplicaFromClusterState(String legacyCloud) throws Exception {
     CollectionAdminRequest.setClusterProperty(ZkStateReader.LEGACY_CLOUD, legacyCloud).process(cluster.getSolrClient());
     final String collectionName = "deleteFromClusterState_"+legacyCloud;
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3)
-        .process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 1, 3);
     
@@ -282,6 +295,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   @Test
   @Slow
   // commented out on: 17-Feb-2019   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // annotated on: 24-Dec-2018
+  @Nightly
   public void raceConditionOnDeleteAndRegisterReplica() throws Exception {
     raceConditionOnDeleteAndRegisterReplica("false");
     CollectionAdminRequest.setClusterProperty(ZkStateReader.LEGACY_CLOUD, null).process(cluster.getSolrClient());
@@ -289,6 +303,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   
   @Test
   @Slow
+  @Nightly
   // commented out on: 17-Feb-2019   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // annotated on: 24-Dec-2018
   public void raceConditionOnDeleteAndRegisterReplicaLegacy() throws Exception {
     raceConditionOnDeleteAndRegisterReplica("true");
@@ -300,7 +315,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     
     CollectionAdminRequest.setClusterProperty(ZkStateReader.LEGACY_CLOUD, legacyCloud).process(cluster.getSolrClient());
     final String collectionName = "raceDeleteReplica_"+legacyCloud;
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2)
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 1, 2);
@@ -434,9 +449,10 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void deleteReplicaOnIndexing() throws Exception {
     final String collectionName = "deleteReplicaOnIndexing";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2)
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
     waitForState("", collectionName, clusterShape(1, 2));
     AtomicBoolean closed = new AtomicBoolean(false);

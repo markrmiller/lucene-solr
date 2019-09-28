@@ -20,6 +20,7 @@ import java.io.File;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.rest.schema.TestBulkSchemaAPI;
 import org.apache.solr.util.RestTestBase;
@@ -31,6 +32,7 @@ import org.junit.Before;
  * Tests the useDocValuesAsStored functionality.
  */
 // See: https://issues.apache.org/jira/browse/SOLR-12028 Tests cannot remove files on Windows machines occasionally
+@LuceneTestCase.Slow
 public class TestUseDocValuesAsStored2 extends RestTestBase {
 
   @Before

@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
@@ -67,6 +68,7 @@ import static org.apache.solr.update.processor.DistributingUpdateProcessorFactor
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 // TODO: longer term this should be combined with TestRecovery somehow ??
+@Nightly // too slow
 public class TestRecoveryHdfs extends SolrTestCaseJ4 {
   // means that we've seen the leader and have version info (i.e. we are a non-leader replica)
   private static String FROM_LEADER = DistribPhase.FROMLEADER.toString(); 

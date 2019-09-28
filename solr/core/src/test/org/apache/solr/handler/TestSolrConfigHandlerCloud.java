@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.LukeRequest;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
@@ -36,15 +37,24 @@ import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.RequestParams;
 import org.apache.solr.core.TestSolrConfigHandler;
 import org.apache.solr.util.RestTestHarness;
+import org.junit.Before;
 import org.junit.Test;
 
 import static java.util.Arrays.asList;
 
+@LuceneTestCase.Slowest
 public class TestSolrConfigHandlerCloud extends AbstractFullDistribZkTestBase {
 
   private static final long TIMEOUT_S = 10;
 
+  @Before
+  public void before() {
+    sliceCount = 1;
+  }
+
+  
   @Test
+  @ShardsFixed(num = 2)
   public void test() throws Exception {
     setupRestTestHarnesses();
     testReqHandlerAPIs();

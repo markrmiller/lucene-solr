@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.PhraseQuery;
@@ -42,6 +43,7 @@ import org.junit.Test;
 /**
  * Tests that the functions in SolrPluginUtils work as advertised.
  */
+@LuceneTestCase.Slow
 public class SolrPluginUtilsTest extends SolrTestCaseJ4 {
 
   @BeforeClass

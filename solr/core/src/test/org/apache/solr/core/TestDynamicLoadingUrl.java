@@ -25,6 +25,8 @@ import java.util.Arrays;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.common.util.Pair;
@@ -41,6 +43,7 @@ import static org.apache.solr.core.TestDynamicLoading.getFileContent;
 import static org.apache.solr.handler.TestSolrConfigHandlerCloud.compareValues;
 
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class TestDynamicLoadingUrl extends AbstractFullDistribZkTestBase {
 
   @BeforeClass

@@ -21,10 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestNonWritablePersistFile extends AbstractDataImportHandlerTestCase {
   private static final String FULLIMPORT_QUERY = "select * from x";
 

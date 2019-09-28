@@ -35,6 +35,7 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricRegistry;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -64,6 +65,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * This test is modeled after SyncSliceTest
  */
 @Slow
+@Nightly // this test should be converted to MiniSolrCloudCluster and should be a lot faster
 public class PeerSyncReplicationTest extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

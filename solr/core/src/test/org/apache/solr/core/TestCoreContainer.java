@@ -32,6 +32,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -49,7 +50,7 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.junit.matchers.JUnitMatchers.containsString;
 
-
+@LuceneTestCase.Slow
 public class TestCoreContainer extends SolrTestCaseJ4 {
 
   private static String oldSolrHome;

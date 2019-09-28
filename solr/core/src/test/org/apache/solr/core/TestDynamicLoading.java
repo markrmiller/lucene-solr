@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.BaseDistributedSearchTestCase.ShardsFixed;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.handler.TestBlobHandler;
@@ -37,6 +39,9 @@ import org.junit.Test;
 import static java.util.Arrays.asList;
 import static org.apache.solr.handler.TestSolrConfigHandlerCloud.compareValues;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly // in a bad case this test can take 2 min
 public class TestDynamicLoading extends AbstractFullDistribZkTestBase {
 
   @BeforeClass
@@ -45,6 +50,7 @@ public class TestDynamicLoading extends AbstractFullDistribZkTestBase {
   }
 
   @Test
+  @ShardsFixed(num = 3)
   // 12-Jun-2018 @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028")
   //17-Aug-2018 commented @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Jul-2018
   public void testDynamicLoading() throws Exception {
@@ -125,7 +131,7 @@ public class TestDynamicLoading extends AbstractFullDistribZkTestBase {
          success = true;
          break;
       }
-      Thread.sleep(100);
+      Thread.sleep(1000);
     }
     ByteBuffer jar = null;
 

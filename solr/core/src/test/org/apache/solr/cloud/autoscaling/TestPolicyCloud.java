@@ -75,7 +75,10 @@ public class TestPolicyCloud extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(5)
+
+    enableMetricsForNonNightly();
+
+    configureCluster(3)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
@@ -92,7 +95,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
     cluster.getSolrClient().request(AutoScalingRequest.create(SolrRequest.METHOD.POST, commands));
     String collectionName = "testCreateCollection";
     HttpSolrClient.RemoteSolrException exp = expectThrows(HttpSolrClient.RemoteSolrException.class,
-        () -> CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1).process(cluster.getSolrClient()));
+        () -> CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient()));
 
     assertTrue(exp.getMessage().contains("No node can satisfy the rules"));
     assertTrue(exp.getMessage().contains("AutoScaling.error.diagnostics"));
@@ -115,7 +118,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
 
     commands =  "{ set-cluster-policy: [ {cores: '<2', node: '#ANY'} ] }";
     cluster.getSolrClient().request(AutoScalingRequest.create(SolrRequest.METHOD.POST, commands));
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 2);
     
@@ -123,6 +126,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
 
   public void testDataProviderPerReplicaDetails() throws Exception {
     CollectionAdminRequest.createCollection("perReplicaDataColl", "conf", 1, 5)
+      .setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection("perReplicaDataColl", 1, 5);
     DocCollection coll = getCollectionState("perReplicaDataColl");
@@ -209,6 +213,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
     final String collectionName = "testCreateCollectionAddReplica";
     log.info("Creating collection {}", collectionName);
     CollectionAdminRequest.createCollection(collectionName, "conf", 1, 1)
+        .setMaxShardsPerNode(10)
         .setPolicy("c1")
         .process(cluster.getSolrClient());
 
@@ -461,6 +466,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
 
     final String collectionName = "addshard_using_policy";
     CollectionAdminRequest.createCollectionWithImplicitRouter(collectionName, "conf", "s1,s2", 1)
+    .setMaxShardsPerNode(10)
         .setPolicy("c1")
         .process(cluster.getSolrClient());
 
@@ -482,6 +488,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
   public void testDataProvider() throws Exception {
     final String collectionName = "data_provider";
     CollectionAdminRequest.createCollectionWithImplicitRouter(collectionName, "conf", "shard1", 2)
+      .setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 1, 2);

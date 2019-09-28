@@ -27,6 +27,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.autoscaling.Policy;
@@ -60,12 +61,15 @@ import static org.apache.solr.common.util.Utils.getObjectByPath;
 /**
  * Test for AutoScalingHandler
  */
+@LuceneTestCase.Slow
 public class AutoScalingHandlerTest extends SolrCloudTestCase {
   final static String CONFIGSET_NAME = "conf";
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    if (TEST_NIGHTLY) System.setProperty("solr.disableJvmMetrics", "false");
+    
     configureCluster(2)
         .addConfig(CONFIGSET_NAME, configset("cloud-minimal"))
         .configure();
@@ -134,6 +138,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
 
     CollectionAdminRequest.deleteCollection(COLLNAME)
         .process(cluster.getSolrClient());
+    cluster.getSolrClient().getZkStateReader().waitForState(COLLNAME, 10, TimeUnit.SECONDS, (n,c) -> c == null);
   }
   public void testDiagnosticsWithPayload() throws Exception {
     CloudSolrClient solrClient = cluster.getSolrClient();
@@ -154,6 +159,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
     assertEquals(response._getStr("diagnostics/violations[0]/node",null),response._getStr("diagnostics/violations[0]/node",null));
     CollectionAdminRequest.deleteCollection(COLLNAME)
         .process(cluster.getSolrClient());
+    cluster.getSolrClient().getZkStateReader().waitForState("COLLNAME", 10, TimeUnit.SECONDS, (n,c) -> c == null);
   }
 
   @Test
@@ -601,6 +607,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void testPolicyAndPreferences() throws Exception {
     CloudSolrClient solrClient = cluster.getSolrClient();
     // add multiple policies
@@ -733,6 +740,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 17-Aug-2018
   public void testReadApi() throws Exception  {
     CloudSolrClient solrClient = cluster.getSolrClient();
@@ -907,6 +915,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
     }
     CollectionAdminRequest.deleteCollection("readApiTestViolations")
         .process(cluster.getSolrClient());
+    cluster.getSolrClient().getZkStateReader().waitForState("readApiTestViolations", 10, TimeUnit.SECONDS, (n,c) -> c == null);
   }
 
   @Test
@@ -988,6 +997,7 @@ public class AutoScalingHandlerTest extends SolrCloudTestCase {
       fail("Only RemoteExecutionException expected");
     }
     solrClient.request(CollectionAdminRequest.deleteCollection("COLL1"));
+    cluster.getSolrClient().getZkStateReader().waitForState("COLL1", 10, TimeUnit.SECONDS, (n,c) -> c == null);
   }
 
   @Test

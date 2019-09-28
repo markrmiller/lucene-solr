@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Random;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -46,6 +47,9 @@ import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
 /**
  * Tests the Multi threaded Collections API.
  */
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class MultiThreadedOCPTest extends AbstractFullDistribZkTestBase {
 
   private static final int REQUEST_STATUS_TIMEOUT = 5 * 60;

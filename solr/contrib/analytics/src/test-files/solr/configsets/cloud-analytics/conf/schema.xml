@@ -23,11 +23,11 @@
   <fieldType name="boolean" class="solr.BoolField" docValues="true" sortMissingLast="true"/>
   <fieldType name="string" class="solr.StrField" docValues="true" sortMissingLast="true"/>
   
-  <fieldType name="int" class="${solr.tests.IntegerFieldType}" docValues="true" precisionStep="0" omitNorms="true" positionIncrementGap="0" />
-  <fieldType name="float" class="${solr.tests.FloatFieldType}" docValues="true" precisionStep="0" omitNorms="true" positionIncrementGap="0" />
-  <fieldType name="long" class="${solr.tests.LongFieldType}" docValues="true" precisionStep="0" omitNorms="true" positionIncrementGap="0"/>
-  <fieldType name="double" class="${solr.tests.DoubleFieldType}" docValues="true" precisionStep="0" omitNorms="true" positionIncrementGap="0"/>
-  <fieldType name="date" class="${solr.tests.DateFieldType}" docValues="true" precisionStep="0" omitNorms="true" positionIncrementGap="0" />
+  <fieldType name="int" class="${solr.tests.IntegerFieldType}" docValues="true" omitNorms="true" positionIncrementGap="0" />
+  <fieldType name="float" class="${solr.tests.FloatFieldType}" docValues="true" omitNorms="true" positionIncrementGap="0" />
+  <fieldType name="long" class="${solr.tests.LongFieldType}" docValues="true" omitNorms="true" positionIncrementGap="0"/>
+  <fieldType name="double" class="${solr.tests.DoubleFieldType}" docValues="true" omitNorms="true" positionIncrementGap="0"/>
+  <fieldType name="date" class="${solr.tests.DateFieldType}" docValues="true" omitNorms="true" positionIncrementGap="0" />
 
   <field name="id" type="string" indexed="true" stored="true" multiValued="false" required="true"/>
 

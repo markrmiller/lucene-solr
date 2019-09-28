@@ -19,11 +19,13 @@ package org.apache.solr.analytics.legacy.expression;
 import java.time.Instant;
 import java.util.Date;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.legacy.LegacyAbstractAnalyticsTest;
 import org.apache.solr.util.DateMathParser;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class LegacyExpressionTest extends LegacyAbstractAnalyticsTest {
   private static final String fileName = "expressions.txt";
 

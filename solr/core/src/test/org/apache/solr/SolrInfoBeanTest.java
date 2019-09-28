@@ -16,6 +16,7 @@
  */
 package org.apache.solr;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.handler.admin.LukeRequestHandler;
@@ -36,6 +37,7 @@ import java.util.List;
 /**
  * A simple test used to increase code coverage for some standard things...
  */
+@LuceneTestCase.Slow
 public class SolrInfoBeanTest extends SolrTestCaseJ4
 {
   @BeforeClass

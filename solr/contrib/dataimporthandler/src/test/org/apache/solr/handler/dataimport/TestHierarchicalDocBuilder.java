@@ -35,6 +35,7 @@ import org.apache.lucene.search.join.BitSetProducer;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.handler.dataimport.config.ConfigNameConstants;
 import org.apache.solr.request.SolrQueryRequest;
@@ -49,6 +50,7 @@ import org.junit.Test;
  * Test for DocBuilder using the test harness. 
  * <b> Documents are hierarchical in this test, i.e. each document have nested children documents.</b>
  */
+@LuceneTestCase.Slow
 public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCase {
 
   private static final String FIELD_ID = "id";

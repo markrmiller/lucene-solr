@@ -24,6 +24,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.UnaryOperator;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -45,6 +46,9 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
 // See: https://issues.apache.org/jira/browse/SOLR-12028 Tests cannot remove files on Windows machines occasionally
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class TestCloudSchemaless extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String SUCCESS_XPATH = "/response/lst[@name='responseHeader']/int[@name='status'][.='0']";
@@ -52,7 +56,6 @@ public class TestCloudSchemaless extends AbstractFullDistribZkTestBase {
   @After
   public void teardDown() throws Exception {
     super.tearDown();
-    closeRestTestHarnesses();
   }
 
   public TestCloudSchemaless() {

@@ -37,6 +37,7 @@ import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.InfoStream;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -67,9 +68,9 @@ public class SolrIndexWriter extends IndexWriter {
   private final Object CLOSE_LOCK = new Object();
   
   String name;
-  private DirectoryFactory directoryFactory;
+  private volatile DirectoryFactory directoryFactory;
   private InfoStream infoStream;
-  private Directory directory;
+  private final Directory directory;
 
   // metrics
   private long majorMergeDocs = 512 * 1024;
@@ -96,6 +97,7 @@ public class SolrIndexWriter extends IndexWriter {
   public static SolrIndexWriter create(SolrCore core, String name, String path, DirectoryFactory directoryFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec) throws IOException {
 
     SolrIndexWriter w = null;
+
     final Directory d = directoryFactory.get(path, DirContext.DEFAULT, config.lockType);
     try {
       w = new SolrIndexWriter(core, name, path, d, create, schema, 
@@ -177,6 +179,7 @@ public class SolrIndexWriter extends IndexWriter {
         flushMeter = metricManager.meter(null, registryName, "flush", SolrInfoBean.Category.INDEX.toString());
       }
     }
+    assert ObjectReleaseTracker.track(this);
   }
 
   @SuppressForbidden(reason = "Need currentTimeMillis, commit time should be used only for debugging purposes, " +
@@ -306,6 +309,8 @@ public class SolrIndexWriter extends IndexWriter {
       log.error("Error closing IndexWriter", t);
     } finally {
       cleanup();
+      System.out.println("release indexwriter");
+      ObjectReleaseTracker.release(this);
     }
   }
 
@@ -321,10 +326,13 @@ public class SolrIndexWriter extends IndexWriter {
       log.error("Exception rolling back IndexWriter", t);
     } finally {
       cleanup();
+      System.out.println("release indexwriter");
+      ObjectReleaseTracker.release(this);
     }
   }
 
   private void cleanup() throws IOException {
+    System.out.println("Calling cleanup");
     // It's kind of an implementation detail whether
     // or not IndexWriter#close calls rollback, so
     // we assume it may or may not
@@ -335,15 +343,19 @@ public class SolrIndexWriter extends IndexWriter {
         isClosed = true;
       }
     }
+    
+    System.out.println("Calling cleanup doClose:" + doClose);
     if (doClose) {
-      
+
       if (infoStream != null) {
         IOUtils.closeQuietly(infoStream);
       }
       numCloses.incrementAndGet();
 
-      if (directoryFactory != null) {
+      try {
         directoryFactory.release(directory);
+      } catch (NullPointerException e) {
+        // okay
       }
     }
   }

@@ -32,6 +32,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -56,6 +57,7 @@ import static org.apache.solr.client.solrj.RoutedAliasTypes.TIME;
  * Direct http tests of the CreateRoutedAlias functionality.
  */
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class CreateRoutedAliasTest extends SolrCloudTestCase {
 
   @BeforeClass

@@ -26,6 +26,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.cloud.autoscaling.AlreadyExistsException;
 import org.apache.solr.client.solrj.cloud.autoscaling.BadVersionException;
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This test compares a ZK-based {@link DistribStateManager} to the simulated one.
  */
+@LuceneTestCase.Slow
 public class TestSimDistribStateManager extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

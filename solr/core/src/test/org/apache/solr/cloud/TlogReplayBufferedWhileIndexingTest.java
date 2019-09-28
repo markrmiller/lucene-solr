@@ -50,8 +50,8 @@ public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTe
     System.setProperty("leaderVoteWait", "300000");
     System.setProperty("solr.autoCommit.maxTime", "10000");
     System.setProperty("solr.autoSoftCommit.maxTime", "3000");
-    TestInjection.updateLogReplayRandomPause = "true:10";
-    TestInjection.updateRandomPause = "true:10";
+    if (TEST_NIGHTLY) TestInjection.updateLogReplayRandomPause = "true:10";
+    if (TEST_NIGHTLY) TestInjection.updateRandomPause = "true:10";
     if (System.getProperty("solr.hdfs.home") != null) useFactory("solr.StandardDirectoryFactory");
   }
   
@@ -60,6 +60,7 @@ public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTe
     System.clearProperty("leaderVoteWait");
     System.clearProperty("solr.autoCommit.maxTime");
     System.clearProperty("solr.autoSoftCommit.maxTime");
+    TestInjection.reset();
   }
 
   @Test

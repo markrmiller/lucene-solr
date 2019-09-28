@@ -35,7 +35,7 @@ public class BadHdfsThreadsFilter implements ThreadFilter {
       return true;
     } else if (name.startsWith("org.apache.hadoop.fs.FileSystem$Statistics")) { // SOLR-11261
       return true;
-    } else if (name.startsWith("ForkJoinPool.")) { // JVM built in pool
+    } else if (name.startsWith("ForkJoinPool")) { // JVM built in pool
       return true;
     } else if (name.startsWith("solr-hdfs-threadpool-")) { // SOLR-9515 and HDFS-14251
       return true;

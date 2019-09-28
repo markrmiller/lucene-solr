@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -31,6 +32,7 @@ import org.junit.Test;
 /**
  * Tests for PREPRECOVERY CoreAdmin API
  */
+@LuceneTestCase.Slow
 public class TestPrepRecovery extends SolrCloudTestCase {
 
   @BeforeClass
@@ -99,7 +101,7 @@ public class TestPrepRecovery extends SolrCloudTestCase {
     waitForState("Expected collection: testLeaderNotResponding to be live with 1 shard and 1 replicas",
         collectionName, clusterShape(1, 1));
 
-    TestInjection.prepRecoveryOpPauseForever = "true:100";
+    if (TEST_NIGHTLY) TestInjection.prepRecoveryOpPauseForever = "true:100";
     try {
       CollectionAdminRequest.addReplicaToShard(collectionName, "shard1")
           .process(solrClient);

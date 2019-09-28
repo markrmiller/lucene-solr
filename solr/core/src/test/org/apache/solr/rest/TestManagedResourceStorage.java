@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.cloud.AbstractZkTestCase;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrResourceLoader;
@@ -36,8 +36,8 @@ import org.junit.Test;
 /**
  * Depends on ZK for testing ZooKeeper backed storage logic.
  */
-@Slow
 // commented 4-Sep-2018 @LuceneTestCase.BadApple(bugUrl = "https://issues.apache.org/jira/browse/SOLR-6443")
+@LuceneTestCase.Slow
 public class TestManagedResourceStorage extends AbstractZkTestCase {
 
   /**

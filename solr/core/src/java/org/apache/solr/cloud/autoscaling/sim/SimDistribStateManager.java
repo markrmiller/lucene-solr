@@ -382,6 +382,7 @@ public class SimDistribStateManager implements DistribStateManager {
 
   @Override
   public void close() throws IOException {
+    watchersPool.shutdownNow();
     multiLock.lock();
     try {
       // remove all my ephemeral nodes
@@ -391,7 +392,7 @@ public class SimDistribStateManager implements DistribStateManager {
     } finally {
       multiLock.unlock();
     }
-
+    ExecutorUtil.shutdownAndAwaitTermination(watchersPool);
   }
 
   @Override

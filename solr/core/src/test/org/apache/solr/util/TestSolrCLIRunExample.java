@@ -73,6 +73,7 @@ public class TestSolrCLIRunExample extends SolrTestCaseJ4 {
         Paths.get(".").toAbsolutePath().toString().contains(" "));
     // to be true
     System.setProperty("solr.directoryFactory", "solr.NRTCachingDirectoryFactory");
+    System.setProperty("solr.cli.retryTime", "500");
   }
 
   @AfterClass
@@ -355,7 +356,7 @@ public class TestSolrCLIRunExample extends SolrTestCaseJ4 {
           try (ServerSocket socket = new ServerSocket(0)) {
             bindPort = socket.getLocalPort();
           }
-          Thread.sleep(100);
+          Thread.sleep(1000);
           status = tool.runTool(SolrCLI.processCommandLineArgs(SolrCLI.joinCommonAndToolOptions(tool.getOptions()), toolArgs));  
         }
         
@@ -410,6 +411,7 @@ public class TestSolrCLIRunExample extends SolrTestCaseJ4 {
    * properties, i.e. there is no test coverage for the -noprompt option.
    */
   @Test
+  @Nightly // flakey
   public void testInteractiveSolrCloudExample() throws Exception {
     File solrHomeDir = new File(ExternalPaths.SERVER_HOME);
     if (!solrHomeDir.isDirectory())

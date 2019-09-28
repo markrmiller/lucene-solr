@@ -16,6 +16,9 @@
  */
 package org.apache.solr.search.stats;
 
+import org.apache.lucene.util.LuceneTestCase;
+
+@LuceneTestCase.Slow
 public class TestLRUStatsCache extends TestBaseStatsCache {
   @Override
   protected String getStatsCacheClassName() {

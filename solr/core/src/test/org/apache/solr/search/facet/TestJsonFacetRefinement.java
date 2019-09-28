@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 
 import org.apache.solr.JSONTestUtil;
@@ -36,6 +37,7 @@ import org.junit.Test;
 import org.noggit.JSONParser;
 import org.noggit.ObjectBuilder;
 
+@LuceneTestCase.Slow
 public class TestJsonFacetRefinement extends SolrTestCaseHS {
 
   private static SolrInstances servers;  // for distributed testing

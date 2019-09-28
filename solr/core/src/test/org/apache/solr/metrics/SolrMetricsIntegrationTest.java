@@ -28,6 +28,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.core.CoreContainer;
@@ -43,6 +44,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SolrMetricsIntegrationTest extends SolrTestCaseJ4 {
   private static final int MAX_ITERATIONS = 20;
   private static final String CORE_NAME = "metrics_integration";

@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -34,7 +36,7 @@ import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.slf4j.Logger;
@@ -50,8 +52,12 @@ public abstract class IterativeMergeStrategy implements MergeStrategy  {
 
   public void merge(ResponseBuilder rb, ShardRequest sreq) {
     rb._responseDocs = new SolrDocumentList(); // Null pointers will occur otherwise.
-    rb.onePassDistributedQuery = true;   // Turn off the second pass distributed.
-    executorService = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("IterativeMergeStrategy"));
+    rb.onePassDistributedQuery = true; // Turn off the second pass distributed.
+    executorService = new MDCAwareThreadPoolExecutor(0, Integer.MAX_VALUE,
+        Long.getLong("solr.iterativeMergeExecIdleTime", 60), TimeUnit.SECONDS,
+        new SynchronousQueue<>(),
+        new SolrjNamedThreadFactory("IterativeMergeStrategy"));
+    
     httpClient = getHttpClient();
     try {
       process(rb, sreq);

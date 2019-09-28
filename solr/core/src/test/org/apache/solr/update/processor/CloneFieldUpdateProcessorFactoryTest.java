@@ -20,10 +20,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class CloneFieldUpdateProcessorFactoryTest extends UpdateProcessorTestBase {
 
   @BeforeClass

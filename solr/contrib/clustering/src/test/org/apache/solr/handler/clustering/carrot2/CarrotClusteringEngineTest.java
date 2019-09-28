@@ -29,6 +29,7 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -48,6 +49,7 @@ import org.junit.Test;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class CarrotClusteringEngineTest extends AbstractClusteringTestCase {
   @Test
   public void testCarrotLingo() throws Exception {

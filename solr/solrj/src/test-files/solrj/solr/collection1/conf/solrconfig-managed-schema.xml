@@ -22,6 +22,9 @@
 -->
 <config>
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
 
   <schemaFactory class="ManagedIndexSchemaFactory">
     <bool name="mutable">true</bool>

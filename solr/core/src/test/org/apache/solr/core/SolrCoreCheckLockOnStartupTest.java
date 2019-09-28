@@ -22,6 +22,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.NativeFSLockFactory;
 import org.apache.lucene.store.SimpleFSLockFactory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,6 +34,7 @@ import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.util.Map;
 
+@LuceneTestCase.Slow
 public class SolrCoreCheckLockOnStartupTest extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

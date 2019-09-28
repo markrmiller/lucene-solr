@@ -22,6 +22,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.common.SolrException;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.core.TestSolrConfigHandler.runConfigCommand;
 
+@LuceneTestCase.Slow
 public class TestStreamBody extends RestTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

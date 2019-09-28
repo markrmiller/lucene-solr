@@ -19,6 +19,7 @@ package org.apache.solr;
 import java.io.IOException;
 
 import org.apache.lucene.search.TimeLimitingCollector;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -30,6 +31,7 @@ import org.junit.Test;
  * Tests that highlighting doesn't break on grouped documents
  * with duplicate unique key fields stored on multiple shards.
  */
+@LuceneTestCase.Slow
 public class TestHighlightDedupGrouping extends BaseDistributedSearchTestCase {
 
   private static final String id_s1 = "id_s1"; // string copy of the id for highlighting

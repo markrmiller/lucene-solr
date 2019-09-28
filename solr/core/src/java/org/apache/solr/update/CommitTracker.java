@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.core.SolrCore;
@@ -59,7 +60,7 @@ public final class CommitTracker implements Runnable {
   private long tLogFileSizeUpperBound;
   
   private final ScheduledExecutorService scheduler = 
-      Executors.newScheduledThreadPool(1, new DefaultSolrThreadFactory("commitScheduler"));
+      Executors.newScheduledThreadPool(0, new DefaultSolrThreadFactory("commitScheduler"));
   private ScheduledFuture pending;
   
   // state
@@ -82,6 +83,10 @@ public final class CommitTracker implements Runnable {
     
     this.docsUpperBound = docsUpperBound;
     this.timeUpperBound = timeUpperBound;
+    
+    System.out.println("CommitTrackerDocUpper:" + docsUpperBound);
+    System.out.println("CommitTrackerDocUpper:" + timeUpperBound);
+    
     this.tLogFileSizeUpperBound = tLogFileSizeUpperBound;
     
     this.softCommit = softCommit;
@@ -243,6 +248,10 @@ public final class CommitTracker implements Runnable {
   /** This is the worker part for the ScheduledFuture **/
   @Override
   public void run() {
+    if (this.core.isClosed()) {
+      return;
+    }
+    
     synchronized (this) {
       // log.info("###start commit. pending=null");
       pending = null;  // allow a new commit to be scheduled
@@ -268,6 +277,8 @@ public final class CommitTracker implements Runnable {
       autoCommitCount.incrementAndGet();
 
       core.getUpdateHandler().commit(command);
+    } catch (AlreadyClosedException e) {
+      log.info("We are closing ...");
     } catch (Exception e) {
       SolrException.log(log, "auto commit error...", e);
     } finally {

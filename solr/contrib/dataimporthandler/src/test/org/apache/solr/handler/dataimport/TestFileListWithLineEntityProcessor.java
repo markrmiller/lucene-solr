@@ -23,6 +23,7 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
 public class TestFileListWithLineEntityProcessor extends AbstractDataImportHandlerTestCase {
   @BeforeClass
   public static void beforeClass() throws Exception {

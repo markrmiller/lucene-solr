@@ -16,6 +16,7 @@
  */
 package org.apache.solr.ltr.feature;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.ltr.FeatureLoggerTestUtils;
 import org.apache.solr.ltr.TestRerankBase;
@@ -23,6 +24,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestExternalFeatures extends TestRerankBase {
 
   @BeforeClass

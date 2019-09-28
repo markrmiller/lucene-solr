@@ -31,6 +31,7 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -56,12 +57,13 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class IndexSizeEstimatorTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static CloudSolrClient solrClient;
   private static String collection = IndexSizeEstimator.class.getSimpleName() + "_collection";
-  private static int NUM_DOCS = 2000;
+  private static int NUM_DOCS = TEST_NIGHTLY ? 2000 : 200;
   private static Set<String> fields;
 
   @BeforeClass

@@ -33,6 +33,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.lucene.util.Constants;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestRuleRestoreSystemProperties;
 
 import org.apache.solr.SolrTestCaseJ4;
@@ -50,6 +51,7 @@ import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
 import org.apache.solr.util.SSLTestConfig;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.rules.TestRule;
 
@@ -63,6 +65,9 @@ import org.slf4j.LoggerFactory;
  *
  * @see TestSSLRandomization
  */
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class TestMiniSolrCloudClusterSSL extends SolrTestCaseJ4 {
 
   private static final SSLContext DEFAULT_SSL_CONTEXT;

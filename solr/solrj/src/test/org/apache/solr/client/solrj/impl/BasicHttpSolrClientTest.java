@@ -53,6 +53,7 @@ import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.cookie.BasicClientCookie;
 import org.apache.http.protocol.HttpContext;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -77,7 +78,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@LuceneTestCase.Slow
 public class BasicHttpSolrClientTest extends SolrJettyTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

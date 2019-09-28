@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -102,7 +103,7 @@ public class TestInPlaceUpdateWithRouteField extends SolrCloudTestCase {
     SolrInputDocument sdoc = sdoc("id", ""+id,
         // use route field in update command
         "shardName", shardName,
-        "inplace_updatable_int", map("set", newDocValue));
+        "inplace_updatable_int", SolrTestCaseJ4.map("set", newDocValue));
     
     UpdateRequest updateRequest = new UpdateRequest()
         .add(sdoc);

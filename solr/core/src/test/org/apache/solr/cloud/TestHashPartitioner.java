@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.CompositeIdRouter;
@@ -33,6 +34,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.StrUtils;
 
+@LuceneTestCase.Slow
 public class TestHashPartitioner extends SolrTestCaseJ4 {
   
   public void testMapHashes() throws Exception {

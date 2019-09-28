@@ -21,6 +21,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.carrotsearch.randomizedtesting.rules.SystemPropertiesRestoreRule;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.TermVectorParams;
 import org.junit.BeforeClass;
@@ -33,6 +35,7 @@ import org.junit.rules.TestRule;
  *
  *
  **/
+@LuceneTestCase.Slow
 public class TermVectorComponentTest extends SolrTestCaseJ4 {
 
   @Rule

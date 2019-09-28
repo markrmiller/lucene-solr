@@ -19,6 +19,8 @@ package org.apache.solr.handler.component;
 import static org.apache.solr.util.stats.InstrumentedHttpListenerFactory.KNOWN_METRIC_NAME_STRATEGIES;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.MalformedURLException;
@@ -82,7 +84,7 @@ import org.apache.solr.util.stats.MetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.apache.solr.util.plugin.PluginInfoInitialized, SolrMetricProducer {
+public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.apache.solr.util.plugin.PluginInfoInitialized, SolrMetricProducer, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String DEFAULT_SCHEME = "http";
   
@@ -346,18 +348,19 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
   @Override
   public void close() {
     try {
-      ExecutorUtil.shutdownAndAwaitTermination(commExecutor);
-    } finally {
       try {
         if (loadbalancer != null) {
-          loadbalancer.close();
+          IOUtils.closeQuietly(loadbalancer);
         }
-      } finally { 
+      } finally {
         if (defaultClient != null) {
           IOUtils.closeQuietly(defaultClient);
         }
       }
+    } finally {
+      ExecutorUtil.shutdownAndAwaitTermination(commExecutor);
     }
+
   }
 
   /**

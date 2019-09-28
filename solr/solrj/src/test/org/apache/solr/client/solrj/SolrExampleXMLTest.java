@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.XMLResponseParser;
@@ -27,6 +28,7 @@ import org.junit.BeforeClass;
  * communication.
  */
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
 public class SolrExampleXMLTest extends SolrExampleTests {
   @BeforeClass
   public static void beforeTest() throws Exception {

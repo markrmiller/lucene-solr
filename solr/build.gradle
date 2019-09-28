@@ -37,3 +37,12 @@ task packageDist(type: org.apache.lucene.gradle.dist.PackageLuceneSolrDist) {
   
   dependsOn project("solr-server").getStartJar
 }
+//configure(subprojects) {
+//plugins.withType(JavaPlugin) {
+//
+//  test {
+//    forkEvery = 30
+//  }
+//}
+//}
+

@@ -16,7 +16,9 @@
  */
 package org.apache.solr.core;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.handler.ReplicationHandler;
@@ -42,6 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+@LuceneTestCase.Slow
 public class SolrCoreTest extends SolrTestCaseJ4 {
   private static final String COLLECTION1 = "collection1";
   
@@ -185,8 +188,8 @@ public class SolrCoreTest extends SolrTestCaseJ4 {
     assertNull(old); // should not be anything...
     assertEquals(core.getRequestHandlers().get(path), handler1);
 
-    final int LOOP = 100;
-    final int MT = 16;
+    final int LOOP = TEST_NIGHTLY ? 100 : 5;
+    final int MT = TEST_NIGHTLY ? 16 : 4;
     ExecutorService service = ExecutorUtil.newMDCAwareFixedThreadPool(MT, new DefaultSolrThreadFactory("refCountMT"));
     List<Callable<Integer>> callees = new ArrayList<>(MT);
     final CoreContainer cores = h.getCoreContainer();
@@ -238,8 +241,7 @@ public class SolrCoreTest extends SolrTestCaseJ4 {
     assertTrue("Refcount != 0", core.getOpenCount() == 0);
     assertTrue("Handler not closed", core.isClosed() && handler1.closed == true);
     
-    service.shutdown();
-    assertTrue("Running for too long...", service.awaitTermination(60, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(service);
   }
 
   @Test
@@ -289,8 +291,7 @@ public class SolrCoreTest extends SolrTestCaseJ4 {
     // and close it when we call reload.
     h.reload();
 
-    executor.shutdown();
-    executor.awaitTermination(1, TimeUnit.MINUTES);
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
 
     // Check that all cores are closed and no searcher references are leaked.
     assertTrue("SolrCore " + core + " is not closed", core.isClosed());
@@ -311,7 +312,7 @@ public class SolrCoreTest extends SolrTestCaseJ4 {
           RefCounted<SolrIndexSearcher> newSearcher = null;
           try {
             newSearcher = core.openNewSearcher(true, true);
-          } catch (SolrCoreState.CoreIsClosedException e) {
+          } catch (AlreadyClosedException.CoreIsClosedException e) {
             // closed
           } finally {
             if (newSearcher != null) {

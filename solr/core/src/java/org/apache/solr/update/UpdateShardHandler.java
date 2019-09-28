@@ -16,6 +16,7 @@
  */
 package org.apache.solr.update;
 
+import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.util.stats.InstrumentedHttpRequestExecutor.KNOWN_METRIC_NAME_STRATEGIES;
 
-public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
+public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean, Closeable {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

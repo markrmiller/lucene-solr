@@ -16,6 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -50,6 +54,7 @@ import org.junit.BeforeClass;
  * @see TestPseudoReturnFields 
  * @see TestRandomFlRTGCloud
  */
+@LuceneTestCase.Slow
 public class TestCloudPseudoReturnFields extends SolrCloudTestCase {
   
   private static final String DEBUG_LABEL = MethodHandles.lookup().lookupClass().getName();

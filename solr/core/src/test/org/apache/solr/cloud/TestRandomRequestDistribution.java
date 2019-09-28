@@ -27,6 +27,8 @@ import java.util.Set;
 
 
 import com.codahale.metrics.Counter;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4;
@@ -50,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slowest
 public class TestRandomRequestDistribution extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

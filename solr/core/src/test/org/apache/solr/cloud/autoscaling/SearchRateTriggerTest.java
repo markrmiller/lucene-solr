@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.AtomicDouble;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.cloud.autoscaling.ReplicaInfo;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -60,6 +61,7 @@ import org.junit.Test;
 /**
  *
  */
+@LuceneTestCase.Slowest
 public class SearchRateTriggerTest extends SolrCloudTestCase {
   private static final String PREFIX = SearchRateTriggerTest.class.getSimpleName() + "-";
   private static final String COLL1 = PREFIX + "collection1";

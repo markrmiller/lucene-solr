@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -49,6 +50,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 
+@LuceneTestCase.Slow
 public class DistributedUpdateProcessorTest extends SolrTestCaseJ4 {
 
   @Rule 
@@ -65,9 +67,7 @@ public class DistributedUpdateProcessorTest extends SolrTestCaseJ4 {
 
   @AfterClass
   public static void AfterClass() {
-    if (null != executor) { // may not have inited due to lack of mockito 
-      executor.shutdown();
-    }
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
     System.clearProperty("enable.update.log");
   }
 

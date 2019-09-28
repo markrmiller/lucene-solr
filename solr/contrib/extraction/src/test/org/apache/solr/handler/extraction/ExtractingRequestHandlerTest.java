@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ContentStream;
@@ -31,6 +32,7 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.processor.BufferingRequestProcessor;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -59,6 +61,12 @@ public class ExtractingRequestHandlerTest extends SolrTestCaseJ4 {
   @Before
   public void setUp() throws Exception {
     super.setUp();
+  }
+  
+  @Override
+  @After
+  public void tearDown() throws Exception {
+    super.tearDown();
     clearIndex();
     assertU(commit());
   }

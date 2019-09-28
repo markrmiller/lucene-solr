@@ -30,7 +30,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexNotFoundException;
 import org.apache.lucene.store.SimpleFSDirectory;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
 
 @SolrTestCaseJ4.SuppressSSL // Currently unknown why SSL does not work with this test
-@Slow
+@LuceneTestCase.Slowest
 public class TestSolrCoreSnapshots extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static long docsSeed; // see indexDocs()

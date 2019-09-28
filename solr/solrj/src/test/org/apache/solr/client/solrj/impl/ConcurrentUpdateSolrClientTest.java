@@ -17,6 +17,7 @@
 package org.apache.solr.client.solrj.impl;
 
 import org.apache.http.HttpResponse;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -45,6 +46,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@LuceneTestCase.Slow
 public class ConcurrentUpdateSolrClientTest extends SolrJettyTestBase {
 
   /**
@@ -168,8 +170,7 @@ public class ConcurrentUpdateSolrClientTest extends SolrJettyTestBase {
       threadPool.execute(new SendDocsRunnable(String.valueOf(r), numDocs, concurrentClient));
     
     // ensure all docs are sent
-    threadPool.awaitTermination(5, TimeUnit.SECONDS);
-    threadPool.shutdown();
+    ExecutorUtil.shutdownAndAwaitTermination(threadPool);
     
     // wait until all requests are processed by CUSS 
     concurrentClient.blockUntilFinished();

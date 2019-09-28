@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.cloud.ZkTestServer;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.SuppressForbidden;
@@ -42,6 +43,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class TestZKPropertiesWriter extends AbstractDataImportHandlerTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   protected static ZkTestServer zkServer;

@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj.io.stream;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.Thread.State;
 import java.lang.invoke.MethodHandles;
@@ -49,7 +50,7 @@ import static org.apache.solr.common.params.CommonParams.ID;
 /**
  * @since 6.0.0
  */
-public class DaemonStream extends TupleStream implements Expressible {
+public class DaemonStream extends TupleStream implements Expressible, Closeable {
 
   private TupleStream tupleStream;
   private StreamRunner streamRunner;
@@ -65,6 +66,7 @@ public class DaemonStream extends TupleStream implements Expressible {
   private Map<String, DaemonStream> daemons;
   private boolean terminate;
   private boolean closed = false;
+  private ExecutorService service;
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public DaemonStream(StreamExpression expression, StreamFactory factory) throws IOException{
@@ -206,12 +208,12 @@ public class DaemonStream extends TupleStream implements Expressible {
     }
     this.closed = false;
     this.streamRunner = new StreamRunner(runInterval, id);
-    ExecutorService service = ExecutorUtil.newMDCAwareSingleThreadExecutor(new SolrjNamedThreadFactory("DaemonStream-" + id));
+    service = ExecutorUtil.newMDCAwareSingleThreadExecutor(new SolrjNamedThreadFactory("DaemonStream-" + id));
     try {
       service.submit(this.streamRunner);
     }
     finally {
-      service.shutdown();
+      service.shutdown(); // we prevent other tasks from being submitted
     }
   }
 
@@ -232,17 +234,31 @@ public class DaemonStream extends TupleStream implements Expressible {
   }
 
   public void shutdown() {
-    streamRunner.setShutdown(true);
+    if (streamRunner != null) {
+      streamRunner.setShutdown(true);
+    }
+    
+
+    ExecutorUtil.shutdownAndAwaitTermination(service, 3);
+    
+
+    ExecutorUtil.shutdownWithInterruptAndAwaitTermination(service);
+    
   }
 
   public void close() {
+    this.closed = true;
     if(closed) {
       return;
     }
     if (streamRunner != null) {
       streamRunner.setShutdown(true);
     }
-    this.closed = true;
+
+    ExecutorUtil.shutdownAndAwaitTermination(service, 3);
+    
+
+    ExecutorUtil.shutdownWithInterruptAndAwaitTermination(service);
   }
 
   public List<TupleStream> children() {
@@ -303,10 +319,12 @@ public class DaemonStream extends TupleStream implements Expressible {
 
     public State getState() {
       if (executingThread == null) {
-        if (shutdown) {
-          return Thread.State.TERMINATED;
-        } else {
-          return Thread.State.NEW;
+        synchronized (this) {
+          if (shutdown) {
+            return Thread.State.TERMINATED;
+          } else {
+            return Thread.State.NEW;
+          }
         }
       } else {
         return executingThread.getState();

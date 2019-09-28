@@ -20,6 +20,10 @@
 <config>
 
   <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.RAMDirectoryFactory}"/>
+  
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
 
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
 

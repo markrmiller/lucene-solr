@@ -17,6 +17,8 @@
 
 package org.apache.solr.update.processor;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -102,7 +105,7 @@ public abstract class RoutedAliasUpdateProcessorTest extends SolrCloudTestCase {
 
   /** @see TrackingUpdateProcessorFactory */
   String getTrackUpdatesGroupName() {
-    return getSaferTestName();
+    return "GroupName";
   }
 
   void createConfigSet(String configName) throws SolrServerException, IOException, InterruptedException {
@@ -152,6 +155,7 @@ public abstract class RoutedAliasUpdateProcessorTest extends SolrCloudTestCase {
         new ConfigSetAdminRequest.List().process(getSolrClient()).getConfigSets()
             .contains(configName)
     );
+    cluster.waitForRemovedCollection(configName);
   }
 
   String getIntField() {
@@ -285,7 +289,7 @@ public abstract class RoutedAliasUpdateProcessorTest extends SolrCloudTestCase {
           assertEquals(0, exec.shutdownNow().size());
         } finally {
           if (exec != null) {
-            exec.shutdownNow();
+            ExecutorUtil.shutdownWithInterruptAndAwaitTermination(exec);
           }
         }
       }

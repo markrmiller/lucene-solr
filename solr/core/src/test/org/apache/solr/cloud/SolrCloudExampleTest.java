@@ -32,6 +32,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.StreamingUpdateRequest;
@@ -56,6 +57,7 @@ import static org.apache.solr.common.util.Utils.getObjectByPath;
  * use data driven functionality and managed schema features of the default configset
  * (configsets/_default).
  */
+@LuceneTestCase.Slow
 public class SolrCloudExampleTest extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

@@ -134,7 +134,9 @@ public class ConnectionManager implements Watcher {
       likelyExpiredState = LikelyExpiredState.EXPIRED;
 
       log.warn("Our previous ZooKeeper session was expired. Attempting to reconnect to recover relationship with ZooKeeper...");
-
+      if (isClosed()) {
+        return;
+      }
       if (beforeReconnect != null) {
         try {
           beforeReconnect.command();
@@ -142,7 +144,9 @@ public class ConnectionManager implements Watcher {
           log.warn("Exception running beforeReconnect command", e);
         }
       }
-
+      if (isClosed()) {
+        return;
+      }
       do {
         // This loop will break if a valid connection is made. If a connection is not made then it will repeat and
         // try again to create a new connection.
@@ -154,7 +158,9 @@ public class ConnectionManager implements Watcher {
                 public void update(SolrZooKeeper keeper) {
                   try {
                     waitForConnected(Long.MAX_VALUE);
-
+                    if (isClosed()) {
+                      return;
+                    }
                     try {
                       client.updateKeeper(keeper);
                     } catch (InterruptedException e) {
@@ -183,6 +189,9 @@ public class ConnectionManager implements Watcher {
         } catch (Exception e) {
           SolrException.log(log, "", e);
           log.info("Could not connect due to error, sleeping for 1s and trying again");
+          if (isClosed()) {
+            return;
+          }
           waitSleep(1000);
         }
 
@@ -192,6 +201,9 @@ public class ConnectionManager implements Watcher {
       log.warn("zkClient has disconnected");
       disconnected();
       connectionStrategy.disconnected();
+      if (isClosed()) {
+        return;
+      }
     } else if (state == KeeperState.AuthFailed) {
       log.warn("zkClient received AuthFailed");
     }

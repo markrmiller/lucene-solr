@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @Slow
 @Nightly
@@ -39,6 +40,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 })
 // commented 20-July-2018  @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 26-Mar-2018
 // commented out on: 24-Dec-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 17-Aug-2018
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsBasicDistributedZk2Test extends BasicDistributedZk2Test {
   private static MiniDFSCluster dfsCluster;
   

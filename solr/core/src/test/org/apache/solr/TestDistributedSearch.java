@@ -32,7 +32,9 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -73,7 +75,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since solr 1.3
  */
-@Slow
+@LuceneTestCase.Slowest
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-9061")
 public class TestDistributedSearch extends BaseDistributedSearchTestCase {
 
@@ -98,17 +100,16 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
   }
 
   @BeforeClass
-  public static void beforeClass() {
+  public static void beforeClass() throws Exception {
     // we shutdown a jetty and start it and try to use
     // the same http client pretty fast - this lowered setting makes sure
     // we validate the connection before use on the restarted
     // server so that we don't use a bad one
+    System.setProperty("bucketVersionLockTimeoutMs", "3000");
     System.setProperty("validateAfterInactivity", "200");
-    
+    System.setProperty("socketTimeout", "15000");
     System.setProperty("solr.httpclient.retries", "0");
     System.setProperty("distribUpdateSoTimeout", "5000");
-    
-
   }
 
   public TestDistributedSearch() {
@@ -117,7 +118,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
   }
   
   @Test
-  public void test() throws Exception {
+  public void basicSolrCloudTest() throws Exception {
     
     assertEquals(clients.size(), jettys.size());
     
@@ -401,7 +402,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     query("q", "toyata", "fl", "id,lowerfilt", "spellcheck", true, "spellcheck.q", "toyata", "qt", "/spellCheckCompRH_Direct", "shards.qt", "/spellCheckCompRH_Direct");
 
     stress=0;  // turn off stress... we want to tex max combos in min time
-    for (int i=0; i<25*RANDOM_MULTIPLIER; i++) {
+    for (int i=0; i< (TEST_NIGHTLY ? 25 : 3) *RANDOM_MULTIPLIER; i++) {
       String f = fieldNames[random().nextInt(fieldNames.length)];
       if (random().nextBoolean()) f = t1;  // the text field is a really interesting one to facet on (and it's multi-valued too)
 
@@ -664,48 +665,49 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
       "min", "max", "sum", "sumOfSquares", "stddev", "mean", "missing", "count"
     };
     
-    // ask for arbitrary pairs of stats
-    for (String stat1 : stats) {
-      for (String stat2 : stats) {
-        // NOTE: stat1 might equal stat2 - good edge case to test for
+    
+    if (TEST_NIGHTLY) { // this can be *very* slow
+      // ask for arbitrary pairs of stats
+      for (String stat1 : stats) {
+        for (String stat2 : stats) {
+          // NOTE: stat1 might equal stat2 - good edge case to test for
 
-        rsp = query("q","*:*", "sort",i1+" desc", "stats", "true",
-                    "stats.field", "{!" + stat1 + "=true " + stat2 + "=true}" + i1);
+          rsp = query("q", "*:*", "sort", i1 + " desc", "stats", "true",
+              "stats.field", "{!" + stat1 + "=true " + stat2 + "=true}" + i1);
 
-        final List<String> statsExpected = new ArrayList<String>(2);
-        statsExpected.add(stat1);
-        if ( ! stat1.equals(stat2) ) {
-          statsExpected.add(stat2);
-        }
+          final List<String> statsExpected = new ArrayList<String>(2);
+          statsExpected.add(stat1);
+          if (!stat1.equals(stat2)) {
+            statsExpected.add(stat2);
+          }
 
-        // ignore the FieldStatsInfo convinience class, and look directly at the NamedList
-        // so we don't need any sort of crazy reflection
-        NamedList<Object> svals = 
-          ((NamedList<NamedList<NamedList<Object>>>)
-           rsp.getResponse().get("stats")).get("stats_fields").get(i1);
+          // ignore the FieldStatsInfo convinience class, and look directly at the NamedList
+          // so we don't need any sort of crazy reflection
+          NamedList<Object> svals = ((NamedList<NamedList<NamedList<Object>>>) rsp.getResponse().get("stats"))
+              .get("stats_fields").get(i1);
 
-        assertNotNull("no stats for field " + i1, svals);
-        assertEquals("wrong quantity of stats", statsExpected.size(), svals.size());
+          assertNotNull("no stats for field " + i1, svals);
+          assertEquals("wrong quantity of stats", statsExpected.size(), svals.size());
 
-        
-        for (String s : statsExpected) {
-          assertNotNull("stat shouldn't be null: " + s, svals.get(s));
-          assertTrue("stat should be a Number: " + s + " -> " + svals.get(s).getClass(),
-                     svals.get(s) instanceof Number);
-          // some loose assertions since we're iterating over various stats
-          if (svals.get(s) instanceof Double) {
-            Double val = (Double) svals.get(s);
-            assertFalse("stat shouldn't be NaN: " + s, val.isNaN());
-            assertFalse("stat shouldn't be Inf: " + s, val.isInfinite());
-            assertFalse("stat shouldn't be 0: " + s, val.equals(0.0D));
-          } else {
-            // count or missing
-            assertTrue("stat should be count of missing: " + s,
-                       ("count".equals(s) || "missing".equals(s)));
-            assertTrue("stat should be a Long: " + s + " -> " + svals.get(s).getClass(),
-                       svals.get(s) instanceof Long);
-            Long val = (Long) svals.get(s);
-            assertFalse("stat shouldn't be 0: " + s, val.equals(0L));
+          for (String s : statsExpected) {
+            assertNotNull("stat shouldn't be null: " + s, svals.get(s));
+            assertTrue("stat should be a Number: " + s + " -> " + svals.get(s).getClass(),
+                svals.get(s) instanceof Number);
+            // some loose assertions since we're iterating over various stats
+            if (svals.get(s) instanceof Double) {
+              Double val = (Double) svals.get(s);
+              assertFalse("stat shouldn't be NaN: " + s, val.isNaN());
+              assertFalse("stat shouldn't be Inf: " + s, val.isInfinite());
+              assertFalse("stat shouldn't be 0: " + s, val.equals(0.0D));
+            } else {
+              // count or missing
+              assertTrue("stat should be count of missing: " + s,
+                  ("count".equals(s) || "missing".equals(s)));
+              assertTrue("stat should be a Long: " + s + " -> " + svals.get(s).getClass(),
+                  svals.get(s) instanceof Long);
+              Long val = (Long) svals.get(s);
+              assertFalse("stat shouldn't be 0: " + s, val.equals(0L));
+            }
           }
         }
       }
@@ -828,56 +830,60 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     EnumSet<Stat> allStats = EnumSet.complementOf(EnumSet.of(Stat.percentiles));
 
     int numTotalStatQueries = 0;
-    // don't go overboard, just do all permutations of 1 or 2 stat params, for each field & query
-    final int numStatParamsAtOnce = 2; 
-    for (int numParams = 1; numParams <= numStatParamsAtOnce; numParams++) {
-      for (EnumSet<Stat> set : new StatSetCombinations(numParams, allStats)) {
+    if (TEST_NIGHTLY) { // speed up normal run
 
-        for (String field : new String[] {
-            "foo_f", i1, tlong, tdate_a, oddField, "foo_sev_enum",
-            // fields that no doc has any value in
-            "bogus___s", "bogus___f", "bogus___i", "bogus___tdt", "bogus___sev_enum"
+      // don't go overboard, just do all permutations of 1 or 2 stat params, for each field & query
+      final int numStatParamsAtOnce = 2;
+      for (int numParams = 1; numParams <= numStatParamsAtOnce; numParams++) {
+        for (EnumSet<Stat> set : new StatSetCombinations(numParams, allStats)) {
+
+          for (String field : new String[] {
+              "foo_f", i1, tlong, tdate_a, oddField, "foo_sev_enum",
+              // fields that no doc has any value in
+              "bogus___s", "bogus___f", "bogus___i", "bogus___tdt", "bogus___sev_enum"
           }) {
 
-          for ( String q : new String[] {
-              "*:*",                         // all docs
-              "bogus___s:bogus",             // no docs
-              "id:" + random().nextInt(50 ), // 0 or 1 doc...
-              "id:" + random().nextInt(50 ), 
-              "id:" + random().nextInt(100), 
-              "id:" + random().nextInt(100), 
-              "id:" + random().nextInt(200) 
+            for (String q : new String[] {
+                "*:*", // all docs
+                "bogus___s:bogus", // no docs
+                "id:" + random().nextInt(50), // 0 or 1 doc...
+                "id:" + random().nextInt(50),
+                "id:" + random().nextInt(100),
+                "id:" + random().nextInt(100),
+                "id:" + random().nextInt(200)
             }) {
 
-            // EnumSets use natural ordering, we want to randomize the order of the params
-            List<Stat> combo = new ArrayList<Stat>(set);
-            Collections.shuffle(combo, random());
-            
-            StringBuilder paras = new StringBuilder("{!key=k ");
-            
-            for (Stat stat : combo) {
-              paras.append(stat + "=true ");
-            }
-            
-            paras.append("}").append(field);
-            numTotalStatQueries++;
-            rsp = query("q", q, "rows", "0", "stats", "true",
-                        "stats.field", paras.toString());
-            // simple assert, mostly relying on comparison with single shard
-            FieldStatsInfo s = rsp.getFieldStatsInfo().get("k");
-            assertNotNull(s);
+              // EnumSets use natural ordering, we want to randomize the order of the params
+              List<Stat> combo = new ArrayList<Stat>(set);
+              Collections.shuffle(combo, random());
 
-            // TODO: if we had a programatic way to determine what stats are supported 
-            // by what field types, we could make more confident asserts here.
+              StringBuilder paras = new StringBuilder("{!key=k ");
+
+              for (Stat stat : combo) {
+                paras.append(stat + "=true ");
+              }
+
+              paras.append("}").append(field);
+              numTotalStatQueries++;
+              rsp = query("q", q, "rows", "0", "stats", "true",
+                  "stats.field", paras.toString());
+              // simple assert, mostly relying on comparison with single shard
+              FieldStatsInfo s = rsp.getFieldStatsInfo().get("k");
+              assertNotNull(s);
+
+              // TODO: if we had a programatic way to determine what stats are supported
+              // by what field types, we could make more confident asserts here.
+            }
           }
         }
       }
+
+      handle.remove("stddev");
+      handle.remove("sumOfSquares");
+      assertEquals("Sanity check failed: either test broke, or test changed, or you adjusted Stat enum" +
+          " (adjust constant accordingly if intentional)",
+          5082, numTotalStatQueries);
     }
-    handle.remove("stddev");
-    handle.remove("sumOfSquares");
-    assertEquals("Sanity check failed: either test broke, or test changed, or you adjusted Stat enum" + 
-                 " (adjust constant accordingly if intentional)",
-                 5082, numTotalStatQueries);
 
     /*** TODO: the failure may come back in "exception"
     try {
@@ -971,6 +977,10 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     List<String> upShards = Collections.synchronizedList(new ArrayList<>(Arrays.asList(shardsArr)));
     
     int cap =  Math.max(upJettys.size() - 1, 1);
+    
+    if (!TEST_NIGHTLY) { // speed up normal run
+      cap =  Math.max(upJettys.size() - 3, 1);
+    }
 
     int numDownServers = random().nextInt(cap);
     for (int i = 0; i < numDownServers; i++) {
@@ -1014,7 +1024,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
         "group.query", t1 + ":kings OR " + t1 + ":eggs",
         "group.limit", 10,
         "sort", i1 + " asc, id asc",
-        CommonParams.TIME_ALLOWED, 10000,
+        CommonParams.TIME_ALLOWED, 500,
         ShardParams.SHARDS_INFO, "true",
         ShardParams.SHARDS_TOLERANT, "true");
 

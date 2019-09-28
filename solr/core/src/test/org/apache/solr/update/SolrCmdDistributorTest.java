@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.xml.parsers.ParserConfigurationException;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -60,6 +62,7 @@ import org.junit.Test;
 import org.xml.sax.SAXException;
 
 // See: https://issues.apache.org/jira/browse/SOLR-12028 Tests cannot remove files on Windows machines occasionally
+@LuceneTestCase.Slow
 public class SolrCmdDistributorTest extends BaseDistributedSearchTestCase {
   
   private static enum NodeType {FORWARD, STANDARD};

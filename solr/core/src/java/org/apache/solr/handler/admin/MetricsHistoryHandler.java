@@ -651,19 +651,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
   @Override
   public void close() {
     log.debug("Closing " + hashCode());
-    if (collectService != null) {
-      boolean shutdown = false;
-      while (!shutdown) {
-        try {
-          // Wait a while for existing tasks to terminate
-          collectService.shutdownNow();
-          shutdown = collectService.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-          // Preserve interrupt status
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
+    ExecutorUtil.shutdownWithInterruptAndAwaitTermination(collectService);
     if (factory != null) {
       factory.close();
     }

@@ -18,8 +18,11 @@
 package org.apache.solr.cloud.hdfs;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -38,6 +41,8 @@ import org.junit.BeforeClass;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@Nightly
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HDFSCollectionsAPITest extends SolrCloudTestCase {
 
   private static MiniDFSCluster dfsCluster;

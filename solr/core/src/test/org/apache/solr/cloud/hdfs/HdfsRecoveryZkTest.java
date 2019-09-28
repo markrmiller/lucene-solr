@@ -17,6 +17,8 @@
 package org.apache.solr.cloud.hdfs;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.lucene.util.LuceneTestCase.BadApple;
@@ -37,6 +39,7 @@ import org.junit.BeforeClass;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsRecoveryZkTest extends RecoveryZkTest {
   private static MiniDFSCluster dfsCluster;
   

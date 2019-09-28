@@ -29,6 +29,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.InputStreamEntity;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrExampleTests;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -53,6 +54,7 @@ import static org.apache.solr.common.util.Utils.fromJSONString;
  * 
  */
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
 public class SolrExampleJettyTest extends SolrExampleTests {
 
   @BeforeClass

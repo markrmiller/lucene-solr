@@ -18,6 +18,7 @@ package org.apache.solr.cloud;
 
 import java.net.URL;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -27,6 +28,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.junit.Test;
 
 @SuppressSSL
+@LuceneTestCase.Slow
 public class TestRequestForwarding extends SolrTestCaseJ4 {
 
   private MiniSolrCloudCluster solrCluster;

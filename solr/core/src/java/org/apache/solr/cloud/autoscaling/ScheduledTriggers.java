@@ -58,6 +58,7 @@ import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.util.DefaultSolrThreadFactory;
+import org.eclipse.jetty.http2.hpack.HpackException.SessionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,6 +221,7 @@ public class ScheduledTriggers implements Closeable {
       if (isClosed || e instanceof AlreadyClosedException) {
         throw new AlreadyClosedException("ScheduledTriggers has been closed and cannot be used anymore");
       }
+      
       if (cloudManager.isClosed()) {
         log.error("Failed to add trigger " + newTrigger.getName() + " - closing or disconnected from data provider", e);
       } else {

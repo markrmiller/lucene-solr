@@ -227,7 +227,6 @@ based HashBitset. -->
     <lst name="spellchecker">
       <str name="name">default</str>
       <str name="field">lowerfilt</str>
-      <str name="spellcheckIndexDir">spellchecker1</str>
       <str name="buildOnCommit">false</str>
     </lst>
     <lst name="spellchecker">
@@ -247,7 +246,6 @@ based HashBitset. -->
     <lst name="spellchecker">
       <str name="name">multipleFields</str>
       <str name="field">lowerfilt1and2</str>
-      <str name="spellcheckIndexDir">spellcheckerMultipleFields</str>
       <str name="buildOnCommit">false</str>
     </lst>
     <!-- Example of using different distance measure -->
@@ -256,7 +254,6 @@ based HashBitset. -->
       <str name="field">lowerfilt</str>
       <!-- Use a different Distance Measure -->
       <str name="distanceMeasure">org.apache.lucene.search.spell.JaroWinklerDistance</str>
-      <str name="spellcheckIndexDir">spellchecker2</str>
 
     </lst>
     <lst name="spellchecker">
@@ -264,13 +261,11 @@ based HashBitset. -->
       <str name="name">external</str>
       <str name="sourceLocation">spellings.txt</str>
       <str name="characterEncoding">UTF-8</str>
-      <str name="spellcheckIndexDir">spellchecker3</str>
     </lst>
     <!-- Comparator -->
     <lst name="spellchecker">
       <str name="name">freq</str>
       <str name="field">lowerfilt</str>
-      <str name="spellcheckIndexDir">spellcheckerFreq</str>
       <!-- comparatorClass be one of:
         1. score (default)
         2. freq (Frequency first, then score)
@@ -282,7 +277,6 @@ based HashBitset. -->
     <lst name="spellchecker">
       <str name="name">fqcn</str>
       <str name="field">lowerfilt</str>
-      <str name="spellcheckIndexDir">spellcheckerFQCN</str>
       <str name="comparatorClass">org.apache.solr.spelling.SampleComparator</str>
       <str name="buildOnCommit">false</str>
     </lst>

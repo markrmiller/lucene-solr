@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -51,6 +52,8 @@ import org.slf4j.LoggerFactory;
  * Tests related to SOLR-6086
  */
 @LogLevel("org.apache.solr.cloud.overseer.*=DEBUG,org.apache.solr.cloud.Overseer=DEBUG,org.apache.solr.cloud.ZkController=DEBUG")
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class TestCloudSearcherWarming extends SolrCloudTestCase {
   public static final AtomicReference<String> coreNodeNameRef = new AtomicReference<>(null),
       coreNameRef = new AtomicReference<>(null);
@@ -81,7 +84,7 @@ public class TestCloudSearcherWarming extends SolrCloudTestCase {
       cluster.shutdown();
       cluster = null;
     }
-    TestInjection.wrongIndexFingerprint = null;
+    TestInjection.reset();
     
     super.tearDown();
   }
@@ -123,18 +126,23 @@ public class TestCloudSearcherWarming extends SolrCloudTestCase {
     // ie: workaround SOLR-13490
     cluster.getSolrClient().getZkStateReader().updateLiveNodes();
     waitForState("jetty count:" + cluster.getJettySolrRunners().size(), collectionName, clusterShape(1, 0));
-    
-    // restart
-    sleepTime.set(1000);
+
     runner.start();
-    cluster.waitForAllNodes(30);
+    
     cluster.getSolrClient().getZkStateReader().registerCollectionStateWatcher(collectionName, stateWatcher);
+    
     cluster.waitForActiveCollection(collectionName, 1, 1);
+    
+    
     assertNull("No replica should have been active without registering a searcher, found: " + failingCoreNodeName.get(), failingCoreNodeName.get());
+    
+    cluster.waitForNode(runner, 3);
+    
     cluster.getSolrClient().getZkStateReader().removeCollectionStateWatcher(collectionName, stateWatcher);
   }
 
   @Test
+  @Nightly
   public void testPeersyncFailureReplicationSuccess() throws Exception {
 
     CloudSolrClient solrClient = cluster.getSolrClient();

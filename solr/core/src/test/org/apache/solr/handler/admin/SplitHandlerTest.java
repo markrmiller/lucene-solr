@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.api.collections.SplitByPrefixTest;
 import org.apache.solr.cloud.api.collections.SplitByPrefixTest.Prefix;
@@ -34,6 +35,7 @@ import org.junit.Test;
 // test low level splitByPrefix range recommendations.
 // This is here to access package private methods.
 // See SplitByPrefixTest for cloud level tests of SPLITSHARD that use this by passing getRanges with the SPLIT command
+@LuceneTestCase.Slow
 public class SplitHandlerTest extends SolrTestCaseJ4 {
 
   @BeforeClass
@@ -78,6 +80,7 @@ public class SplitHandlerTest extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Nightly
   public void testRandomSplitRecommendations() throws Exception {
     Random rand = random();
     for (int i=0; i<10000; i++) { // 1M takes ~ 1 sec

@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -28,6 +29,7 @@ import org.apache.solr.client.solrj.response.RequestStatusState;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class DeleteStatusTest extends SolrCloudTestCase {
 
   public static final int MAX_WAIT_TIMEOUT = 30;

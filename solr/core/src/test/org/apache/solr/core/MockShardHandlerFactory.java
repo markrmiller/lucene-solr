@@ -16,6 +16,8 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
+
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.ResponseBuilder;
@@ -26,7 +28,7 @@ import org.apache.solr.handler.component.ShardResponse;
 import org.apache.solr.util.plugin.PluginInfoInitialized;
 
 /** a fake shardhandler factory that does nothing. */
-public class MockShardHandlerFactory extends ShardHandlerFactory implements PluginInfoInitialized {
+public class MockShardHandlerFactory extends ShardHandlerFactory implements PluginInfoInitialized, Closeable {
   NamedList args;
   
   @Override

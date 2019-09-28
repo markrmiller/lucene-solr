@@ -17,9 +17,11 @@
 
 package org.apache.solr.analysis;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
 public class TestDeprecatedFilters extends SolrTestCaseJ4 {
 
   @BeforeClass

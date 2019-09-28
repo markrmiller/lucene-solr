@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.request.ConfigSetAdminRequest;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
  * the responses indicate the requests are handled sequentially for
  * the same ConfigSet and base ConfigSet.
  */
+@LuceneTestCase.Slow
 public class TestConfigSetsAPIExclusivity extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

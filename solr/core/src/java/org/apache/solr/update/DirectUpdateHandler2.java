@@ -825,7 +825,7 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
       SolrRequestInfo.setRequestInfo(new SolrRequestInfo(req, rsp)); // important for debugging
     }
     try {
-      if (!commitOnClose) {
+      if (!commitOnClose || !Boolean.getBoolean("solr.commitOnClose")) {
         if (writer != null) {
           writer.rollback();
         }

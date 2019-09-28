@@ -186,7 +186,6 @@ public class TestSimPolicyCloud extends SimSolrCloudTestCase {
     assertEquals("Expected exactly three replica of collection on node with port: " + firstNodePort, 3, replicasOnNode1);
     assertEquals("Expected exactly three replica of collection on node with port: " + secondNodePort, 3, replicasOnNode2);
     CollectionAdminRequest.deleteCollection(collectionName).process(solrClient);
-
   }
 
   public void testMetricsTag() throws Exception {

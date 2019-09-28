@@ -117,8 +117,8 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @BeforeClass
-  public static void beforeFullSolrCloudTest() {
-
+  public static void beforeFullSolrCloudTest() throws Exception {
+    
   }
   
   @Before
@@ -289,7 +289,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
 
   public AbstractFullDistribZkTestBase() {
     sliceCount = 2;
-    fixShardCount(4);
+    fixShardCount(TEST_NIGHTLY ? 4 : 2);
 
     // TODO: for now, turn off stress because it uses regular clients, and we
     // need the cloud client because we kill servers
@@ -416,7 +416,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
                              // expect sliceCount active shards, but no active replicas
                              SolrCloudTestCase.activeClusterShape(sliceCount, 0));
     
-    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
+    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("jettyCreate"));
 
     int numOtherReplicas = numJettys - getPullReplicaCount() * sliceCount;
     
@@ -590,6 +590,16 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   protected void waitForLiveNode(JettySolrRunner j) throws InterruptedException, TimeoutException {
     log.info("waitForLiveNode: {}", j.getNodeName());
     cloudClient.getZkStateReader().waitForLiveNodes(30, TimeUnit.SECONDS, SolrCloudTestCase.containsLiveNode(j.getNodeName()));
+  }
+
+  public void waitForRemovedCollection(String collection) {
+    try {
+       cloudClient.waitForState(collection, 30, TimeUnit.SECONDS, (n, c) -> {
+        return c == null;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      throw new RuntimeException("Timeout waiting for removed collection: " + collection);
+    }
   }
 
   protected void waitForActiveReplicaCount(CloudSolrClient client, String collection, int expectedNumReplicas) throws TimeoutException, NotInClusterStateException {
@@ -1067,16 +1077,15 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
 
     query("q", "*:*", "sort", "n_tl1 desc");
 
-    handle.put("response", UNORDERED);  // get?ids=a,b,c requests are unordered
+    handle.put("response", UNORDERED); // get?ids=a,b,c requests are unordered
     String ids = "987654";
-    for (int i=0; i<20; i++) {
-      query("qt","/get", "id",Integer.toString(i));
-      query("qt","/get", "ids",Integer.toString(i));
+    for (int i = 0; i < (TEST_NIGHTLY ? 20 : 1); i++) {
+      query("qt", "/get", "id", Integer.toString(i));
+      query("qt", "/get", "ids", Integer.toString(i));
       ids = ids + ',' + Integer.toString(i);
-      query("qt","/get", "ids",ids);
+      query("qt", "/get", "ids", ids);
     }
     handle.remove("response");
-
 
 
     // random value sort
@@ -1227,12 +1236,12 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     indexr(id, 16, "SubjectTerms_mfacet", new String[] {"test 1", "test 2",
         "test3"});
     String[] vals = new String[100];
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < (TEST_NIGHTLY ? 100 : 5); i++) {
       vals[i] = "test " + i;
     }
     indexr(id, 17, "SubjectTerms_mfacet", vals);
 
-    for (int i = 100; i < 150; i++) {
+    for (int i = 100; i < (TEST_NIGHTLY ? 150 : 5); i++) {
       indexr(id, i);
     }
   }
@@ -1414,6 +1423,9 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   }
 
   protected void randomlyEnableAutoSoftCommit() {
+    if (!TEST_NIGHTLY) {
+      return;
+    }
     if (r.nextBoolean()) {
       enableAutoSoftCommit(1000);
     } else {
@@ -1728,9 +1740,11 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
       IOUtils.closeQuietly(c);
     }));
 
-    customThreadPool.submit(() -> Collections.singletonList(controlClientCloud).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
-    }));
+    if (controlClientCloud != null && controlClientCloud != cloudClient) {
+      customThreadPool.submit(() -> Collections.singletonList(controlClientCloud).parallelStream().forEach(c -> {
+        IOUtils.closeQuietly(c);
+      }));
+    }
 
     customThreadPool.submit(() -> Collections.singletonList(cloudClient).parallelStream().forEach(c -> {
       IOUtils.closeQuietly(c);
@@ -2030,7 +2044,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
       if (!missing) {
         return;
       }
-      Thread.sleep(50);
+      Thread.sleep(1000);
     }
 
     fail("Could not find the new collection - " + exp.code() + " : " + collectionClient.getBaseURL());
@@ -2061,17 +2075,19 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   }
 
   protected void createCollectionRetry(String testCollectionName, String configSetName, int numShards, int replicationFactor, int maxShardsPerNode)
-      throws SolrServerException, IOException, InterruptedException, TimeoutException {
+      throws Exception {
     CollectionAdminResponse resp = createCollection(testCollectionName, configSetName, numShards, replicationFactor, maxShardsPerNode);
     if (resp.getResponse().get("failure") != null) {
       CollectionAdminRequest.Delete req = CollectionAdminRequest.deleteCollection(testCollectionName);
       req.process(cloudClient);
+      waitForRemovedCollection(testCollectionName);
 
       resp = createCollection(testCollectionName, configSetName, numShards, replicationFactor, maxShardsPerNode);
 
       if (resp.getResponse().get("failure") != null) {
         fail("Could not create " + testCollectionName);
       }
+      waitForCollection(cloudClient.getZkStateReader(), testCollectionName, numShards);
     }
   }
 
@@ -2340,10 +2356,11 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
    * Logs a WARN if collection can't be deleted, but does not fail or throw an exception
    * @return true if success, else false
    */
-  protected static boolean attemptCollectionDelete(CloudSolrClient client, String collectionName) {
+  protected boolean attemptCollectionDelete(CloudSolrClient client, String collectionName) {
     // try to clean up
     try {
       CollectionAdminRequest.deleteCollection(collectionName).process(client);
+      waitForRemovedCollection(collectionName);
       return true;
     } catch (Exception e) {
       // don't fail the test
@@ -2410,8 +2427,10 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   }
 
   protected void closeRestTestHarnesses() throws IOException {
-    for (RestTestHarness h : restTestHarnesses) {
-      h.close();
+    synchronized (restTestHarnesses) {
+      for (RestTestHarness h : restTestHarnesses) {
+        h.close();
+      }
     }
   }
 

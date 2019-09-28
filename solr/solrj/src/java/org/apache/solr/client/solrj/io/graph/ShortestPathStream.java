@@ -370,7 +370,7 @@ public class ShortestPathStream extends TupleStream implements Expressible {
         ++depth;
       }
     } finally {
-      threadPool.shutdown();
+      ExecutorUtil.shutdownAndAwaitTermination(threadPool);
     }
 
     Set<String> finalPaths = new HashSet();

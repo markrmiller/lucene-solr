@@ -47,6 +47,7 @@ import org.apache.lucene.util.LuceneTestCase;
  *        |
  *       \./
  */
+@LuceneTestCase.Slow
 public class TestSort extends LuceneTestCase {
 
   private void assertEquals(Sort a, Sort b) {

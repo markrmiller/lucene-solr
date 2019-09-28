@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -55,6 +56,8 @@ import org.slf4j.LoggerFactory;
  * Test for {@link SystemLogListener}
  */
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG")
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly // slow test
 public class SystemLogListenerTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -88,6 +91,7 @@ public class SystemLogListenerTest extends SolrCloudTestCase {
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
     CollectionAdminRequest.createCollection(CollectionAdminParams.SYSTEM_COLL, null, 1, 3)
+        .setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(CollectionAdminParams.SYSTEM_COLL,  1, 3);
   }
@@ -127,11 +131,10 @@ public class SystemLogListenerTest extends SolrCloudTestCase {
 
     CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection("test",
         "conf",3, 2);
-    create.setMaxShardsPerNode(3);
+    create.setMaxShardsPerNode(10);
     create.process(solrClient);
 
-    waitForState("Timed out waiting for replicas of new collection to be active",
-        "test", clusterShape(3, 6));
+    cluster.waitForActiveCollection("test", 3, 6);
 
     String setListenerCommand = "{" +
         "'set-listener' : " +
@@ -182,8 +185,7 @@ public class SystemLogListenerTest extends SolrCloudTestCase {
     } catch (TimeoutException e) {
       // fine
     }
-    // make sure the event docs are replicated and committed
-    Thread.sleep(5000);
+
     cluster.getSolrClient().commit(CollectionAdminParams.SYSTEM_COLL, true, true);
 
 

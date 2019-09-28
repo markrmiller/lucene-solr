@@ -22,10 +22,13 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.request.SolrQueryRequest;
 import org.junit.After;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -33,6 +36,11 @@ import org.junit.Test;
  */
 public class SolrIndexMetricsTest extends SolrTestCaseJ4 {
 
+  @BeforeClass
+  public static void beforeSolrIndexMetricsTest() {
+    enableMetricsForNonNightly();
+  }
+  
   @After
   public void afterMethod() throws Exception {
     deleteCore();

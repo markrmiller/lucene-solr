@@ -16,6 +16,8 @@
  */
 package org.apache.solr.schema;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -23,6 +25,7 @@ import org.junit.Test;
 /**
  * Tests things like sorting on docvalues with missing values
  */
+@LuceneTestCase.Slow
 public class DocValuesMissingTest extends SolrTestCaseJ4 {
   
   @BeforeClass

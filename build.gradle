@@ -30,6 +30,7 @@ import org.gradle.api.Project
 import org.apache.commons.io.FilenameUtils
 import org.gradle.api.publish.maven.plugins.MavenPublishPlugin
 import org.apache.lucene.gradle.DepInsightReportTask
+import org.apache.lucene.gradle.testFast.FastTest
 
 plugins {
   id "com.palantir.consistent-versions" version "1.12.4"
@@ -147,12 +148,13 @@ configure(luceneSolrSubProjects) {
     project.compileJava.options.compilerArgs << "-Werror"
     project.compileTestJava.options.compilerArgs << "-Werror"
     
-    
-    project.sourceSets {
-      main.java.srcDirs = ['src/java']
-      main.resources.srcDirs = ['src/resources']
-      test.java.srcDirs = ['src/test']
-      test.resources.srcDirs = ['src/test-files']
+    if (project.name != 'buildSrc') { // buildSrc defines it's own
+      project.sourceSets {
+        main.java.srcDirs = ['src/java']
+        main.resources.srcDirs = ['src/resources']
+        test.java.srcDirs = ['src/test']
+        test.resources.srcDirs = ['src/test-files']
+      }
     }
     
     // configure tests
@@ -163,7 +165,25 @@ configure(luceneSolrSubProjects) {
       project.ext.testsPolicy = 'lucene/tools/junit4/solr-tests.policy'
     }
 
+    task testFast(type: FastTest) {
+      group = 'Test'
+      description = "A smarter and faster version of the test task when running parallel tests."
+    }
+    
     project.apply from: mfile(rootProjectDir, 'buildSrc/common/configure-test.gradle')
+    project.tasks.test testConf
+    project.tasks.testFast testConf
+    
+    test {
+      doFirst {
+        project.ext.testTask =  project.tasks.test
+      }
+    }
+    testFast {
+      doFirst {
+        project.ext.testTask = project.tasks.testFast
+      }
+    }
 
     task sourceJar(type: Jar) {
       classifier 'sources'
@@ -246,8 +266,9 @@ configure(allprojects) {
   apply plugin: 'eclipse'
   apply plugin: 'idea'
   
+  project.apply from: mfile(rootProjectDir, 'buildSrc/ide/eclipse.gradle')
+  
   plugins.withType(JavaPlugin) {
-    project.apply from: mfile(rootProjectDir, 'buildSrc/ide/eclipse.gradle')
     project.apply from: mfile(rootProjectDir, 'buildSrc/ide/idea.gradle')
   }
   

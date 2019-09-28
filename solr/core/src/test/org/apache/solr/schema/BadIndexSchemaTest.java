@@ -127,6 +127,7 @@ public class BadIndexSchemaTest extends AbstractBadConfigTestBase {
     doTest("bad-schema-sim-global-vs-ft-mismatch.xml", "global similarity does not support it");
   }
   
+  @Nightly
   public void testPerFieldtypePostingsFormatButNoSchemaCodecFactory() throws Exception {
     doTest("bad-schema-codec-global-vs-ft-mismatch.xml", "codec does not support");
   }

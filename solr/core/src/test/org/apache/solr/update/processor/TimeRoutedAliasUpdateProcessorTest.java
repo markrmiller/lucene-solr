@@ -63,6 +63,7 @@ import static org.apache.solr.common.cloud.ZkStateReader.COLLECTIONS_ZKNODE;
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROPS_ZKNODE;
 
 @LuceneTestCase.BadApple(bugUrl = "https://issues.apache.org/jira/browse/SOLR-13059")
+@LuceneTestCase.Slow
 public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcessorTest {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -78,7 +79,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
 
   @Before
   public void doBefore() throws Exception {
-    configureCluster(4).configure();
+    configureCluster(TEST_NIGHTLY ? 4 : 2).configure();
     solrClient = getCloudSolrClient(cluster);
     //log this to help debug potential causes of problems
     log.info("SolrClient: {}", solrClient);
@@ -175,6 +176,8 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
     //   delete the collection
     CollectionAdminRequest.deleteCollection(col23rd).process(solrClient);
 
+    cluster.waitForRemovedCollection(col23rd);
+    
     // now we're going to add documents that will trigger more collections to be created
     //   for 25th & 26th
     addDocsAndCommit(false, // send these to alias & collections
@@ -188,9 +191,15 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
     // verify that collection properties are set when the collections are created. Note: first 2 collections in
     // this test have a core property instead, of a collection property but that MUST continue to work as well
     // for back compatibility's reasons.
-    Thread.sleep(1000);
     byte[] data = cluster.getZkClient()
         .getData(COLLECTIONS_ZKNODE + "/" + alias + TRA + "2017-10-26" + "/" + COLLECTION_PROPS_ZKNODE,null, null, true);
+    
+    if (data == null) {
+      Thread.sleep(500);
+      data = cluster.getZkClient()
+          .getData(COLLECTIONS_ZKNODE + "/" + alias + TRA + "2017-10-26" + "/" + COLLECTION_PROPS_ZKNODE,null, null, true);
+    }
+    
     assertNotNull(data);
     assertTrue(data.length > 0);
     @SuppressWarnings("unchecked")
@@ -222,6 +231,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
   @Slow
   @Test
   @LogLevel("org.apache.solr.update.processor.TrackingUpdateProcessorFactory=DEBUG")
+  @Nightly
   public void testSliceRouting() throws Exception {
     String configName = getSaferTestName();
     createConfigSet(configName);
@@ -232,7 +242,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
     final int numReplicas = 1 + random().nextInt(3);
     CollectionAdminRequest.createTimeRoutedAlias(alias, "2017-10-23T00:00:00Z", "+1DAY", getTimeField(),
         CollectionAdminRequest.createCollection("_unused_", configName, numShards, numReplicas)
-            .setMaxShardsPerNode(numReplicas))
+            .setMaxShardsPerNode(10))
         .process(solrClient);
 
     // cause some collections to be created
@@ -271,6 +281,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
 
   @Test
   @Slow
+  @Nightly
   public void testPreemptiveCreation() throws Exception {
     String configName = getSaferTestName();
     createConfigSet(configName);
@@ -332,7 +343,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
     // threads are known to be terminated by now, check for exceptions
     for (Exception threadException : threadExceptions) {
       if (threadException != null) {
-        Thread.sleep(5000); // avoid spurious fails due to TRA thread not done yet
+        //Thread.sleep(5000); // avoid spurious fails due to TRA thread not done yet
         throw threadException;
       }
     }
@@ -367,7 +378,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
 
     CollectionAdminRequest.createTimeRoutedAlias(getSaferTestName() + "foo", "2017-10-23T00:00:00Z", "+1DAY", getTimeField(),
         CollectionAdminRequest.createCollection("_unused_", configName, 2, 2)
-            .setMaxShardsPerNode(numReplicas)).setPreemptiveCreateWindow("3HOUR")
+            .setMaxShardsPerNode(10)).setPreemptiveCreateWindow("3HOUR")
         .process(solrClient);
 
     waitColAndAlias(getSaferTestName() + "foo", TRA, "2017-10-23",2);
@@ -384,6 +395,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
     for (String colName : foo) {
       CollectionAdminRequest.deleteCollection(colName).process(solrClient);
       waitCoreCount(colName, 0);
+      cluster.waitForRemovedCollection(colName);
     }
 
     // if the design for terminating our executor is correct create/delete above will not cause failures below
@@ -711,6 +723,7 @@ public class TimeRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcess
    * an autoDeleteAge setting will gracefully convert to the new format over time.
    */
   @Test
+  @Nightly
   public void handleLegacyCollectionNames() throws Exception {
     manuallyConstructLegacyTRA();
 

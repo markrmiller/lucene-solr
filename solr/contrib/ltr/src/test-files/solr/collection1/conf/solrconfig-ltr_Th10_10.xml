@@ -18,6 +18,10 @@
 
  <schemaFactory class="ClassicIndexSchemaFactory" />
 
+ <indexConfig>
+   <lockType>${solr.lock.type:single}</lockType>
+ </indexConfig>
+
  <requestDispatcher>
    <requestParsers enableStreamBody="true" />
  </requestDispatcher>

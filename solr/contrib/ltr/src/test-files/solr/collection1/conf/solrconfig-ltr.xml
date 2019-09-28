@@ -16,6 +16,11 @@
  <directoryFactory name="DirectoryFactory"
   class="${solr.directoryFactory:solr.RAMDirectoryFactory}" />
 
+  <indexConfig>
+    <useCompoundFile>${useCompoundFile:false}</useCompoundFile>
+    <lockType>single</lockType>
+  </indexConfig>
+
  <!-- for use with the DefaultWrapperModel class -->
  <lib dir="${solr.solr.home:.}/models" />
 

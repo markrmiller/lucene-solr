@@ -16,6 +16,8 @@
  */
 package org.apache.solr.client.solrj.impl;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.URL;
@@ -36,7 +38,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -72,6 +74,7 @@ import org.apache.solr.handler.admin.ConfigSetsHandler;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -84,7 +87,8 @@ import static org.apache.solr.client.solrj.impl.BaseCloudSolrClient.*;
 /**
  * This test would be faster if we simulated the zk state instead.
  */
-@Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -95,7 +99,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
   private static final String id = "id";
 
   private static final int TIMEOUT = 30;
-  private static final int NODE_COUNT = 3;
+  private static final int NODE_COUNT = TEST_NIGHTLY ? 3 : 1;
 
   private static CloudHttp2SolrClient httpBasedCloudSolrClient = null;
   private static CloudHttp2SolrClient zkBasedCloudSolrClient = null;
@@ -144,7 +148,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
   @Test
   public void testParallelUpdateQTime() throws Exception {
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION, 2, 2);
     UpdateRequest req = new UpdateRequest();
     for (int i=0; i<10; i++)  {
@@ -160,7 +164,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
   @Test
   public void testOverwriteOption() throws Exception {
 
-    CollectionAdminRequest.createCollection("overwrite", "conf", 1, 1)
+    CollectionAdminRequest.createCollection("overwrite", "conf", 1, 1).setMaxShardsPerNode(10)
         .processAndWait(cluster.getSolrClient(), TIMEOUT);
     cluster.waitForActiveCollection("overwrite", 1, 1);
     
@@ -184,10 +188,10 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
   @Test
   public void testAliasHandling() throws Exception {
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION, 2, 2);
 
-    CollectionAdminRequest.createCollection(COLLECTION2, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION2, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION2, 2, 2);
 
     CloudHttp2SolrClient client = getRandomClient();
@@ -231,8 +235,9 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
   public void testRouting() throws Exception {
-    CollectionAdminRequest.createCollection("routing_collection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("routing_collection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("routing_collection", 2, 2);
     
     AbstractUpdateRequest request = new UpdateRequest()
@@ -282,7 +287,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
     assertEquals(0, docs.getNumFound());
     
     // Test Multi-Threaded routed updates for UpdateRequest
-    try (CloudSolrClient threadedClient = new CloudSolrClientBuilder
+    try (CloudSolrClient threadedClient = new CloudSolrClient.Builder
         (Collections.singletonList(cluster.getZkServer().getZkAddress()), Optional.empty())
         .withParallelUpdates(true)
         .build()) {
@@ -404,6 +409,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
    * limits the distributed query to locally hosted shards only
    */
   @Test
+  @Nightly
   // commented 4-Sep-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2-Aug-2018
   public void preferLocalShardsTest() throws Exception {
 
@@ -569,9 +575,9 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
     try (CloudSolrClient client = getCloudSolrClient(cluster.getZkServer().getZkAddress())) {
 
-      String async1 = CollectionAdminRequest.createCollection("multicollection1", "conf", 2, 1)
+      String async1 = CollectionAdminRequest.createCollection("multicollection1", "conf", 2, 1).setMaxShardsPerNode(10)
           .processAsync(client);
-      String async2 = CollectionAdminRequest.createCollection("multicollection2", "conf", 2, 1)
+      String async2 = CollectionAdminRequest.createCollection("multicollection2", "conf", 2, 1).setMaxShardsPerNode(10)
           .processAsync(client);
 
       CollectionAdminRequest.waitForAsyncRequest(async1, client, TIMEOUT);
@@ -611,8 +617,9 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
   @Test
   @SuppressWarnings("deprecation")
+  @Nightly
   public void stateVersionParamTest() throws Exception {
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION, 2, 2);
 
     DocCollection coll = cluster.getSolrClient().getZkStateReader().getClusterState().getCollection(COLLECTION);
@@ -716,7 +723,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
 
   @Test
   public void testVersionsAreReturned() throws Exception {
-    CollectionAdminRequest.createCollection("versions_collection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("versions_collection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("versions_collection", 2, 2);
     
     // assert that "adds" are returned
@@ -764,7 +771,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
   
   @Test
   public void testInitializationWithSolrUrls() throws Exception {
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION, 2, 2);
     CloudHttp2SolrClient client = httpBasedCloudSolrClient;
     SolrInputDocument doc = new SolrInputDocument("id", "1", "title_s", "my doc");
@@ -789,6 +796,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
     }
   }
 
+  @Nightly
   public void testRetryUpdatesWhenClusterStateIsStale() throws Exception {
     final String COL = "stale_state_test_col";
     assert cluster.getJettySolrRunners().size() >= 2;
@@ -800,6 +808,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
     assertEquals("Couldn't create collection", 0,
                  CollectionAdminRequest.createCollection(COL, "conf", 1, 1)
                  .setCreateNodeSet(old_leader_node.getNodeName())
+                 .setMaxShardsPerNode(10)
                  .process(cluster.getSolrClient()).getStatus());
     cluster.waitForActiveCollection(COL, 1, 1);
 
@@ -811,7 +820,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
     final String old_leader_core_node_name = slice.getLeader().getName();
 
     // NOTE: creating our own CloudSolrClient whose settings we can muck with...
-    try (CloudSolrClient stale_client = new CloudSolrClientBuilder
+    try (CloudSolrClient stale_client = new CloudSolrClient.Builder
         (Collections.singletonList(cluster.getZkServer().getZkAddress()), Optional.empty())
         .sendDirectUpdatesToAnyShardReplica()
         .withParallelUpdates(true)
@@ -869,6 +878,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
    */
   @Test
   // commented 15-Sep-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2-Aug-2018
+  @Nightly // needs more nodes that nightly run provides
   public void preferReplicaTypesTest() throws Exception {
 
     String collectionName = "replicaTypesTestColl";
@@ -879,7 +889,7 @@ public class CloudHttp2SolrClientTest extends SolrCloudTestCase {
     // Hence the below configuration for our collection
     int pullReplicas = Math.max(1, liveNodes - 2);
     CollectionAdminRequest.createCollection(collectionName, "conf", liveNodes, 1, 1, pullReplicas)
-        .setMaxShardsPerNode(liveNodes)
+        .setMaxShardsPerNode(10)
         .processAndWait(cluster.getSolrClient(), TIMEOUT);
     cluster.waitForActiveCollection(collectionName, liveNodes, liveNodes * (2 + pullReplicas));
     

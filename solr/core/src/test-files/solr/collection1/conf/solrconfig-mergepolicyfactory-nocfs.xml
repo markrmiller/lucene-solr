@@ -23,6 +23,7 @@
   <schemaFactory class="ClassicIndexSchemaFactory"/>
 
   <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
     <useCompoundFile>${testSetNoCFSMergePolicyConfig.useCompoundFile:false}</useCompoundFile>
     <mergePolicyFactory class="org.apache.solr.index.TieredMergePolicyFactory">
       <double name="noCFSRatio">0.5</double>

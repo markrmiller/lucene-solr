@@ -25,7 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.io.SolrClientCache;
@@ -63,11 +62,13 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
-@Slow
+@LuceneTestCase.Slowest
 @SolrTestCaseJ4.SuppressSSL
 @LuceneTestCase.SuppressCodecs({"Lucene3x", "Lucene40","Lucene41","Lucene42","Lucene45"})
+@Ignore // leaks clients
 public class StreamDecoratorTest extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";
@@ -78,7 +79,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 1)
         .addConfig("conf", getFile("solrj").toPath().resolve("solr").resolve("configsets").resolve("streaming").resolve("conf"))
         .addConfig("ml", getFile("solrj").toPath().resolve("solr").resolve("configsets").resolve("ml").resolve("conf"))
         .configure();
@@ -91,12 +92,10 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
       collection = COLLECTIONORALIAS;
     }
 
-    CollectionAdminRequest.createCollection(collection, "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collection, "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collection, 2, 2);
-    
-    AbstractDistribZkTestBase.waitForRecoveriesToFinish(collection, cluster.getSolrClient().getZkStateReader(),
-        false, true, TIMEOUT);
+
     if (useAlias) {
       CollectionAdminRequest.createAlias(COLLECTIONORALIAS, collection).process(cluster.getSolrClient());
     }
@@ -958,6 +957,8 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Slow
+  @Nightly // slow
   public void testDaemonStream() throws Exception {
 
     new UpdateRequest()
@@ -2670,7 +2671,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testUpdateStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("destinationCollection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("destinationCollection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("destinationCollection", 2, 2);
 
     new UpdateRequest()
@@ -2756,6 +2757,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
       assertList(tuple.getLongs("i_multi"), Long.parseLong("4444"), Long.parseLong("7777"));
     } finally {
       CollectionAdminRequest.deleteCollection("destinationCollection").process(cluster.getSolrClient());
+      cluster.waitForRemovedCollection("destinationCollection");
       solrClientCache.close();
     }
   }
@@ -2763,7 +2765,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testParallelUpdateStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("parallelDestinationCollection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("parallelDestinationCollection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("parallelDestinationCollection", 2, 2);
 
     new UpdateRequest()
@@ -2861,7 +2863,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testParallelDaemonUpdateStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("parallelDestinationCollection1", 2, 2);
 
     new UpdateRequest()
@@ -3035,7 +3037,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   public void testParallelTerminatingDaemonUpdateStream() throws Exception {
     Assume.assumeTrue(!useAlias);
 
-    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("parallelDestinationCollection1", 2, 2);
 
     new UpdateRequest()
@@ -3221,7 +3223,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testCommitStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("destinationCollection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("destinationCollection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("destinationCollection", 2, 2);
 
     new UpdateRequest()
@@ -3314,7 +3316,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testParallelCommitStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("parallelDestinationCollection", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("parallelDestinationCollection", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("parallelDestinationCollection", 2, 2);
 
     new UpdateRequest()
@@ -3412,7 +3414,7 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   @Test
   public void testParallelDaemonCommitStream() throws Exception {
 
-    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("parallelDestinationCollection1", "conf", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("parallelDestinationCollection1", 2, 2);
 
     new UpdateRequest()
@@ -3626,14 +3628,16 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly // slow
+  @Slow
   public void testClassifyStream() throws Exception {
     Assume.assumeTrue(!useAlias);
 
-    CollectionAdminRequest.createCollection("modelCollection", "ml", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("modelCollection", "ml", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("modelCollection", 2, 2);
-    CollectionAdminRequest.createCollection("uknownCollection", "ml", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("uknownCollection", "ml", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("uknownCollection", 2, 2);
-    CollectionAdminRequest.createCollection("checkpointCollection", "ml", 2, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("checkpointCollection", "ml", 2, 1).setMaxShardsPerNode(10).process(cluster.getSolrClient());
     cluster.waitForActiveCollection("checkpointCollection", 2, 2);
 
     UpdateRequest updateRequest = new UpdateRequest();
@@ -3843,11 +3847,11 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
 
   @Test
   public void testExecutorStream() throws Exception {
-    CollectionAdminRequest.createCollection("workQueue", "conf", 2, 1).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("workQueue", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
     cluster.waitForActiveCollection("workQueue", 2, 2);
-    CollectionAdminRequest.createCollection("mainCorpus", "conf", 2, 1).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("mainCorpus", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
     cluster.waitForActiveCollection("mainCorpus", 2, 2);
-    CollectionAdminRequest.createCollection("destination", "conf", 2, 1).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("destination", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
     cluster.waitForActiveCollection("destination", 2, 2);
 
     UpdateRequest workRequest = new UpdateRequest();
@@ -3908,12 +3912,14 @@ public class StreamDecoratorTest extends SolrCloudTestCase {
 
 
   @Test
+  @Nightly // slow
+  @Slow
   public void testParallelExecutorStream() throws Exception {
-    CollectionAdminRequest.createCollection("workQueue1", "conf", 2, 1).processAndWait(cluster.getSolrClient(),DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("workQueue1", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(),DEFAULT_TIMEOUT);
 
-    CollectionAdminRequest.createCollection("mainCorpus1", "conf", 2, 1).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("mainCorpus1", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
 
-    CollectionAdminRequest.createCollection("destination1", "conf", 2, 1).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
+    CollectionAdminRequest.createCollection("destination1", "conf", 2, 1).setMaxShardsPerNode(10).processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
 
     cluster.waitForActiveCollection("workQueue1", 2, 2);
     cluster.waitForActiveCollection("mainCorpus1", 2, 2);

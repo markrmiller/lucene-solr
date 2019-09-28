@@ -19,6 +19,7 @@ package org.apache.solr.handler.component;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
@@ -33,6 +34,7 @@ import org.junit.Test;
  *
  * @see org.apache.solr.handler.component.QueryComponent
  */
+@LuceneTestCase.Slow
 public class DistributedExpandComponentTest extends BaseDistributedSearchTestCase {
 
   public DistributedExpandComponentTest() {

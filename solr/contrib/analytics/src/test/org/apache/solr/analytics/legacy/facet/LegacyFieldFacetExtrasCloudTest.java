@@ -22,11 +22,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.util.NamedList;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Slowest
 public class LegacyFieldFacetExtrasCloudTest extends LegacyAbstractAnalyticsFacetCloudTest {
   public static final int INT = 21;
   public static final int LONG = 22;

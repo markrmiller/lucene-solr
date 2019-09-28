@@ -16,6 +16,9 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
+
+@LuceneTestCase.Slow
 public class SuggesterWFSTTest extends SuggesterTest {
   public SuggesterWFSTTest() {
     super.requestUri = "/suggest_wfst";

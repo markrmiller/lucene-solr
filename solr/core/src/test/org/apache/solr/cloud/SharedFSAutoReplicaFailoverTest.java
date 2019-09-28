@@ -71,6 +71,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,13 +86,14 @@ import org.slf4j.LoggerFactory;
 })
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG;org.apache.solr.cloud.*=DEBUG")
 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Jul-2018
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final boolean DEBUG = true;
   private static MiniDFSCluster dfsCluster;
 
-  ThreadPoolExecutor executor = new ExecutorUtil.MDCAwareThreadPoolExecutor(0,
+  static ThreadPoolExecutor executor = new ExecutorUtil.MDCAwareThreadPoolExecutor(0,
       Integer.MAX_VALUE, 5, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
       new DefaultSolrThreadFactory("testExecutor"));
   
@@ -109,6 +112,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
   
   @AfterClass
   public static void hdfsFailoverAfterClass() throws Exception {
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
     HdfsTestUtil.teardownClass(dfsCluster);
     System.clearProperty("solr.hdfs.blockcache.blocksperbank");
     dfsCluster = null;

@@ -55,7 +55,7 @@ public class SolrRrdBackendFactoryTest extends SolrTestCaseJ4 {
   @Before
   public void setup() {
     solrClient = new MockSearchableSolrClient();
-    if (random().nextBoolean()) {
+    if (TEST_NIGHTLY && random().nextBoolean()) {
       timeSource = TimeSource.NANO_TIME;
     } else {
       timeSource = TimeSource.get("simTime:50");

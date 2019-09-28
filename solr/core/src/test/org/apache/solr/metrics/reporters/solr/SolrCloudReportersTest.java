@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.core.CoreContainer;
@@ -39,6 +40,7 @@ import com.codahale.metrics.Metric;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class SolrCloudReportersTest extends SolrCloudTestCase {
   volatile int leaderRegistries;
   volatile int clusterRegistries;
@@ -48,6 +50,7 @@ public class SolrCloudReportersTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void configureDummyCluster() throws Exception {
+    System.setProperty("solr.disableJvmMetrics", "false");
     configureCluster(0).configure();
   }
 

@@ -16,10 +16,12 @@
  */
 package org.apache.solr.search;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import java.util.Random;
 
+@LuceneTestCase.Slow
 public class TestReload extends TestRTGBase {
 
   @BeforeClass

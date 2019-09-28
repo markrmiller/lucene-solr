@@ -25,9 +25,11 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.autoscaling.TriggerEventType;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
+import org.apache.solr.client.solrj.impl.BaseHttpSolrClient.RemoteSolrException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.V2Request;
@@ -47,6 +49,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class AutoAddReplicasPlanActionTest extends SolrCloudTestCase{
   
   @BeforeClass
@@ -150,10 +153,14 @@ public class AutoAddReplicasPlanActionTest extends SolrCloudTestCase{
     req = AutoScalingRequest.create(SolrRequest.METHOD.POST, setClusterPreferencesCommand);
     
     // you can hit a stale connection from pool when restarting jetty
+    try {
     try (CloudSolrClient cloudClient = new CloudSolrClient.Builder(Collections.singletonList(cluster.getZkServer().getZkAddress()),
         Optional.empty())
             .withSocketTimeout(45000).withConnectionTimeout(15000).build()) {
       response = cloudClient.request(req);
+    }
+    } catch (RemoteSolrException e) {
+      // hit a stale connection
     }
 
     assertEquals(response.get("result").toString(), "success");

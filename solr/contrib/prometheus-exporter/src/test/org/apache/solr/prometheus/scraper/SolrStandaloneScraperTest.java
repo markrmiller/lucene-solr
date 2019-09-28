@@ -38,8 +38,10 @@ import org.apache.solr.util.DefaultSolrThreadFactory;
 import org.apache.solr.util.RestTestBase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class SolrStandaloneScraperTest extends RestTestBase {
 
   private static MetricsConfiguration configuration;
@@ -85,6 +87,7 @@ public class SolrStandaloneScraperTest extends RestTestBase {
     cleanUpHarness();
     if (null != executor) {
       executor.shutdownNow();
+      ExecutorUtil.shutdownAndAwaitTermination(executor);
       executor = null;
     }
     if (null != jetty) {

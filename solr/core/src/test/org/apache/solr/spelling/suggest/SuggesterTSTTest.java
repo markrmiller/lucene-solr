@@ -16,6 +16,9 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
+
+@LuceneTestCase.Slow
 public class SuggesterTSTTest extends SuggesterTest {
   public SuggesterTSTTest() {
     super.requestUri = "/suggest_tst";

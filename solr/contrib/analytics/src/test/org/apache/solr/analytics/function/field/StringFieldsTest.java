@@ -21,9 +21,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.ExpressionFactory;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class StringFieldsTest extends AbstractAnalyticsFieldTest {
 
   @Test

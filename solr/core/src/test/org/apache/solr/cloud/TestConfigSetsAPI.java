@@ -53,6 +53,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
@@ -101,6 +102,7 @@ import static org.junit.matchers.JUnitMatchers.containsString;
 /**
  * Simple ConfigSets API tests on user errors and simple success cases.
  */
+@LuceneTestCase.Slow
 public class TestConfigSetsAPI extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -693,6 +695,11 @@ public class TestConfigSetsAPI extends SolrTestCaseJ4 {
   
   @Test
   public void testUserAndTestDefaultConfigsetsAreSame() throws IOException {
+    String solrDirectoryFactory = System.getProperty("solr.directoryFactory");
+    if (solrDirectoryFactory == null || !solrDirectoryFactory.equals("solr.RAMDirectoryFactory")) {
+      assumeFalse("Requires an FSDirectory", true);
+    }
+    
     File testDefaultConf = configset("_default").toFile();
     log.info("Test _default path: " + testDefaultConf);
     

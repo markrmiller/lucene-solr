@@ -25,6 +25,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.solr.cloud.overseer.OverseerAction;
@@ -42,6 +44,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.RetryUtil;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.search.SolrIndexSearcher;
@@ -365,7 +368,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         // should I be leader?
         ZkShardTerms zkShardTerms = zkController.getShardTerms(collection, shardId);
         if (zkShardTerms.registered(coreNodeName) && !zkShardTerms.canBecomeLeader(coreNodeName)) {
-          if (!waitForEligibleBecomeLeaderAfterTimeout(zkShardTerms, coreNodeName, leaderVoteWait)) {
+          if (!waitForEligibleBecomeLeaderAfterTimeout(zkShardTerms, core.getCoreDescriptor(), leaderVoteWait)) {
             rejoinLeaderElection(core);
             return;
           } else {
@@ -383,16 +386,6 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         // we are going to attempt to be the leader
         // first cancel any current recovery
         core.getUpdateHandler().getSolrCoreState().cancelRecovery();
-        
-        if (weAreReplacement) {
-          // wait a moment for any floating updates to finish
-          try {
-            Thread.sleep(2500);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new SolrException(ErrorCode.SERVICE_UNAVAILABLE, e);
-          }
-        }
 
         PeerSync.PeerSyncResult result = null;
         boolean success = false;
@@ -528,21 +521,29 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
    * @return true if after {@code timeout} there are no other replicas with higher term participate in the election,
    * false if otherwise
    */
-  private boolean waitForEligibleBecomeLeaderAfterTimeout(ZkShardTerms zkShardTerms, String coreNodeName, int timeout) throws InterruptedException {
-    long timeoutAt = System.nanoTime() + TimeUnit.NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS);
-    while (!isClosed && !cc.isShutDown()) {
-      if (System.nanoTime() > timeoutAt) {
-        log.warn("After waiting for {}ms, no other potential leader was found, {} try to become leader anyway (" +
-                "core_term:{}, highest_term:{})",
-            timeout, coreNodeName, zkShardTerms.getTerm(coreNodeName), zkShardTerms.getHighestTerm());
-        return true;
-      }
-      if (replicasWithHigherTermParticipated(zkShardTerms, coreNodeName)) {
-        log.info("Can't become leader, other replicas with higher term participated in leader election");
-        return false;
-      }
-      Thread.sleep(500L);
+  private boolean waitForEligibleBecomeLeaderAfterTimeout(ZkShardTerms zkShardTerms, CoreDescriptor cd, int timeout) throws InterruptedException {
+    String coreNodeName = cd.getCloudDescriptor().getCoreNodeName();
+    AtomicReference<Boolean> foundHigherTerm = new AtomicReference<>();
+    try {
+      zkStateReader.waitForState(cd.getCollectionName(), timeout, TimeUnit.MILLISECONDS, (n,c) -> foundForHigherTermReplica(zkShardTerms, cd, foundHigherTerm));
+    } catch (TimeoutException e) {
+      log.warn("After waiting for {}ms, no other potential leader was found, {} try to become leader anyway (" +
+          "core_term:{}, highest_term:{})",
+      timeout, cd, zkShardTerms.getTerm(coreNodeName), zkShardTerms.getHighestTerm());
+      return true;
     }
+    
+    return false;
+  }
+
+  private boolean foundForHigherTermReplica(ZkShardTerms zkShardTerms, CoreDescriptor cd, AtomicReference<Boolean> foundHigherTerm) {
+    String coreNodeName = cd.getCloudDescriptor().getCoreNodeName();
+    if (replicasWithHigherTermParticipated(zkShardTerms, coreNodeName)) {
+      log.info("Can't become leader, other replicas with higher term participated in leader election");
+      foundHigherTerm.set(true);
+      return true;
+    }
+    
     return false;
   }
 
@@ -596,60 +597,24 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
 
   // returns true if all replicas are found to be up, false if not
   private boolean waitForReplicasToComeUp(int timeoutms) throws InterruptedException {
-    long timeoutAt = System.nanoTime() + TimeUnit.NANOSECONDS.convert(timeoutms, TimeUnit.MILLISECONDS);
     final String shardsElectZkPath = electionPath + LeaderElector.ELECTION_NODE;
-    
-    DocCollection docCollection = zkController.getClusterState().getCollectionOrNull(collection);
-    Slice slices = (docCollection == null) ? null : docCollection.getSlice(shardId);
-    int cnt = 0;
-    while (!isClosed && !cc.isShutDown()) {
-      // wait for everyone to be up
-      if (slices != null) {
-        int found = 0;
-        try {
-          found = zkClient.getChildren(shardsElectZkPath, null, true).size();
-        } catch (KeeperException e) {
-          if (e instanceof KeeperException.SessionExpiredException) {
-            // if the session has expired, then another election will be launched, so
-            // quit here
-            throw new SolrException(ErrorCode.SERVER_ERROR,
-                                    "ZK session expired - cancelling election for " + collection + " " + shardId);
-          }
-          SolrException.log(log,
-              "Error checking for the number of election participants", e);
-        }
-        
-        // on startup and after connection timeout, wait for all known shards
-        if (found >= slices.getReplicas(EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT)).size()) {
-          log.info("Enough replicas found to continue.");
-          return true;
-        } else {
-          if (cnt % 40 == 0) {
-            log.info("Waiting until we see more replicas up for shard {}: total={}"
-              + " found={}"
-              + " timeoutin={}ms",
-                shardId, slices.getReplicas(EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT)).size(), found,
-                TimeUnit.MILLISECONDS.convert(timeoutAt - System.nanoTime(), TimeUnit.NANOSECONDS));
-          }
-        }
-        
-        if (System.nanoTime() > timeoutAt) {
-          log.info("Was waiting for replicas to come up, but they are taking too long - assuming they won't come back till later");
-          return false;
-        }
-      } else {
-        log.warn("Shard not found: " + shardId + " for collection " + collection);
-
-        return false;
-
-      }
-      
-      Thread.sleep(500);
-      docCollection = zkController.getClusterState().getCollectionOrNull(collection);
-      slices = (docCollection == null) ? null : docCollection.getSlice(shardId);
-      cnt++;
+    try {
+      zkStateReader.waitForState(collection, timeoutms, TimeUnit.MILLISECONDS,
+          (n, c) -> {
+            try {
+              return c != null && c.getSlice(shardId) != null && zkClient.getChildren(shardsElectZkPath, null, true)
+                  .size() >= c.getSlice(shardId).getReplicas(EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT, Replica.Type.PULL)).size();
+            } catch (KeeperException e) {
+              throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new RuntimeException(e);
+            }
+          });
+      return true;
+    } catch (TimeoutException e1) {
+      return false;
     }
-    return false;
   }
   
   // returns true if all replicas are found to be up, false if not

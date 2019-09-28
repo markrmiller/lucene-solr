@@ -53,7 +53,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test the delegation token support in the {@link org.apache.solr.security.KerberosPlugin}.
  */
-@LuceneTestCase.Slow
 public class TestSolrCloudWithDelegationTokens extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final int NUM_SERVERS = 2;

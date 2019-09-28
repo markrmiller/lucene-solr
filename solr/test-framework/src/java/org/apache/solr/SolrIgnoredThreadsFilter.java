@@ -64,6 +64,15 @@ public class SolrIgnoredThreadsFilter implements ThreadFilter {
       return true;
     }
     
+    // ZkTestServer threads that will shutdown in a moment, waiting to come out of a short spin to do so
+    if (threadName.equals("SessionTracker")) {
+      return true;
+    }
+    
+    // special executor just for closing things - we don't close it, the threads have a low idle time
+    if (threadName.startsWith("solrSmartCloser")) {
+      return true;
+    }
 
     return false;
   }

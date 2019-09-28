@@ -25,9 +25,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestCorePropertiesReload extends SolrTestCaseJ4 {
 
   private final File solrHomeDirectory = createTempDir().toFile();

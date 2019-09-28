@@ -17,12 +17,16 @@
 package org.apache.solr.cloud.hdfs;
 
 import java.io.IOException;
+import java.util.Map.Entry;
+import java.util.Set;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
@@ -32,12 +36,15 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @ThreadLeakFilters(defaultFilters = true, filters = {
     SolrIgnoredThreadsFilter.class,
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@LuceneTestCase.Slow
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class HdfsThreadLeakTest extends SolrTestCaseJ4 {
   private static MiniDFSCluster dfsCluster;
 
@@ -60,6 +67,7 @@ public class HdfsThreadLeakTest extends SolrTestCaseJ4 {
     String uri = HdfsTestUtil.getURI(dfsCluster);
     Path path = new Path(uri);
     Configuration conf = HdfsTestUtil.getClientConfiguration(dfsCluster);
+    conf.setBoolean("fs.hdfs.impl.disable.cache", true);
     try(FileSystem fs = FileSystem.get(path.toUri(), conf)) {
       Path testFile = new Path(uri + "/testfile");
       try(FSDataOutputStream out = fs.create(testFile)) {

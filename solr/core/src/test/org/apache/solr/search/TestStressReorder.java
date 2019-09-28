@@ -26,6 +26,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.TestHarness;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
+@LuceneTestCase.Slow
 public class TestStressReorder extends TestRTGBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -66,13 +68,13 @@ public class TestStressReorder extends TestRTGBase {
     final int deletePercent = 4+random().nextInt(25);
     final int deleteByQueryPercent = random().nextInt(8);
     final int ndocs = 5 + (random().nextBoolean() ? random().nextInt(25) : random().nextInt(200));
-    int nWriteThreads = 5 + random().nextInt(25);
+    int nWriteThreads = 5 + random().nextInt(TEST_NIGHTLY ? 25 : 3);
 
     final int maxConcurrentCommits = nWriteThreads;
         // query variables
     final int percentRealtimeQuery = 75;
     final AtomicLong operations = new AtomicLong(50000);  // number of query operations to perform in total
-    int nReadThreads = 5 + random().nextInt(25);
+    int nReadThreads = 5 + random().nextInt(TEST_NIGHTLY ? 25 : 2);
 
 
     /** // testing

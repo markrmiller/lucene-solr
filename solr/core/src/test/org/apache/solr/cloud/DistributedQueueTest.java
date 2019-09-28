@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.cloud.DistributedQueue;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -35,6 +36,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@Slow
 public class DistributedQueueTest extends SolrTestCaseJ4 {
 
   private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -336,7 +338,7 @@ public class DistributedQueueTest extends SolrTestCaseJ4 {
     } catch (Exception exc) {
     }
     closeZk();
-    executor.shutdown();
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
   }
 
   protected void setupZk() throws Exception {

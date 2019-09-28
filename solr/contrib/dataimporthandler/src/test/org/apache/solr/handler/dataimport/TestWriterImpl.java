@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
@@ -33,6 +34,7 @@ import java.util.*;
  * 
  * @since solr 4.0
  */
+@LuceneTestCase.Slow
 public class TestWriterImpl extends AbstractDataImportHandlerTestCase {
   
   @BeforeClass

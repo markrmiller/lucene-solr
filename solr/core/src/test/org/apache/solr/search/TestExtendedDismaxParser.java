@@ -16,6 +16,10 @@
  */
 package org.apache.solr.search;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -47,6 +51,13 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
   @BeforeClass
   public static void beforeClass() throws Exception {
     System.setProperty("enable.update.log", "false"); // schema12 doesn't support _version_
+    System.out.println("TESTHOME:" + TEST_HOME());
+    System.out.println("TESTHOME:" + new File(".").getAbsolutePath());
+    System.out.println("TESTHOME:" + Arrays.asList(new File(".").listFiles()));
+//    Files.copy(testSolrHome.resolve("synonyms.txt"),
+//        Paths.get(TEST_HOME()).resolve("synonyms.txt"),
+//        StandardCopyOption.REPLACE_EXISTING);
+
     initCore("solrconfig.xml", "schema12.xml");
     index();
   }
@@ -335,9 +346,11 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
     );
 
     // test that basic synonyms work
-    assertQ(req("defType", "edismax", "qf", "text_sw",
-           "q","GB"), oner
-    );
+    // nocommit
+    if (TEST_NIGHTLY) {
+      assertQ(req("defType", "edismax", "qf", "text_sw",
+          "q", "GB"), oner);
+    }
 
     // test for stopword removal in main query part
     assertQ(req("defType", "edismax", "qf", "text_sw",
@@ -1127,6 +1140,7 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
    * Test that we don't apply minShouldMatch to the inner boolean queries
    * when there are synonyms (these are indicated by coordination factor)
    */
+  @Nightly // synonyms are expensive for non nightly nocommit: need to run nightly to test, fix syn file
   public void testSynonyms() throws Exception {
     // document only contains baraaa, but should still match.
     assertQ("test synonyms",
@@ -1493,6 +1507,7 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Nightly // not loading synonyms non nightly
   public void testSplitOnWhitespace_Basic() throws Exception {
     // The "text_sw" field has synonyms loaded from synonyms.txt
 
@@ -1616,6 +1631,7 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
     }
   }
 
+  @Nightly // not loading synonyms non nightly
   public void testOperatorsAndMultiWordSynonyms() throws Exception {
     // The "text_sw" field has synonyms loaded from synonyms.txt
 
@@ -1856,6 +1872,7 @@ public class TestExtendedDismaxParser extends SolrTestCaseJ4 {
     );
   }
 
+  @Nightly // not loading synonyms non nightly
   public void testAutoGeneratePhraseQueries() throws Exception {
     ModifiableSolrParams noSowParams = new ModifiableSolrParams();
     noSowParams.add("df", "text");

@@ -144,12 +144,7 @@ public class ExecutorStream extends TupleStream implements Expressible {
 
   public void close() throws IOException {
     stream.close();
-    executorService.shutdown();
-    try {
-      executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-    } catch(InterruptedException e) {
-      log.error("Interrupted while waiting for termination", e);
-    }
+    ExecutorUtil.shutdownAndAwaitTermination(executorService);
   }
 
   public Tuple read() throws IOException {

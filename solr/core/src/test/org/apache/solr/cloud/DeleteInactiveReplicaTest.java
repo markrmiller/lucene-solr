@@ -16,10 +16,12 @@
  */
 package org.apache.solr.cloud;
 
+import java.io.File;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -38,12 +40,16 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//@LuceneTestCase.Nightly // test is silly slow
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class DeleteInactiveReplicaTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    useFactory(null); // needs fsdir
     configureCluster(4)
         .addConfig("conf", configset("cloud-minimal"))
         .withProperty(ZkStateReader.LEGACY_CLOUD, "false")
@@ -91,8 +97,8 @@ public class DeleteInactiveReplicaTest extends SolrCloudTestCase {
     cluster.startJettySolrRunner(jetty);
     log.info("restarted jetty");
     TimeOut timeOut = new TimeOut(60, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-    timeOut.waitFor("Expected data dir and instance dir of " + replica.getName() + " is deleted", ()
-        -> !Files.exists(replicaCd.getInstanceDir()) && !FileUtils.fileExists(replicaCd.getDataDir()));
+    timeOut.waitFor("Expected data dir and instance dir of " + replica.getName() + " is deleted cd.instanceDir=" + replicaCd.getInstanceDir() + "cd.dataDir=" + replicaCd.getDataDir(), ()
+        -> !Files.exists(replicaCd.getInstanceDir()) && !FileUtils.fileExists(replicaCd.getInstanceDir() + File.separator + replicaCd.getDataDir()));
 
     // Check that we can't create a core with no coreNodeName
     try (SolrClient queryClient = getHttpSolrClient(jetty.getBaseUrl().toString())) {

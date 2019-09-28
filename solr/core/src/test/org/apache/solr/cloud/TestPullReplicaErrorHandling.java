@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -54,6 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
 public class TestPullReplicaErrorHandling extends SolrCloudTestCase {
   
   private final static int REPLICATION_TIMEOUT_SECS = 10;
@@ -72,7 +74,7 @@ public class TestPullReplicaErrorHandling extends SolrCloudTestCase {
   public static void setupCluster() throws Exception {
     System.setProperty("solr.zkclienttimeout", "20000");
 
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 3)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
     // Add proxies
@@ -142,7 +144,7 @@ public class TestPullReplicaErrorHandling extends SolrCloudTestCase {
 public void testCantConnectToPullReplica() throws Exception {
     int numShards = 2;
     CollectionAdminRequest.createCollection(collectionName, "conf", numShards, 1, 0, 1)
-      .setMaxShardsPerNode(1)
+      .setMaxShardsPerNode(3)
       .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(collectionName, numShards, numShards * 2);
     addDocs(10);
@@ -223,6 +225,7 @@ public void testCantConnectToPullReplica() throws Exception {
     CollectionAdminRequest.createCollection(collectionName, "conf", numShards, 1, 0, 1)
       .setMaxShardsPerNode(1)
       .process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(collectionName, 1, 2);
     addDocs(10);
     DocCollection docCollection = assertNumberOfReplicas(numShards, 0, numShards, false, true);
     Slice s = docCollection.getSlices().iterator().next();

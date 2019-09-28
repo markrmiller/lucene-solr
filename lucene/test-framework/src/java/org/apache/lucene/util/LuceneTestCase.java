@@ -207,7 +207,7 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 @ThreadLeakScope(Scope.SUITE)
 @ThreadLeakGroup(Group.MAIN)
 @ThreadLeakAction({Action.WARN, Action.INTERRUPT})
-@ThreadLeakLingering(linger = 20000) // Wait long for leaked threads to complete before failure. zk needs this.
+@ThreadLeakLingering(linger = 0)
 @ThreadLeakZombies(Consequence.IGNORE_REMAINING_TESTS)
 @TimeoutSuite(millis = 2 * TimeUnits.HOUR)
 @ThreadLeakFilters(defaultFilters = true, filters = {
@@ -227,6 +227,7 @@ public abstract class LuceneTestCase extends Assert {
   public static final String SYSPROP_MONSTER = "tests.monster";
   public static final String SYSPROP_AWAITSFIX = "tests.awaitsfix";
   public static final String SYSPROP_SLOW = "tests.slow";
+  public static final String SYSPROP_SLOWEST = "tests.slowest";
   public static final String SYSPROP_BADAPPLES = "tests.badapples";
 
   /** @see #ignoreAfterMaxFailures*/
@@ -285,6 +286,16 @@ public abstract class LuceneTestCase extends Assert {
   @Retention(RetentionPolicy.RUNTIME)
   @TestGroup(enabled = true, sysProperty = SYSPROP_SLOW)
   public @interface Slow {}
+  
+  /**
+   * Annotation for tests that are slowest. Slow tests can take longer than about
+   * 10 seconds, slowest tests can take closer to a minute and anthing else should be {@link Nightly}
+   */
+  @Documented
+  @Inherited
+  @Retention(RetentionPolicy.RUNTIME)
+  @TestGroup(enabled = true, sysProperty = SYSPROP_SLOWEST)
+  public @interface Slowest {}
 
   /**
    * Annotation for tests that fail frequently and are not executed in Jenkins builds

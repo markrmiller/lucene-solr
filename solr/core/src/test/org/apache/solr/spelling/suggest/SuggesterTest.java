@@ -16,6 +16,7 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.SpellingParams;
 import org.apache.solr.common.util.NamedList;
@@ -23,6 +24,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SuggesterTest extends SolrTestCaseJ4 {
   /**
    * Expected URI at which the given suggester will live.

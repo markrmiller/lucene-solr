@@ -19,6 +19,7 @@ package org.apache.solr.spelling;
 import java.util.Collection;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.SuppressTempFileChecks;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.SpellingParams;
@@ -32,6 +33,7 @@ import org.junit.Test;
  * Simple tests for {@link DirectSolrSpellChecker}
  */
 @SuppressTempFileChecks(bugUrl = "https://issues.apache.org/jira/browse/SOLR-1877 Spellcheck IndexReader leak bug?")
+@LuceneTestCase.Slow
 public class DirectSolrSpellCheckerTest extends SolrTestCaseJ4 {
 
   private static SpellingQueryConverter queryConverter;

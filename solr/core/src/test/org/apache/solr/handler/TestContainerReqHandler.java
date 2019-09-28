@@ -30,6 +30,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import com.google.common.collect.ImmutableMap;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
@@ -82,6 +84,7 @@ import static org.apache.solr.core.TestDynamicLoadingUrl.runHttpServer;
 
 @SolrTestCaseJ4.SuppressSSL
 @LogLevel("org.apache.solr.common.cloud.ZkStateReader=DEBUG;org.apache.solr.handler.admin.CollectionHandlerApi=DEBUG;org.apache.solr.core.PackageManager=DEBUG;org.apache.solr.common.cloud.ClusterProperties=DEBUG")
+@LuceneTestCase.Slowest
 public class TestContainerReqHandler extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -97,7 +100,7 @@ public class TestContainerReqHandler extends SolrCloudTestCase {
 
     for (int i = 0; i < repeats; i++) {
       if (i > 0) {
-        Thread.sleep(100);
+        Thread.sleep(300);
       }
       try {
         rsp = req.process(client);
@@ -468,7 +471,7 @@ public class TestContainerReqHandler extends SolrCloudTestCase {
     Pair<Server, Integer> server = runHttpServer(jars);
     int port = server.second();
     System.setProperty("enable.runtime.lib", "true");
-    MiniSolrCloudCluster cluster = configureCluster(4)
+    MiniSolrCloudCluster cluster = configureCluster(TEST_NIGHTLY ? 4 : 1)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
     try {
@@ -679,7 +682,7 @@ public class TestContainerReqHandler extends SolrCloudTestCase {
         "          \"class\":\"org.apache.solr.core.MyDocCache\",\n" +
         "          \"size\":\"512\",\n" +
         "          \"initialSize\":\"512\" , \"package\":\"cache_pkg\"}}}}";
-    MiniSolrCloudCluster cluster = configureCluster(4)
+    MiniSolrCloudCluster cluster = configureCluster(TEST_NIGHTLY ? 4 : 1)
         .addConfig("conf", configset("cloud-minimal"),
             Collections.singletonMap(ConfigOverlay.RESOURCE_NAME, overlay.getBytes(UTF_8)))
         .configure();

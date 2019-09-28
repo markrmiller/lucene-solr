@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
@@ -41,6 +42,7 @@ import org.junit.Test;
 import static org.hamcrest.core.StringContains.containsString;
 
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
 public class PeerSyncTest extends BaseDistributedSearchTestCase {
   protected static int numVersions = 100;  // number of versions to use when syncing
   protected static final String FROM_LEADER = DistribPhase.FROMLEADER.toString();

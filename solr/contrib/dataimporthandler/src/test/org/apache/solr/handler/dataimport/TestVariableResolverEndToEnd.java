@@ -24,12 +24,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.Assert;
-
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.request.SolrQueryRequest;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class TestVariableResolverEndToEnd  extends AbstractDIHJdbcTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

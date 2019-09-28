@@ -31,7 +31,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.IOUtils;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
@@ -55,11 +55,12 @@ import org.slf4j.LoggerFactory;
  *
  * @since solr 1.4
  */
-@Slow
 @ThreadLeakFilters(defaultFilters = true, filters = {
     SolrIgnoredThreadsFilter.class,
     QuickPatchThreadsFilter.class
 })
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

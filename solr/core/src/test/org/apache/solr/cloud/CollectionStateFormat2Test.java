@@ -16,6 +16,8 @@
  */
 package org.apache.solr.cloud;
 
+import java.lang.invoke.MethodHandles;
+
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -23,19 +25,26 @@ import org.apache.zookeeper.data.Stat;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CollectionStateFormat2Test extends SolrCloudTestCase {
-
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 2)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
   
   @After
   public void afterTest() throws Exception {
-    cluster.deleteAllCollections();
+    try {
+      cluster.deleteAllCollections();
+    } catch(Exception e) {
+      log.error("", e);
+    }
   }
   
   @Test
@@ -43,11 +52,11 @@ public class CollectionStateFormat2Test extends SolrCloudTestCase {
 
     String collectionName = "myExternColl";
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
+        .setMaxShardsPerNode(10)
         .process(cluster.getSolrClient());
 
     cluster.waitForActiveCollection(collectionName, 2, 4);
-    
-    waitForState("Collection not created", collectionName, (n, c) -> DocCollection.isFullyActive(n, c, 2, 2));
+
     assertTrue("State Format 2 collection path does not exist",
         zkClient().exists(ZkStateReader.getCollectionPath(collectionName), true));
 

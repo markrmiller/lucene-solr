@@ -105,7 +105,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
   private int waitForUpdatesWithStaleStatePauseMilliSeconds = Integer
       .getInteger("solr.cloud.wait-for-updates-with-stale-state-pause", 2500);
   private int maxRetries = 500;
-  private int startingRecoveryDelayMilliSeconds = 2000;
+  private int startingRecoveryDelayMilliSeconds = Integer
+      .getInteger("solr.cloud.starting-recovery-delay-milli-seconds", 2000);
 
   public static interface RecoveryListener {
     public void recovered();
@@ -192,6 +193,11 @@ public class RecoveryStrategy implements Runnable, Closeable {
     if (prevSendPreRecoveryHttpUriRequest != null) {
       prevSendPreRecoveryHttpUriRequest.abort();
     }
+    try {
+      prevSendPreRecoveryHttpUriRequest.abort();
+    } catch (NullPointerException e) {
+      // expected
+    }     
     log.warn("Stopping recovery for core=[{}] coreNodeName=[{}]", coreName, coreZkNodeName);
   }
 
@@ -794,6 +800,10 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
       if (leaderReplica.getCoreUrl().equals(ourUrl)) {
         return leaderReplica;
+      }
+      
+      if (isClosed()) {
+        return null;
       }
 
       try (HttpSolrClient httpSolrClient = buildRecoverySolrClient(leaderReplica.getCoreUrl())) {

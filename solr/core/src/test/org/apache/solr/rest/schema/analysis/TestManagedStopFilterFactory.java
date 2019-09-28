@@ -22,6 +22,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.RestTestBase;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -35,6 +36,7 @@ import org.restlet.ext.servlet.ServerServlet;
  * GET: returns the list of stop words or a single word if it exists
  * PUT: add some words to the current list
  */
+@LuceneTestCase.Slow
 public class TestManagedStopFilterFactory extends RestTestBase {
   private static File tmpSolrHome;
   private static File tmpConfDir;

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -35,6 +36,7 @@ import org.junit.Test;
  * See SOLR-7147 for more information
  */
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class TestTrackingShardHandlerFactory extends AbstractFullDistribZkTestBase {
 
   public TestTrackingShardHandlerFactory() {

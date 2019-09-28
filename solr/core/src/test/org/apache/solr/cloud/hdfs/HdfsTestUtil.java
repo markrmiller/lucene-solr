@@ -108,7 +108,7 @@ public class HdfsTestUtil {
     conf.setInt("dfs.namenode.metrics.logger.period.seconds", 0);
     conf.setInt("dfs.datanode.metrics.logger.period.seconds", 0);
 
-    System.setProperty("test.build.data", dir + File.separator + "hdfs" + File.separator + "build");
+    System.setProperty("test.build.data", dir + File.separator + "hdfs" + File.separator + "build-data");
     System.setProperty("test.cache.data", dir + File.separator + "hdfs" + File.separator + "cache");
     System.setProperty("solr.lock.type", DirectoryFactory.LOCK_TYPE_HDFS);
 
@@ -140,7 +140,7 @@ public class HdfsTestUtil {
     if (haTesting) dfsCluster.transitionToActive(0);
 
     int rndMode = random().nextInt(3);
-    if (safeModeTesting && rndMode == 1) {
+    if (safeModeTesting && (rndMode == 1 && LuceneTestCase.TEST_NIGHTLY)) {
       NameNodeAdapter.enterSafeMode(dfsCluster.getNameNode(), false);
 
       int rnd = random().nextInt(10000);
@@ -250,6 +250,9 @@ public class HdfsTestUtil {
           System.clearProperty(propertyName);
         }
       }
+      
+      // hdfs cluster can be slow to shutdown all it's threads
+      SolrTestCaseJ4.interruptThreadsOnTearDown("DataXceiverServer", true);
     }
   }
 

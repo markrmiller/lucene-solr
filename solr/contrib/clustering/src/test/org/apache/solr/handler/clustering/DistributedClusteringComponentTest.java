@@ -16,12 +16,14 @@
  */
 package org.apache.solr.handler.clustering;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.common.params.CommonParams;
 import org.junit.Test;
 
 @SuppressSSL
+@LuceneTestCase.Slowest // TODO: can be very slow
 public class DistributedClusteringComponentTest extends
     BaseDistributedSearchTestCase {
 

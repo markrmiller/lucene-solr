@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.FacetField;
@@ -41,6 +42,7 @@ import org.apache.solr.common.util.NamedList;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class BlockJoinFacetDistribTest extends SolrCloudTestCase{
 
   private static final int defFacetLimit = 10;

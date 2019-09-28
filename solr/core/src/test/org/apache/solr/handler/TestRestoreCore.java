@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.SolrTestCaseJ4;
@@ -45,6 +46,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 @SolrTestCaseJ4.SuppressSSL     // Currently unknown why SSL does not work with this test
+@LuceneTestCase.Slow
 public class TestRestoreCore extends SolrJettyTestBase {
 
   JettySolrRunner masterJetty;
@@ -83,6 +85,7 @@ public class TestRestoreCore extends SolrJettyTestBase {
   @Before
   public void setUp() throws Exception {
     super.setUp();
+    useFactory(null);
     String configFile = "solrconfig-master.xml";
 
     master = new TestReplicationHandler.SolrInstance(createTempDir("solr-instance").toFile(), "master", null);

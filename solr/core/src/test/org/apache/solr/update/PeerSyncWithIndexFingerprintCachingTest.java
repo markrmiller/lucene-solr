@@ -21,6 +21,7 @@ import static org.apache.solr.update.processor.DistributingUpdateProcessorFactor
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
@@ -42,6 +43,7 @@ import org.junit.Test;
  *  
  */
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
 public class PeerSyncWithIndexFingerprintCachingTest extends BaseDistributedSearchTestCase {
   private static int numVersions = 100;  // number of versions to use when syncing
   private final String FROM_LEADER = DistribPhase.FROMLEADER.toString();

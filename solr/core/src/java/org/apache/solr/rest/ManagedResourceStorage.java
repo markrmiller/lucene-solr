@@ -38,6 +38,7 @@ import java.util.Map;
 
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -94,6 +95,9 @@ public abstract class ManagedResourceStorage {
       try {
         zkConfigName = ((ZkSolrResourceLoader)resourceLoader).getZkController().
             getZkStateReader().readConfigName(collection);
+      } catch (AlreadyClosedException e) {
+        throw new SolrException(ErrorCode.SERVER_ERROR,
+            "Failed to load config name for collection:" + collection  + " due to: ", e);
       } catch (Exception e) {
         log.error("Failed to get config name due to", e);
         throw new SolrException(ErrorCode.SERVER_ERROR,

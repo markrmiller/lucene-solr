@@ -17,11 +17,13 @@
 package org.apache.solr.analytics.legacy.expression;
 
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.legacy.LegacyAbstractAnalyticsTest;
 import org.apache.solr.analytics.legacy.facet.LegacyAbstractAnalyticsFacetTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class LegacyFunctionTest extends LegacyAbstractAnalyticsTest {
   static String fileName = "functions.txt";
 

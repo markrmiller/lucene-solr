@@ -16,10 +16,12 @@
  */
 package org.apache.solr.update.processor;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class LangDetectLanguageIdentifierUpdateProcessorFactoryTest extends LanguageIdentifierUpdateProcessorFactoryTestCase {
   @Override
   protected LanguageIdentifierUpdateProcessor createLangIdProcessor(ModifiableSolrParams parameters) throws Exception {

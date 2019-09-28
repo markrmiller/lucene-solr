@@ -54,6 +54,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -83,6 +84,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+@LuceneTestCase.Slow
 public class AddBlockUpdateTest extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -120,6 +122,11 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
     counter.set(0);
     initCore("solrconfig.xml", "schema15.xml");
   }
+  
+  @AfterClass
+  public static void afterExpectedException() {
+    ExecutorUtil.shutdownAndAwaitTermination(exe);
+  }
 
   @Before
   public void prepare() {
@@ -153,10 +160,8 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
 
   @AfterClass
   public static void afterClass() throws Exception {
-    if (null != exe) {
-      exe.shutdownNow();
-      exe = null;
-    }
+    ExecutorUtil.shutdownWithInterruptAndAwaitTermination(exe);
+    exe = null;
     inputFactory = null;
   }
 

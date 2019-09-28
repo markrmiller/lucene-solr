@@ -16,6 +16,10 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.map;
+import static org.apache.solr.SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP;
+import static org.apache.solr.SolrTestCaseJ4.RANDOMIZED_NUMERIC_FIELDTYPES;
+
 import java.lang.invoke.MethodHandles;
 import java.net.URL;
 import java.nio.file.Path;
@@ -34,6 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -108,6 +113,9 @@ public class TestStressCloudBlindAtomicUpdates extends SolrCloudTestCase {
   
   @BeforeClass
   private static void createMiniSolrCloudCluster() throws Exception {
+    
+    SolrTestCaseJ4.randomizeNumericTypesProperties();
+    
     // NOTE: numDocsToCheck uses atLeast, so nightly & multiplier are alreayd a factor in index size
     // no need to redundently factor them in here as well
     DOC_ID_INCR = TestUtil.nextInt(random(), 1, 7);
@@ -120,21 +128,17 @@ public class TestStressCloudBlindAtomicUpdates extends SolrCloudTestCase {
     final int numShards = TEST_NIGHTLY ? 5 : 2; 
     final int repFactor = 2; 
     final int numNodes = numShards * repFactor;
-   
-    final String configName = DEBUG_LABEL + "_config-set";
-    final Path configDir = Paths.get(TEST_HOME(), "collection1", "conf");
     
-    configureCluster(numNodes).addConfig(configName, configDir).configure();
+    configureCluster(numNodes).addConfig("conf", configset("atomic-updates")).configure();
 
     CLOUD_CLIENT = cluster.getSolrClient();
     CLOUD_CLIENT.setDefaultCollection(COLLECTION_NAME);
 
-    CollectionAdminRequest.createCollection(COLLECTION_NAME, configName, numShards, repFactor)
-        .withProperty("config", "solrconfig-tlog.xml")
-        .withProperty("schema", "schema-minimal-atomic-stress.xml")
+    CollectionAdminRequest.createCollection(COLLECTION_NAME, "conf", numShards, repFactor)
+        
         .process(CLOUD_CLIENT);
 
-    waitForRecoveriesToFinish(CLOUD_CLIENT);
+    cluster.waitForActiveCollection(COLLECTION_NAME, numShards, repFactor * numShards);
 
     CLIENTS.clear();
     for (JettySolrRunner jetty : cluster.getJettySolrRunners()) {

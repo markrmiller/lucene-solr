@@ -25,7 +25,11 @@
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
   <requestHandler name="/select" class="solr.SearchHandler"></requestHandler>
   <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.RAMDirectoryFactory}"/>
-
+  
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
+  
   <schemaFactory class="ManagedIndexSchemaFactory">
     <bool name="mutable">true</bool>
     <str name="managedSchemaResourceName">managed-schema</str>

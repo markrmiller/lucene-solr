@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrExampleTests;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateHttp2SolrClient;
@@ -32,6 +33,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
 public class SolrExampleStreamingHttp2Test extends SolrExampleTests {
 
   @BeforeClass

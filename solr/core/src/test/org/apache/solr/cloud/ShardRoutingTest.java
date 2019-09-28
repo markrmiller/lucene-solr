@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -30,7 +31,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 
-
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class ShardRoutingTest extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

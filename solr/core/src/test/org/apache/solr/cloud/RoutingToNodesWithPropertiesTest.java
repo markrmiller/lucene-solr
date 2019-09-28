@@ -27,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableMap;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
@@ -55,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.cloud.rule.ImplicitSnitch.SYSPROP;
 
+@LuceneTestCase.Slow
 public class RoutingToNodesWithPropertiesTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String PROP_NAME = SYSPROP + "zone";
@@ -67,6 +70,7 @@ public class RoutingToNodesWithPropertiesTest extends SolrCloudTestCase {
 
   @Before
   public void setupCluster() throws Exception {
+    System.setProperty("solr.disableJvmMetrics", "false");
     TestInjection.additionalSystemProps = ImmutableMap.of("zone", "us-west1");
     configureCluster(2)
         .withSolrXml(TEST_PATH().resolve("solr-trackingshardhandler.xml"))

@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -35,6 +36,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class ConcurrentUpdateHttp2SolrClientTest extends SolrJettyTestBase {
 
 

@@ -606,7 +606,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
       } catch(Exception e) {
         throw new RuntimeException(e);
       } finally {
-        threadPool.shutdown();
+        ExecutorUtil.shutdownAndAwaitTermination(threadPool);
       }
     }
 

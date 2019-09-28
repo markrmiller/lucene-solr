@@ -54,7 +54,7 @@ public class TestImplicitCoreProperties extends SolrTestCaseJ4 {
   // SOLR-5279
   @Test
   public void testPropertiesArePersistedAcrossReload() {
-    cc.reload("collection1");
+    //cc.reload("collection1");
     assertQ(req("q", "*:*")
         , "//str[@name='dummy1'][.='collection1']"
         , "//str[@name='dummy2'][.='data']"

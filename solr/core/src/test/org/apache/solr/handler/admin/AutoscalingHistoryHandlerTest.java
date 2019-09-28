@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.autoscaling.TriggerEventProcessorStage;
@@ -57,11 +58,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG;org.apache.solr.cloud.Overseer=DEBUG;org.apache.solr.cloud.overseer=DEBUG;org.apache.solr.client.solrj.cloud.autoscaling=DEBUG")
+@LuceneTestCase.Slowest
 public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static CountDownLatch actionFiredLatch;
-  private static CountDownLatch listenerFiredLatch;
+  private static volatile CountDownLatch actionFiredLatch;
+  private static volatile CountDownLatch listenerFiredLatch;
   private static CloudSolrClient solrClient;
   private static String PREFIX = AutoscalingHistoryHandlerTest.class.getSimpleName();
   private static String COLL_NAME = PREFIX + "_collection";
@@ -77,7 +79,7 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(2)
+    configureCluster(3)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
     solrClient = cluster.getSolrClient();
@@ -85,6 +87,7 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
     // any interference from .system replicas being moved around.
     systemCollNode = cluster.getJettySolrRunner(0).getNodeName();
     CollectionAdminRequest.createCollection(CollectionAdminParams.SYSTEM_COLL, null, 1, 1)
+        .setMaxShardsPerNode(10)
         .setCreateNodeSet(systemCollNode)
         .process(solrClient);
     cluster.waitForActiveCollection(CollectionAdminParams.SYSTEM_COLL, 1, 1);
@@ -93,7 +96,7 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
     otherNodes.remove(systemCollNode);
     CollectionAdminRequest.createCollection(COLL_NAME, null, 1, 3)
         .setCreateNodeSet(String.join(",", otherNodes))
-        .setMaxShardsPerNode(3)
+        .setMaxShardsPerNode(10)
         .process(solrClient);
     cluster.waitForActiveCollection(COLL_NAME, 1, 3);
   }
@@ -267,29 +270,22 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
 
   @Test
   public void testHistory() throws Exception {
-    waitForState("Timed out wait for collection be active", COLL_NAME,
-        clusterShape(1, 3));
-    waitForState("Timed out wait for collection be active", CollectionAdminParams.SYSTEM_COLL,
-        clusterShape(1, 1));
-
     log.info("### Start add node...");
     JettySolrRunner jetty = cluster.startJettySolrRunner();
     cluster.waitForAllNodes(30);
     String nodeAddedName = jetty.getNodeName();
     log.info("### Added node " + nodeAddedName);
-    boolean await = actionFiredLatch.await(60, TimeUnit.SECONDS);
+    boolean await = actionFiredLatch.await(30, TimeUnit.SECONDS);
     assertTrue("action did not execute", await);
 
-    await = listenerFiredLatch.await(60, TimeUnit.SECONDS);
+    await = listenerFiredLatch.await(30, TimeUnit.SECONDS);
     assertTrue("listener did not execute", await);
 
     waitForRecovery(COLL_NAME);
 
     // commit on the history collection
-    Thread.sleep(5000);
     log.info("### Commit .system");
     solrClient.commit(CollectionAdminParams.SYSTEM_COLL);
-    Thread.sleep(5000);
 
     // verify that new docs exist
     ModifiableSolrParams query = params(CommonParams.Q, "type:" + SystemLogListener.DOC_TYPE,
@@ -366,29 +362,30 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
       }
     }
     assertNotNull("no suitable node found", nodeToKill);
+    JettySolrRunner j = null;
     log.info("### Stopping node " + nodeToKill);
     for (int i = 0; i < cluster.getJettySolrRunners().size(); i++) {
       if (cluster.getJettySolrRunner(i).getNodeName().equals(nodeToKill)) {
-        JettySolrRunner j = cluster.stopJettySolrRunner(i);
+        j = cluster.stopJettySolrRunner(i);
         cluster.waitForJettyToStop(j);
         break;
       }
     }
+    
+    assertNotNull(j);
     log.info("### Stopped node " + nodeToKill);
-    await = actionFiredLatch.await(60, TimeUnit.SECONDS);
+    await = actionFiredLatch.await(30, TimeUnit.SECONDS);
     assertTrue("action did not execute", await);
 
-    await = listenerFiredLatch.await(60, TimeUnit.SECONDS);
+    await = listenerFiredLatch.await(30, TimeUnit.SECONDS);
     assertTrue("listener did not execute", await);
 
     // wait for recovery
-    waitForRecovery(COLL_NAME);
+    cluster.waitForActiveCollection(COLL_NAME, 1, 3);
 
-    Thread.sleep(5000);
     // commit on the history collection
     log.info("### Commit .system");
     solrClient.commit(CollectionAdminParams.SYSTEM_COLL);
-    Thread.sleep(5000);
 
     query = params(CommonParams.QT, CommonParams.AUTOSCALING_HISTORY_PATH,
         AutoscalingHistoryHandler.TRIGGER_PARAM, PREFIX + "_node_lost_trigger");
@@ -451,7 +448,7 @@ public class AutoscalingHistoryHandlerTest extends SolrCloudTestCase {
         break;
       } else {
         log.info("--- waiting, allActive=" + allActive + ", hasLeaders=" + hasLeaders);
-        Thread.sleep(1000);
+        Thread.sleep(300);
       }
     }
     assertTrue("replica never fully recovered: allActive=" + allActive + ", hasLeaders=" + hasLeaders + ", collState=" + collState, recovered);

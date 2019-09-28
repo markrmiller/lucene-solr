@@ -33,6 +33,7 @@ import java.util.TimeZone;
 
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.queries.function.valuesource.QueryValueSource;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -62,6 +63,7 @@ import org.junit.BeforeClass;
 /**
  * Statistics Component Test
  */
+@LuceneTestCase.Slow
 public class StatsComponentTest extends SolrTestCaseJ4 {
 
   final static String XPRE = "/response/lst[@name='stats']/";

@@ -50,10 +50,10 @@ public class CollectionPropsTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupClass() throws Exception {
-    Boolean useLegacyCloud = rarely();
+    Boolean useLegacyCloud = TEST_NIGHTLY ? rarely() : false;
     log.info("Using legacyCloud?: {}", useLegacyCloud);
 
-    configureCluster(4)
+    configureCluster(TEST_NIGHTLY ? 4 : 1)
         .withProperty(ZkStateReader.LEGACY_CLOUD, String.valueOf(useLegacyCloud))
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
@@ -67,8 +67,10 @@ public class CollectionPropsTest extends SolrCloudTestCase {
     collectionName = "CollectionPropsTest" + System.nanoTime();
 
     CollectionAdminRequest.Create request = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2);
+    request.setMaxShardsPerNode(10);
     CollectionAdminResponse response = request.process(cluster.getSolrClient());
     assertTrue("Unable to create collection: " + response.toString(), response.isSuccess());
+    cluster.waitForActiveCollection(collectionName, 2, 4);
   }
 
   @Test

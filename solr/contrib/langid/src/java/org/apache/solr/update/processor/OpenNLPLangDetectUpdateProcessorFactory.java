@@ -49,6 +49,7 @@ import opennlp.tools.langdetect.LanguageDetectorModel;
  *
  * @since 7.3.0
  */
+
 public class OpenNLPLangDetectUpdateProcessorFactory extends UpdateRequestProcessorFactory
   implements SolrCoreAware {
 

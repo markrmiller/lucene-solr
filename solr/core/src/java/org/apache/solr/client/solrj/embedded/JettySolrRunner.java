@@ -48,6 +48,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.lucene.util.Constants;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
+import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -93,8 +94,8 @@ public class JettySolrRunner {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final int THREAD_POOL_MAX_THREADS = 10000;
-  // NOTE: needs to be larger than SolrHttpClient.threadPoolSweeperMaxIdleTime
-  private static final int THREAD_POOL_MAX_IDLE_TIME_MS = 260000;
+  // NOTE: needs to be larger than HttpClientUtil.SolrHttpClient.EVICT_IDLE_CONNECTIONS
+  private static final int THREAD_POOL_MAX_IDLE_TIME_MS = HttpClientUtil.EVICT_IDLE_CONNECTIONS_DEFAULT + 10000;
 
   Server server;
 
@@ -262,8 +263,10 @@ public class JettySolrRunner {
   private void init(int port) {
 
     QueuedThreadPool qtp = new QueuedThreadPool();
-    qtp.setMaxThreads(THREAD_POOL_MAX_THREADS);
-    qtp.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
+    qtp.setMaxThreads(Integer.getInteger("solr.maxContainerThreads", THREAD_POOL_MAX_THREADS));
+    qtp.setLowThreadsThreshold(Integer.getInteger("solr.lowContainerThreadsThreshold", 1));
+    qtp.setMinThreads(Integer.getInteger("solr.minContainerThreads", 1));
+    qtp.setIdleTimeout(Integer.getInteger("solr.containerThreadsIdle", THREAD_POOL_MAX_IDLE_TIME_MS));
     qtp.setReservedThreads(0);
     server = new Server(qtp);
     server.manage(qtp);
@@ -773,7 +776,8 @@ public class JettySolrRunner {
   }
 
   public SolrClient newClient() {
-    return new HttpSolrClient.Builder(getBaseUrl().toString()).build();
+    return new HttpSolrClient.Builder(getBaseUrl().toString())
+        .withSocketTimeout(Integer.getInteger("socketTimeout", 30000)).withConnectionTimeout(15000).build();
   }
 
   public SolrClient newClient(int connectionTimeoutMillis, int socketTimeoutMillis) {

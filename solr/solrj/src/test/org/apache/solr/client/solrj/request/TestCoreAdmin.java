@@ -60,6 +60,7 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.core.Is.is;
 
 @ThreadLeakFilters(defaultFilters = true, filters = {SolrIgnoredThreadsFilter.class})
+@LuceneTestCase.Slow
 public class TestCoreAdmin extends AbstractEmbeddedSolrServerTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

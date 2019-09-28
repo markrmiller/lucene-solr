@@ -168,7 +168,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           assert val.refCnt > -1 : val.refCnt;
           int cnt = 0;
           while (val.refCnt != 0) {
-            wait(100);
+            wait(300);
 
             if (cnt++ >= 120) {
               String msg = "Timeout waiting for all directory ref counts to be released - gave up waiting on " + val;
@@ -191,7 +191,15 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           for (CacheValue v : val.closeEntries) {
             assert v.refCnt == 0 : val.refCnt;
             log.debug("Closing directory when closing factory: " + v.path);
-            boolean cl = closeCacheValue(v);
+            boolean cl = false;
+            try {
+              cl = closeCacheValue(v);
+            } catch (Throwable e) {
+              SolrException.log(log, "Error closing directory", e);
+              if (e instanceof Error) {
+                throw (Error) e;
+              }
+            }
             if (cl) {
               closedDirs.add(v);
             }
@@ -226,58 +234,72 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
   // returns true if we closed the cacheValue, false if it will be closed later
   private boolean closeCacheValue(CacheValue cacheValue) {
     log.debug("looking to close {} {}", cacheValue.path, cacheValue.closeEntries.toString());
-    List<CloseListener> listeners = closeListeners.remove(cacheValue.directory);
-    if (listeners != null) {
-      for (CloseListener listener : listeners) {
-        try {
-          listener.preClose();
-        } catch (Exception e) {
-          SolrException.log(log, "Error executing preClose for directory", e);
-        }
-      }
-    }
-    cacheValue.closeCacheValueCalled = true;
-    if (cacheValue.deleteOnClose) {
-      // see if we are a subpath
-      Collection<CacheValue> values = byPathCache.values();
-
-      Collection<CacheValue> cacheValues = new ArrayList<>(values);
-      cacheValues.remove(cacheValue);
-      for (CacheValue otherCacheValue : cacheValues) {
-        // if we are a parent path and a sub path is not already closed, get a sub path to close us later
-        if (isSubPath(cacheValue, otherCacheValue) && !otherCacheValue.closeCacheValueCalled) {
-          // we let the sub dir remove and close us
-          if (!otherCacheValue.deleteAfterCoreClose && cacheValue.deleteAfterCoreClose) {
-            otherCacheValue.deleteAfterCoreClose = true;
+    List<CloseListener> listeners = null;
+    try {
+      listeners = closeListeners.remove(cacheValue.directory);
+      if (listeners != null) {
+        for (CloseListener listener : listeners) {
+          try {
+            listener.preClose();
+          } catch (Exception e) {
+            SolrException.log(log, "Error executing preClose for directory", e);
           }
-          otherCacheValue.removeEntries.addAll(cacheValue.removeEntries);
-          otherCacheValue.closeEntries.addAll(cacheValue.closeEntries);
-          cacheValue.closeEntries.clear();
-          cacheValue.removeEntries.clear();
-          return false;
         }
       }
+      cacheValue.closeCacheValueCalled = true;
+      if (cacheValue.deleteOnClose) {
+        // see if we are a subpath
+        Collection<CacheValue> values = byPathCache.values();
+
+        Collection<CacheValue> cacheValues = new ArrayList<>(values);
+        cacheValues.remove(cacheValue);
+        for (CacheValue otherCacheValue : cacheValues) {
+          // if we are a parent path and a sub path is not already closed, get a sub path to close us later
+          if (isSubPath(cacheValue, otherCacheValue) && !otherCacheValue.closeCacheValueCalled) {
+            // we let the sub dir remove and close us
+            if (!otherCacheValue.deleteAfterCoreClose && cacheValue.deleteAfterCoreClose) {
+              otherCacheValue.deleteAfterCoreClose = true;
+            }
+            otherCacheValue.removeEntries.addAll(cacheValue.removeEntries);
+            otherCacheValue.closeEntries.addAll(cacheValue.closeEntries);
+            cacheValue.closeEntries.clear();
+            cacheValue.removeEntries.clear();
+            return false;
+          }
+        }
+      }
+
+    } catch (Exception e) {
+      log.error("Exception releasing directory", e);
     }
 
     boolean cl = false;
     for (CacheValue val : cacheValue.closeEntries) {
-      close(val);
+      try {
+        close(val);
+      } catch (Exception e) {
+        log.error("Exception closing", e);
+      }
       if (val == cacheValue) {
         cl = true;
       }
     }
 
-    for (CacheValue val : cacheValue.removeEntries) {
-      if (!val.deleteAfterCoreClose) {
-        log.debug("Removing directory before core close: " + val.path);
-        try {
-          removeDirectory(val);
-        } catch (Exception e) {
-          SolrException.log(log, "Error removing directory " + val.path + " before core close", e);
+    try {
+      for (CacheValue val : cacheValue.removeEntries) {
+        if (!val.deleteAfterCoreClose) {
+          log.debug("Removing directory before core close: " + val.path);
+          try {
+            removeDirectory(val);
+          } catch (Exception e) {
+            SolrException.log(log, "Error removing directory " + val.path + " before core close", e);
+          }
+        } else {
+          removeEntries.add(val);
         }
-      } else {
-        removeEntries.add(val);
       }
+    } catch (Exception e) {
+      log.error("Exception removing directory", e);
     }
 
     if (listeners != null) {
@@ -416,7 +438,9 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
   @Override
   public void release(Directory directory) throws IOException {
     if (directory == null) {
-      throw new NullPointerException();
+      NullPointerException e = new NullPointerException();
+      log.error("Attempt to release null directory", e);
+      throw e;
     }
     synchronized (this) {
       // don't check if already closed here - we need to able to release
@@ -424,6 +448,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
 
       CacheValue cacheValue = byDirectoryCache.get(directory);
       if (cacheValue == null) {
+        log.error("Attempt to release unknown directory: " + directory);
         throw new IllegalArgumentException("Unknown directory: " + directory
             + " " + byDirectoryCache);
       }

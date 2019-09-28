@@ -16,9 +16,11 @@
  */
 package org.apache.solr.spelling.suggest;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
+@LuceneTestCase.Slow
 public class TestFreeTextSuggestions extends SolrTestCaseJ4 {
   static final String URI = "/free_text_suggest";
   

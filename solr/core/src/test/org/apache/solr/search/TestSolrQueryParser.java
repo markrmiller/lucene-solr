@@ -33,6 +33,7 @@ import org.apache.lucene.search.PointInSetQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermInSetQuery;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.MapSolrParams;
@@ -656,6 +657,7 @@ public class TestSolrQueryParser extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Nightly // not loading synonyms non nightly
   public void testSplitOnWhitespace_Basic() throws Exception {
     // The "syn" field has synonyms loaded from synonyms.txt
 
@@ -691,6 +693,7 @@ public class TestSolrQueryParser extends SolrTestCaseJ4 {
     );
   }
 
+  @Nightly // not loading synonyms non nightly
   public void testSplitOnWhitespace_Comments() throws Exception {
     // The "syn" field has synonyms loaded from synonyms.txt
 
@@ -816,6 +819,7 @@ public class TestSolrQueryParser extends SolrTestCaseJ4 {
     );
   }
 
+  @Nightly // not loading synonyms non nightly
   public void testOperatorsAndMultiWordSynonyms() throws Exception {
     // The "syn" field has synonyms loaded from synonyms.txt
 
@@ -1055,6 +1059,7 @@ public class TestSolrQueryParser extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Nightly // not loading synonyms non nightly
   public void testAutoGeneratePhraseQueries() throws Exception {
     ModifiableSolrParams noSowParams = new ModifiableSolrParams();
     ModifiableSolrParams sowFalseParams = new ModifiableSolrParams();
@@ -1105,7 +1110,7 @@ public class TestSolrQueryParser extends SolrTestCaseJ4 {
     );
   }
 
-
+  @Nightly // not loading synonyms non nightly
   public void testSynonymQueryStyle() throws Exception {
 
     Query q = QParser.getParser("tabby", req(params("df", "t_pick_best_foo"))).getQuery();

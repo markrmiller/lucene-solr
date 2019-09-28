@@ -19,6 +19,7 @@ package org.apache.solr.ltr.feature;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.ltr.TestRerankBase;
@@ -26,7 +27,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Slowest
 public class TestFeatureExtractionFromMultipleSegments extends TestRerankBase {
   static final String AB = "abcdefghijklmnopqrstuvwxyz";
 

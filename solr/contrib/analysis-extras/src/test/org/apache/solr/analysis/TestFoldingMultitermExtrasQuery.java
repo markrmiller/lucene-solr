@@ -19,11 +19,13 @@ package org.apache.solr.analysis;
 import java.io.File;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 // See: https://issues.apache.org/jira/browse/SOLR-12028 Tests cannot remove files on Windows machines occasionally
+@LuceneTestCase.Slow
 public class TestFoldingMultitermExtrasQuery extends SolrTestCaseJ4 {
 
   public String getCoreName() {

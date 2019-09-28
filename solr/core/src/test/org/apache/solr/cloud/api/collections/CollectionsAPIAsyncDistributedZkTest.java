@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -53,6 +54,7 @@ import org.slf4j.LoggerFactory;
  * Tests the Cloud Collections API.
  */
 @Slow
+@Slowest
 public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
 
   private static final int MAX_TIMEOUT_SECONDS = 90;
@@ -80,6 +82,7 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
 
     RequestStatusState state = CollectionAdminRequest.createCollection("testasynccollectioncreation","conf1",1,1)
         .processAndWait(client, MAX_TIMEOUT_SECONDS);
+    cluster.waitForActiveCollection("testasynccollectioncreation", 1, 1);
     assertSame("CreateCollection task did not complete!", RequestStatusState.COMPLETED, state);
 
     state = CollectionAdminRequest.createCollection("testasynccollectioncreation","conf1",1,1)
@@ -88,16 +91,18 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
 
     state = CollectionAdminRequest.addReplicaToShard("testasynccollectioncreation", "shard1")
       .processAndWait(client, MAX_TIMEOUT_SECONDS);
+    cluster.waitForActiveCollection("testasynccollectioncreation", 1, 2);
     assertSame("Add replica did not complete", RequestStatusState.COMPLETED, state);
 
     state = CollectionAdminRequest.splitShard("testasynccollectioncreation")
         .setShardName("shard1")
         .processAndWait(client, MAX_TIMEOUT_SECONDS * 2);
-    assertEquals("Shard split did not complete. Last recorded state: " + state, RequestStatusState.COMPLETED, state);
 
+    assertEquals("Shard split did not complete. Last recorded state: " + state, RequestStatusState.COMPLETED, state);
   }
 
   @Test
+  @Nightly
   public void testAsyncRequests() throws Exception {
     boolean legacy = random().nextBoolean();
     if (legacy) {
@@ -115,11 +120,10 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
         .processAndWait(client, MAX_TIMEOUT_SECONDS);
     assertSame("CreateCollection task did not complete!", RequestStatusState.COMPLETED, state);
 
-    
     cluster.waitForActiveCollection(collection, 1, 1);
     
     //Add a few documents to shard1
-    int numDocs = TestUtil.nextInt(random(), 10, 100);
+    int numDocs = TestUtil.nextInt(random(), 10, TEST_NIGHTLY ? 100 : 20);
     List<SolrInputDocument> docs = new ArrayList<>(numDocs);
     for (int i=0; i<numDocs; i++) {
       SolrInputDocument doc = new SolrInputDocument();
@@ -169,6 +173,11 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
       if (slice == null) {
         return false;
       }
+      
+      Slice slice2 = c.getSlice("shard2");
+      if (slice2 != null) {
+        return false;
+      }
 
       if (slice.getReplicas().size() == 2) {
         return true;
@@ -176,6 +185,7 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
 
       return false;
     });
+
 
     state = CollectionAdminRequest.createAlias("myalias",collection)
         .processAndWait(client, MAX_TIMEOUT_SECONDS);
@@ -213,11 +223,13 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
     state = CollectionAdminRequest.deleteReplica(collection, "shard1", replicaName)
       .processAndWait(client, MAX_TIMEOUT_SECONDS);
     assertSame("DeleteReplica did not complete", RequestStatusState.COMPLETED, state);
-
+    cluster.waitForRemovedCollection(collection);
+    
     if (!legacy) {
       state = CollectionAdminRequest.deleteCollection(collection)
           .processAndWait(client, MAX_TIMEOUT_SECONDS);
       assertSame("DeleteCollection did not complete", RequestStatusState.COMPLETED, state);
+      cluster.waitForRemovedCollection(collection);
     }
   }
 
@@ -233,6 +245,8 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
         .setShards("shard1")
         .processAndWait(cluster.getSolrClient(), MAX_TIMEOUT_SECONDS);
     assertSame("CreateCollection task did not complete!", RequestStatusState.COMPLETED, state);
+    
+    cluster.waitForActiveCollection("testAsyncIdRaceCondition", 1, 1);
     
     int numThreads = 10;
     final AtomicInteger numSuccess = new AtomicInteger(0);
@@ -268,8 +282,7 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
           }
         });
       }
-      es.shutdown();
-      assertTrue(es.awaitTermination(10, TimeUnit.SECONDS));
+      ExecutorUtil.shutdownAndAwaitTermination(es);
       assertEquals(1, numSuccess.get());
       assertEquals(numThreads - 1, numFailure.get());
     } finally {
@@ -277,6 +290,11 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
         clients[i].close();
       }
     }
+    
+    CollectionAdminRequest.deleteCollection("testAsyncIdRaceCondition")
+        .processAndWait(cluster.getSolrClient(), MAX_TIMEOUT_SECONDS);
+    assertSame("DeleteCollection did not complete", RequestStatusState.COMPLETED, state);
+    cluster.waitForRemovedCollection("testAsyncIdRaceCondition");
   }
   
   public void testAsyncIdBackCompat() throws Exception {

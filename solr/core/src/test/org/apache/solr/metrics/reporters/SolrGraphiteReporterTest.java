@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
@@ -43,6 +44,7 @@ import org.junit.Test;
 /**
  *
  */
+@LuceneTestCase.Slow
 public class SolrGraphiteReporterTest extends SolrTestCaseJ4 {
 
   @Test

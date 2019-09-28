@@ -40,6 +40,7 @@ import org.apache.solr.request.macro.MacroExpander;
 import org.apache.solr.util.hll.HLL;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
@@ -50,6 +51,9 @@ import com.tdunning.math.stats.AVLTreeDigest;
 //   TestJsonFacetRefinement for refinement tests
 
 @LuceneTestCase.SuppressCodecs({"Lucene3x","Lucene40","Lucene41","Lucene42","Lucene45","Appending"})
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class TestJsonFacets extends SolrTestCaseHS {
   
   private static SolrInstances servers;  // for distributed testing

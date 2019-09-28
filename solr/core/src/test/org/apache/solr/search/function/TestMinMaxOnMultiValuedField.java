@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.LuceneTestCase.SuppressCodecs;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
@@ -41,6 +43,7 @@ import org.junit.BeforeClass;
  * as well as the beahvior of sorting on <code>foo asc|desc</code> to implicitly choose the min|max.
  */
 @SuppressCodecs({"SimpleText"}) // see TestSortedSetSelector
+@LuceneTestCase.Slow
 public class TestMinMaxOnMultiValuedField extends SolrTestCaseJ4 {
 
   /** Initializes core and does some sanity checking of schema */

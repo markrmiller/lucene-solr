@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkCmdExecutor;
@@ -34,6 +35,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slowest
 public class ZkSolrClientTest extends SolrTestCaseJ4 {
 
   @BeforeClass
@@ -206,10 +208,9 @@ public class ZkSolrClientTest extends SolrTestCaseJ4 {
       server = new ZkTestServer(zkDir);
       server.run();
 
-      final int timeout = random().nextInt(10000) + 5000;
-      
-      ZkCmdExecutor zkCmdExecutor = new ZkCmdExecutor(timeout);
+      final int timeout = random().nextInt(1000) + 3000;
       final long start = System.nanoTime();
+      ZkCmdExecutor zkCmdExecutor = new ZkCmdExecutor(timeout);
       expectThrows(KeeperException.SessionExpiredException.class, () -> {
         zkCmdExecutor.retryOperation(() -> {
           if (System.nanoTime() - start > TimeUnit.NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS)) {
@@ -375,7 +376,6 @@ public class ZkSolrClientTest extends SolrTestCaseJ4 {
   
   @AfterClass
   public static void afterClass() throws InterruptedException {
-    // wait just a bit for any zk client threads to outlast timeout
-    Thread.sleep(2000);
+
   }
 }

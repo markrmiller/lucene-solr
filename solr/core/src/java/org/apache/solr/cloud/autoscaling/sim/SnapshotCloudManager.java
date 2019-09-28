@@ -17,6 +17,7 @@
 
 package org.apache.solr.cloud.autoscaling.sim;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -59,7 +60,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Read-only snapshot of another {@link SolrCloudManager}.
  */
-public class SnapshotCloudManager implements SolrCloudManager {
+public class SnapshotCloudManager implements SolrCloudManager, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private ObjectCache objectCache = new ObjectCache();
   private SnapshotClusterStateProvider clusterStateProvider;

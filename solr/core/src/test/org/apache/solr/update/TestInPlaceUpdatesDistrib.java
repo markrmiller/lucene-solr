@@ -17,6 +17,8 @@
 
 package org.apache.solr.update;
 
+import static org.apache.solr.SolrTestCaseJ4.map;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -34,7 +36,9 @@ import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -43,7 +47,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest.Field;
 import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.client.solrj.response.schema.SchemaResponse.FieldResponse;
-import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
+import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.cloud.ZkShardTerms;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -64,70 +68,49 @@ import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.KeeperException;
 import org.junit.BeforeClass;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Tests the in-place updates (docValues updates) for a one shard, three replica cluster.
  */
-@Slow
-public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
+@LuceneTestCase.Slowest
+public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final boolean onlyLeaderIndexes = random().nextBoolean();
+  private final boolean onlyLeaderIndexes = TEST_NIGHTLY ? false : random().nextBoolean();
 
   @BeforeClass
+  public static void beforeDistribCursorPagingTest() throws Exception {
+    numShards = 3;
+    sliceCount = 1;
+    replicationFactor = 3;
+  }
+  
+  @BeforeClass
   public static void beforeSuperClass() throws Exception {
+    
+    System.setProperty("solr.zkclienttimeout", "45000");
+    System.setProperty("distribUpdateSoTimeout", "10000");
+    System.setProperty("socketTimeout", "10000");
+    
     schemaString = "schema-inplace-updates.xml";
-    configString = "solrconfig-tlog.xml";
+    solrconfigString = "solrconfig-tlog.xml";
 
     // we need consistent segments that aren't re-ordered on merge because we're
     // asserting inplace updates happen by checking the internal [docid]
-    systemSetPropertySolrTestsMergePolicyFactory(NoMergePolicyFactory.class.getName());
+    SolrTestCaseJ4.systemSetPropertySolrTestsMergePolicyFactory(NoMergePolicyFactory.class.getName());
 
-    randomizeUpdateLogImpl();
-
-    initCore(configString, schemaString);
-    
-    // sanity check that autocommits are disabled
-    assertEquals(-1, h.getCore().getSolrConfig().getUpdateHandlerInfo().autoCommmitMaxTime);
-    assertEquals(-1, h.getCore().getSolrConfig().getUpdateHandlerInfo().autoSoftCommmitMaxTime);
-    assertEquals(-1, h.getCore().getSolrConfig().getUpdateHandlerInfo().autoCommmitMaxDocs);
-    assertEquals(-1, h.getCore().getSolrConfig().getUpdateHandlerInfo().autoSoftCommmitMaxDocs);
-    
-    // assert that NoMergePolicy was chosen
-    RefCounted<IndexWriter> iw = h.getCore().getSolrCoreState().getIndexWriter(h.getCore());
-    try {
-      IndexWriter writer = iw.get();
-      assertTrue("Actual merge policy is: " + writer.getConfig().getMergePolicy(),
-          writer.getConfig().getMergePolicy() instanceof NoMergePolicy); 
-    } finally {
-      iw.decref();
-    }
-  }
-
-  @Override
-  protected boolean useTlogReplicas() {
-    return false; // TODO: tlog replicas makes commits take way to long due to what is likely a bug and it's TestInjection use
-  }
-
-  public TestInPlaceUpdatesDistrib() throws Exception {
-    super();
-    sliceCount = 1;
-    fixShardCount(3);
+    SolrTestCaseJ4.randomizeUpdateLogImpl();
   }
 
   private SolrClient LEADER = null;
   private List<SolrClient> NONLEADERS = null;
   
-  @Test
-  @ShardsFixed(num = 3)
-  @SuppressWarnings("unchecked")
+
   //28-June-2018 @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 21-May-2018
   // commented 4-Sep-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2-Aug-2018
   // commented out on: 17-Feb-2019   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // annotated on: 24-Dec-2018
-  public void test() throws Exception {
-    waitForRecoveriesToFinish(true);
+  public void testDistInPlaceUpdate() throws Exception {
 
     resetDelays();
     
@@ -186,7 +169,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
   }
 
   private void resetDelays() {
-    for (JettySolrRunner j   : jettys  ) {
+    for (JettySolrRunner j   : cluster.getJettySolrRunners()  ) {
       j.getDebugFilter().unsetDelay();
     }
   }
@@ -218,6 +201,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     }
     
     assertNotNull(LEADER);
+    cloudClient.getZkStateReader().getZkClient().printStateToStream(System.out);
     assertEquals(2, NONLEADERS.size());
   }
 
@@ -260,7 +244,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     }
   }
 
-  final int NUM_RETRIES = 100, WAIT_TIME = 50;
+  final int NUM_RETRIES = 100, WAIT_TIME = 200;
 
   // The following should work: full update to doc 0, in-place update for doc 0, delete doc 0
   private void reorderedDBQsSimpleTest() throws Exception {
@@ -310,8 +294,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(10);
     }
     
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
     
     // assert all requests were successful
     for (Future<UpdateResponse> resp: updateResponses) {
@@ -363,8 +346,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(100);
     }
 
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     // assert all requests were successful
     for (Future<UpdateResponse> resp: updateResponses) {
@@ -410,15 +392,15 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     for (int id : ids) {
       // NOTE: in rare cases, this may be setting the value to 0, on a doc that
       // already had an init value of 0 -- which is an interesting edge case, so we don't exclude it
-      final float multiplier = r.nextBoolean() ? -5.0F : 5.0F;
-      final float value = r.nextFloat() * multiplier;
+      final float multiplier = random().nextBoolean() ? -5.0F : 5.0F;
+      final float value = random().nextFloat() * multiplier;
       assert -5.0F <= value && value <= 5.0F;
       valuesList.set(id, value);
     }
     log.info("inplace_updatable_float: " + valuesList);
     
     // update doc w/ set
-    Collections.shuffle(ids, r); // so updates aren't applied in index order
+    Collections.shuffle(ids, random()); // so updates aren't applied in index order
     for (int id : ids) {
       index("id", id, "inplace_updatable_float", map("set", valuesList.get(id)));
     }
@@ -434,12 +416,12 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       
     // update doc, w/increment
     log.info("Updating the documents...");
-    Collections.shuffle(ids, r); // so updates aren't applied in the same order as our 'set'
+    Collections.shuffle(ids, random()); // so updates aren't applied in the same order as our 'set'
     for (int id : ids) {
       // all incremements will use some value X such that 20 < abs(X)
       // thus ensuring that after all incrememnts are done, there should be
       // 0 test docs matching the query inplace_updatable_float:[-10 TO 10]
-      final float inc = (r.nextBoolean() ? -1.0F : 1.0F) * (r.nextFloat() + (float)atLeast(20));
+      final float inc = (random().nextBoolean() ? -1.0F : 1.0F) * (random().nextFloat() + (float)atLeast(20));
       assert 20 < Math.abs(inc);
       final float value = (float)valuesList.get(id) + inc;
       assert value < -10 || 10 < value;
@@ -457,7 +439,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
        luceneDocids, "inplace_updatable_float", valuesList);
 
     log.info("Updating the documents with new field...");
-    Collections.shuffle(ids, r);
+    Collections.shuffle(ids, random());
     for (int id : ids) {
       final int val = random().nextInt(20);
       valuesList.set(id, val);
@@ -621,73 +603,75 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     clearIndex();
     commit();
 
+    int cnt = TEST_NIGHTLY ? 100 : 10;
+    
     float inplace_updatable_float = 1;
-    String title = "title100";
+    String title = "title" + Integer.toString(cnt);
     long version = 0, currentVersion;
 
-    currentVersion = buildRandomIndex(100).get(0);
+    currentVersion = buildRandomIndex(cnt).get(0);
     assertTrue(currentVersion > version);
 
     // do an initial (non-inplace) update to ensure both the float & int fields we care about have (any) value
     // that way all subsequent atomic updates will be inplace
-    currentVersion = addDocAndGetVersion("id", 100,
-                                         "inplace_updatable_float", map("set", r.nextFloat()),
-                                         "inplace_updatable_int", map("set", r.nextInt()));
+    currentVersion = addDocAndGetVersion("id", cnt,
+                                         "inplace_updatable_float", map("set", random().nextFloat()),
+                                         "inplace_updatable_int", map("set", random().nextInt()));
     LEADER.commit();
     
     // get the internal docids of id=100 document from the three replicas
-    List<Integer> docids = getInternalDocIds("100");
+    List<Integer> docids = getInternalDocIds(Integer.toString(cnt));
 
     // update doc, set
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", map("set", inplace_updatable_float));
+    currentVersion = addDocAndGetVersion("id", cnt, "inplace_updatable_float", map("set", inplace_updatable_float));
     assertTrue(currentVersion > version);
     version = currentVersion;
     LEADER.commit();
-    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds("100"), docids.equals(getInternalDocIds("100")));
+    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds(Integer.toString(cnt)), docids.equals(getInternalDocIds(Integer.toString(cnt))));
     
-    SolrDocument sdoc = LEADER.getById("100");  // RTG straight from the index
+    SolrDocument sdoc = LEADER.getById(Integer.toString(cnt));  // RTG straight from the index
     assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
     assertEquals(sdoc.toString(), title, sdoc.get("title_s"));
     assertEquals(sdoc.toString(), version, sdoc.get("_version_"));
 
-    if(r.nextBoolean()) {
-      title = "newtitle100";
-      currentVersion = addDocAndGetVersion("id", 100, "title_s", title, "inplace_updatable_float", inplace_updatable_float); // full indexing
+    if(random().nextBoolean()) {
+      title = "newtitle" + Integer.toString(cnt);
+      currentVersion = addDocAndGetVersion("id", cnt, "title_s", title, "inplace_updatable_float", inplace_updatable_float); // full indexing
       assertTrue(currentVersion > version);
       version = currentVersion;
 
-      sdoc = LEADER.getById("100");  // RTG from the tlog
+      sdoc = LEADER.getById(Integer.toString(cnt));  // RTG from the tlog
       assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
       assertEquals(sdoc.toString(), title, sdoc.get("title_s"));
       assertEquals(sdoc.toString(), version, sdoc.get("_version_"));
 
       // we've done a full index, so we need to update the [docid] for each replica
       LEADER.commit(); // can't get (real) [docid] from the tlogs, need to force a commit
-      docids = getInternalDocIds("100");
+      docids = getInternalDocIds(Integer.toString(cnt));
     }
 
     inplace_updatable_float++;
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", map("inc", 1));
+    currentVersion = addDocAndGetVersion("id", cnt, "inplace_updatable_float", map("inc", 1));
     assertTrue(currentVersion > version);
     version = currentVersion;
     LEADER.commit();
-    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds("100"), docids.equals(getInternalDocIds("100")));
+    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds(Integer.toString(cnt)), docids.equals(getInternalDocIds(Integer.toString(cnt))));
     
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_int", map("set", "100"));
+    currentVersion = addDocAndGetVersion("id", cnt, "inplace_updatable_int", map("set", Integer.toString(cnt)));
     assertTrue(currentVersion > version);
     version = currentVersion;
 
     inplace_updatable_float++;
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", map("inc", 1));
+    currentVersion = addDocAndGetVersion("id", cnt, "inplace_updatable_float", map("inc", 1));
     assertTrue(currentVersion > version);
     version = currentVersion;
 
     // RTG from tlog(s)
     for (SolrClient client : clients) {
       final String clientDebug = client.toString() + (LEADER.equals(client) ? " (leader)" : " (not leader)");
-      sdoc = client.getById("100", params("distrib", "false"));
+      sdoc = client.getById(Integer.toString(cnt), params("distrib", "false"));
 
-      assertEquals(clientDebug + " => "+ sdoc, (int) 100, sdoc.get("inplace_updatable_int"));
+      assertEquals(clientDebug + " => "+ sdoc, (int) cnt, sdoc.get("inplace_updatable_int"));
       assertEquals(clientDebug + " => "+ sdoc, (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
       assertEquals(clientDebug + " => "+ sdoc, title, sdoc.get("title_s"));
       assertEquals(clientDebug + " => "+ sdoc, version, sdoc.get("_version_"));
@@ -695,7 +679,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     
     // assert that the internal docid for id=100 document remains same, in each replica, as before
     LEADER.commit(); // can't get (real) [docid] from the tlogs, need to force a commit
-    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds("100"), docids.equals(getInternalDocIds("100")));
+    assertTrue("Earlier: "+docids+", now: "+getInternalDocIds(Integer.toString(cnt)), docids.equals(getInternalDocIds(Integer.toString(cnt))));
 
     log.info("ensureRtgWorksWithPartialUpdatesTest: This test passed fine...");
   }
@@ -754,7 +738,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
 
     // re-order the updates for NONLEADER 0
     List<UpdateRequest> reorderedUpdates = new ArrayList<>(updates);
-    Collections.shuffle(reorderedUpdates, r);
+    Collections.shuffle(reorderedUpdates, random());
     List<Future<UpdateResponse>> updateResponses = new ArrayList<>();
     for (UpdateRequest update : reorderedUpdates) {
       AsyncUpdateWithRandomCommit task = new AsyncUpdateWithRandomCommit(update, NONLEADERS.get(0), random().nextLong());
@@ -764,8 +748,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(10);
     }
     
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     // assert all requests were successful
     for (Future<UpdateResponse> resp: updateResponses) {
@@ -786,6 +769,8 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
   }
   
   // The following should work: full update to doc 0, in-place update for doc 0, delete doc 0
+  @Nightly // can be very slow
+  @Slow
   private void reorderedDeletesTest() throws Exception {
     
     clearIndex();
@@ -822,7 +807,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
 
     // re-order the updates for NONLEADER 0
     List<UpdateRequest> reorderedUpdates = new ArrayList<>(updates);
-    Collections.shuffle(reorderedUpdates, r);
+    Collections.shuffle(reorderedUpdates, random());
     List<Future<UpdateResponse>> updateResponses = new ArrayList<>();
     for (UpdateRequest update : reorderedUpdates) {
       AsyncUpdateWithRandomCommit task = new AsyncUpdateWithRandomCommit(update, NONLEADERS.get(0), random().nextLong());
@@ -832,8 +817,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(10);
     }
     
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     // assert all requests were successful
     for (Future<UpdateResponse> resp: updateResponses) {
@@ -908,8 +892,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(10);
     }
     
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     int successful = 0;
     for (Future<UpdateResponse> resp: updateResponses) {
@@ -968,7 +951,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     updates.add(regularUpdateRequest("id", 1, "inplace_updatable_float", map("inc", 1)));
 
     // The next request to replica2 will be delayed (timeout is 5s)
-    shardToJetty.get(SHARD1).get(1).jetty.getDebugFilter().addDelay(
+    cluster.getJettySolrRunner(1).getDebugFilter().addDelay(
         "Waiting for dependant update to timeout", 1, 6000);
 
     ExecutorService threadpool =
@@ -983,15 +966,13 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(100); 
     }
 
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 15 secs", threadpool.awaitTermination(15, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     commit();
 
     // TODO: Could try checking ZK for LIR flags to ensure LIR has not kicked in
     // Check every 10ms, 100 times, for a replica to go down (& assert that it doesn't)
     for (int i=0; i<100; i++) {
-      Thread.sleep(10);
       cloudClient.getZkStateReader().forceUpdateCollection(DEFAULT_COLLECTION);
       ClusterState state = cloudClient.getZkStateReader().getClusterState();
 
@@ -1037,12 +1018,12 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     {
       clearIndex();
       commit();
-      shardToJetty.get(SHARD1).get(1).jetty.getDebugFilter().unsetDelay();
+      cluster.getJettySolrRunner(1).getDebugFilter().unsetDelay();
       
       updates.add(regularDeleteRequest(1));
 
-      shardToJetty.get(SHARD1).get(1).jetty.getDebugFilter().addDelay("Waiting for dependant update to timeout", 1, 5999); // the first update
-      shardToJetty.get(SHARD1).get(1).jetty.getDebugFilter().addDelay("Waiting for dependant update to timeout", 4, 5998); // the delete update
+      cluster.getJettySolrRunner(1).getDebugFilter().addDelay("Waiting for dependant update to timeout", 1, 5999); // the first update
+      cluster.getJettySolrRunner(1).getDebugFilter().addDelay("Waiting for dependant update to timeout", 4, 5998); // the delete update
 
       threadpool =
           ExecutorUtil.newMDCAwareFixedThreadPool(updates.size() + 1, new DefaultSolrThreadFactory(getTestName()));
@@ -1294,7 +1275,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
 
     // The second request will be delayed very very long, so that the next update actually gives up waiting for this
     // and fetches a full update from the leader.
-    shardToJetty.get(SHARD1).get(1).jetty.getDebugFilter().addDelay(
+    cluster.getJettySolrRunner(1).getDebugFilter().addDelay(
         "Waiting for dependant update to timeout", 2, 8000);
 
     ExecutorService threadpool =
@@ -1309,8 +1290,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
       Thread.sleep(100); 
     }
 
-    threadpool.shutdown();
-    assertTrue("Thread pool didn't terminate within 12 secs", threadpool.awaitTermination(12, TimeUnit.SECONDS));
+    ExecutorUtil.shutdownAndAwaitTermination(threadpool);
 
     commit();
 
@@ -1339,9 +1319,7 @@ public class TestInPlaceUpdatesDistrib extends AbstractFullDistribZkTestBase {
     log.info("reorderedDBQsUsingUpdatedValueFromADroppedUpdate: This test passed fine...");
   }
 
-  @Override
   public void clearIndex() {
-    super.clearIndex();
     try {
       for (SolrClient client: new SolrClient[] {LEADER, NONLEADERS.get(0), NONLEADERS.get(1)}) {
         if (client != null) {

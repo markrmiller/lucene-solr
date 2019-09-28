@@ -24,6 +24,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.util.FilesystemResourceLoader;
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.lucene.analysis.util.StringMockResourceLoader;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
@@ -34,6 +35,7 @@ import com.ibm.icu.util.ULocale;
 /**
  * Tests {@link ICUCollationField} with TermQueries, RangeQueries, and sort order.
  */
+@LuceneTestCase.Slow
 public class TestICUCollationField extends SolrTestCaseJ4 {
   
   @BeforeClass

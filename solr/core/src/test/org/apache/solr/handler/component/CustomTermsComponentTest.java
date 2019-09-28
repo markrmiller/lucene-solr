@@ -20,6 +20,8 @@ import static org.hamcrest.CoreMatchers.containsString;
 
 import java.io.IOException;
 import java.util.List;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -32,6 +34,7 @@ import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.util.NamedList;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class CustomTermsComponentTest extends ShardsWhitelistTest {
 
   public static class CustomTermsComponent extends TermsComponent {

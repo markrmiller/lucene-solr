@@ -26,6 +26,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -44,6 +46,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class ReplaceNodeTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   @BeforeClass
@@ -73,7 +76,7 @@ public class ReplaceNodeTest extends SolrCloudTestCase {
     // have to worry about null checking when comparing the Create command with the final Slices
     
     // TODO: tlog replicas do not work correctly in tests due to fault TestInjection#waitForInSyncWithLeader
-    create = pickRandom(
+    create = SolrTestCaseJ4.pickRandom(
                         CollectionAdminRequest.createCollection(coll, "conf1", 5, 2,0,0),
                         //CollectionAdminRequest.createCollection(coll, "conf1", 5, 1,1,0),
                         //CollectionAdminRequest.createCollection(coll, "conf1", 5, 0,1,1),

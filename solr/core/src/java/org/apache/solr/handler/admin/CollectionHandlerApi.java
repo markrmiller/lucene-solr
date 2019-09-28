@@ -36,6 +36,7 @@ import org.apache.solr.client.solrj.request.CollectionApiMapping;
 import org.apache.solr.client.solrj.request.CollectionApiMapping.CommandMeta;
 import org.apache.solr.client.solrj.request.CollectionApiMapping.Meta;
 import org.apache.solr.client.solrj.request.CollectionApiMapping.V2EndPoint;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -252,6 +253,9 @@ public class CollectionHandlerApi extends BaseHandlerApiSupport {
   }
 
   private void waitForStateSync(int expectedVersion, CoreContainer coreContainer) {
+    
+    checkClosed();
+    
     final RTimer timer = new RTimer();
     int waitTimeSecs = 30;
     // get a list of active replica cores to query for the schema zk version (skipping this core of course)
@@ -259,11 +263,12 @@ public class CollectionHandlerApi extends BaseHandlerApiSupport {
 
     ZkStateReader zkStateReader = coreContainer.getZkController().getZkStateReader();
     for (String nodeName : zkStateReader.getClusterState().getLiveNodes()) {
-      PerNodeCallable e = new PerNodeCallable(zkStateReader.getBaseUrlForNodeName(nodeName), expectedVersion, waitTimeSecs);
+      PerNodeCallable e = new PerNodeCallable(handler.getCoreContainer(), zkStateReader.getBaseUrlForNodeName(nodeName), expectedVersion, waitTimeSecs);
       concurrentTasks.add(e);
     }
     if (concurrentTasks.isEmpty()) return; // nothing to wait for ...
 
+    checkClosed();
     log.info("Waiting up to {} secs for {} nodes to update clusterprops to be of version {} ",
         waitTimeSecs, concurrentTasks.size(), expectedVersion);
     SolrConfigHandler.execInparallel(concurrentTasks, parallelExecutor -> {
@@ -287,6 +292,12 @@ public class CollectionHandlerApi extends BaseHandlerApiSupport {
     log.info("Took {}ms to update the clusterprops to be of version {}  on {} nodes",
         timer.getTime(), expectedVersion, concurrentTasks.size());
 
+  }
+
+  private void checkClosed() {
+    if (handler.getCoreContainer().isShutDown()) {
+      throw new AlreadyClosedException();
+    }
   }
 
   interface Command {
@@ -335,13 +346,17 @@ public class CollectionHandlerApi extends BaseHandlerApiSupport {
   public static class PerNodeCallable extends SolrConfigHandler.PerReplicaCallable {
 
     static final List<String> path = Arrays.asList("metadata", CommonParams.VERSION);
+    private CoreContainer cc;
 
-    PerNodeCallable(String baseUrl, int expectedversion, int waitTime) {
+    PerNodeCallable(CoreContainer coreContainer, String baseUrl, int expectedversion, int waitTime) {
       super(baseUrl, ConfigOverlay.ZNODEVER, expectedversion, waitTime);
+      this.cc = coreContainer;
     }
 
     @Override
     protected boolean verifyResponse(MapWriter mw, int attempts) {
+      if (cc.isShutDown()) throw new AlreadyClosedException();
+      
       remoteVersion = (Number) mw._get(path, -1);
       if (remoteVersion.intValue() >= expectedZkVersion) return true;
       log.info(formatString("Could not get expectedVersion {0} from {1} , remote val= {2}   after {3} attempts", expectedZkVersion, coreUrl, remoteVersion, attempts));

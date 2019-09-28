@@ -17,6 +17,7 @@
 
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.pickRandom;
 
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
@@ -38,12 +40,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
 public class DeleteNodeTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(6)
+    configureCluster(TEST_NIGHTLY ? 6 : 2)
         .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-dynamic").resolve("conf"))
         .configure();
   }
@@ -68,7 +71,7 @@ public class DeleteNodeTest extends SolrCloudTestCase {
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 1, 0, 0),
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 0, 1, 0)
         );
-    create.setCreateNodeSet(StrUtils.join(l, ',')).setMaxShardsPerNode(3);
+    create.setCreateNodeSet(StrUtils.join(l, ',')).setMaxShardsPerNode(10);
     cloudClient.request(create);
     state = cloudClient.getZkStateReader().getClusterState();
     String node2bdecommissioned = l.get(0);

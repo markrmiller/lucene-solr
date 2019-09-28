@@ -21,6 +21,8 @@ import java.io.IOException;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
@@ -47,6 +49,7 @@ import org.junit.Test;
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 @Nightly // test is too long for non nightly
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class MoveReplicaHDFSFailoverTest extends SolrCloudTestCase {
   private static MiniDFSCluster dfsCluster;
 
@@ -137,6 +140,7 @@ public class MoveReplicaHDFSFailoverTest extends SolrCloudTestCase {
     cluster.getSolrClient().commit(coll);
     assertEquals(numDocs, cluster.getSolrClient().query(coll, new SolrQuery("*:*")).getResults().getNumFound());
     CollectionAdminRequest.deleteCollection(coll).process(cluster.getSolrClient());
+    cluster.waitForRemovedCollection(coll);
   }
 
   @Test

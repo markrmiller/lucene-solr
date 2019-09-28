@@ -16,12 +16,14 @@
  */
 package org.apache.solr.highlight;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.handler.component.HighlightComponent;
 import org.apache.solr.schema.IndexSchema;
 import org.junit.BeforeClass;
 
 /** simple tests for PostingsSolrHighlighter */
+@LuceneTestCase.Slow
 public class TestPostingsSolrHighlighter extends SolrTestCaseJ4 {
   
   @BeforeClass

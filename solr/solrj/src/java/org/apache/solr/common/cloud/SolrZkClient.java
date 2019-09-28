@@ -82,7 +82,7 @@ public class SolrZkClient implements Closeable {
   private ZkCmdExecutor zkCmdExecutor;
 
   private final ExecutorService zkCallbackExecutor =
-      ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("zkCallback"));
+      ExecutorUtil.newMDCAwareCachedThreadPool(0, 5000, new SolrjNamedThreadFactory("zkCallback"));
   private final ExecutorService zkConnManagerCallbackExecutor =
       ExecutorUtil.newMDCAwareSingleThreadExecutor(new SolrjNamedThreadFactory("zkConnectionManagerCallback"));
 
@@ -600,7 +600,7 @@ public class SolrZkClient implements Closeable {
     string.append(dent).append(path).append(" (").append(children.size()).append(")").append(NEWL);
     if (data != null) {
       String dataString = new String(data, StandardCharsets.UTF_8);
-      if ((!path.endsWith(".txt") && !path.endsWith(".xml")) || path.endsWith(ZkStateReader.CLUSTER_STATE)) {
+      if ((!path.endsWith(".txt") && !path.endsWith(".xml") && !path.endsWith("managed-schema")) || path.endsWith(ZkStateReader.CLUSTER_STATE)) {
         if (path.endsWith(".xml")) {
           // this is the cluster state in xml format - lets pretty print
           dataString = prettyPrint(dataString);
@@ -624,11 +624,46 @@ public class SolrZkClient implements Closeable {
     }
 
   }
+  
+  public void printState(String path, int indent, StringBuilder string)
+      throws KeeperException, InterruptedException {
+    byte[] data = getData(path, null, null, true);
+    List<String> children = getChildren(path, null, true);
+    StringBuilder dent = new StringBuilder();
+    for (int i = 0; i < indent; i++) {
+      dent.append(" ");
+    }
+    if (path.endsWith("state.json")) {
+      string.append(dent).append(path).append(" (").append(children.size()).append(")").append(NEWL);
+      if (data != null) {
+        String dataString = new String(data, StandardCharsets.UTF_8);
+        string.append(dent).append("DATA:\n").append(dent).append("    ").append(dataString.replaceAll("\n", "\n" + dent + "    ")).append(NEWL);
+      }
+    }
+    for (String child : children) {
+      if (!child.equals("quota")) {
+        try {
+          printState(path + (path.equals("/") ? "" : "/") + child, indent + 1,
+              string);
+        } catch (NoNodeException e) {
+          // must have gone away
+        }
+      }
+    }
+
+  }
 
   public void printLayoutToStream(PrintStream out) throws KeeperException,
       InterruptedException {
     StringBuilder sb = new StringBuilder();
     printLayout("/", 0, sb);
+    out.println(sb.toString());
+  }
+  
+  public void printStateToStream(PrintStream out) throws KeeperException,
+      InterruptedException {
+    StringBuilder sb = new StringBuilder();
+    printState("/", 0, sb);
     out.println(sb.toString());
   }
 
@@ -656,10 +691,14 @@ public class SolrZkClient implements Closeable {
     if (isClosed) return; // it's okay if we over close - same as solrcore
     isClosed = true;
     try {
-      closeCallbackExecutor();
-    } finally {
+      zkCallbackExecutor.shutdown();
+      zkConnManagerCallbackExecutor.shutdown();
+      
       connManager.close();
       closeKeeper(keeper);
+
+    } finally {
+      closeCallbackExecutor();
     }
     assert ObjectReleaseTracker.release(this);
   }
@@ -701,13 +740,13 @@ public class SolrZkClient implements Closeable {
 
   private void closeCallbackExecutor() {
     try {
-      ExecutorUtil.shutdownAndAwaitTermination(zkCallbackExecutor);
+      ExecutorUtil.shutdownWithInterruptAndAwaitTermination(zkCallbackExecutor);
     } catch (Exception e) {
       SolrException.log(log, e);
     }
 
     try {
-      ExecutorUtil.shutdownAndAwaitTermination(zkConnManagerCallbackExecutor);
+      ExecutorUtil.shutdownWithInterruptAndAwaitTermination(zkConnManagerCallbackExecutor);
     } catch (Exception e) {
       SolrException.log(log, e);
     }

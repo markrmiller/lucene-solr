@@ -35,6 +35,7 @@ import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.filter.ThresholdFilter;
 import org.apache.logging.log4j.message.Message;
+import org.apache.logging.log4j.util.ReadOnlyStringMap;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.logging.CircularList;
@@ -278,10 +279,15 @@ public class Log4j2Watcher extends LogWatcher<LogEvent> {
     if (t != null)
       doc.setField("trace", Throwables.getStackTraceAsString(t));
 
-    Map<String,String> contextMap = event.getContextMap();
-    if (contextMap != null) {
-      for (Map.Entry<String, String> entry : contextMap.entrySet())
-        doc.setField(entry.getKey(), entry.getValue());
+    ReadOnlyStringMap contextData = event.getContextData();
+    if (contextData != null) {
+       contextData.forEach(new org.apache.logging.log4j.util.BiConsumer<String,String>() {
+
+        @Override
+        public void accept(String key, String value) {
+          doc.setField(key, value);
+        }
+      });
     }
 
     if (!doc.containsKey("core"))

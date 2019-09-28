@@ -42,12 +42,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,6 +81,7 @@ import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.CloseHook;
@@ -1383,24 +1386,60 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
       }
 
       @Override
-      public void postClose(SolrCore core) {}
+      public void postClose(SolrCore core) {
+        ReplicationHandler.this.shutdown();
+      }
     });
   }
 
   public void shutdown() {
-    if (executorService != null) executorService.shutdown();
-    if (pollingIndexFetcher != null) {
-      pollingIndexFetcher.destroy();
+
+    restoreExecutor.shutdown();
+    try {
+      executorService.shutdown();
+    } catch (NullPointerException e) {
+      // okay
     }
-    if (currentIndexFetcher != null && currentIndexFetcher != pollingIndexFetcher) {
-      currentIndexFetcher.destroy();
+
+    ExecutorService closeThreadPool = ExecutorUtil
+        .newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("replicationHandlerCloser"));
+    List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
+    try {
+
+      if (restoreFuture != null) {
+        restoreFuture.cancel(false);
+      }
+
+      closeCalls.add(() -> {
+        if (pollingIndexFetcher != null) {
+          pollingIndexFetcher.destroy();
+        }
+        return null;
+      });
+      closeCalls.add(() -> {
+        if (currentIndexFetcher != null && currentIndexFetcher != pollingIndexFetcher) {
+          currentIndexFetcher.destroy();
+        }
+        return null;
+      });
+      closeCalls.add(() -> {
+        ExecutorUtil.shutdownAndAwaitTermination(restoreExecutor);
+        return null;
+      });
+      closeCalls.add(() -> {
+        ExecutorUtil.shutdownAndAwaitTermination(executorService);
+        return null;
+      });
+    } finally {
+
+      try {
+        closeThreadPool.invokeAll(closeCalls);
+      } catch (InterruptedException e1) {
+        // we are shutting down
+      }
+      
+      ExecutorUtil.shutdownAndAwaitTermination(closeThreadPool);
     }
-    ExecutorUtil.shutdownAndAwaitTermination(restoreExecutor);
-    if (restoreFuture != null) {
-      restoreFuture.cancel(false);
-    }
-    
-    ExecutorUtil.shutdownAndAwaitTermination(executorService);
   }
 
   /**

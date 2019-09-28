@@ -23,15 +23,17 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import org.apache.lucene.store.AlreadyClosedException;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.spelling.suggest.RandomTestDictionaryFactory;
 import org.apache.solr.spelling.suggest.SuggesterParams;
-import org.apache.solr.update.SolrCoreState;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class InfixSuggestersTest extends SolrTestCaseJ4 {
   private static final String rh_analyzing_short = "/suggest_analyzing_infix_short_dictionary";
   private static final String rh_analyzing_long = "/suggest_analyzing_infix_long_dictionary";
@@ -102,7 +104,7 @@ public class InfixSuggestersTest extends SolrTestCaseJ4 {
     try {
       // Build the suggester in the background with a long dictionary
       Future job = executor.submit(() ->
-          expectThrows(RuntimeException.class, SolrCoreState.CoreIsClosedException.class,
+          expectThrows(RuntimeException.class, AlreadyClosedException.class,
               () -> assertQ(req("qt", rh_analyzing_long,
                   SuggesterParams.SUGGEST_BUILD_ALL, "true"),
                   "//str[@name='command'][.='buildAll']")));
@@ -122,7 +124,7 @@ public class InfixSuggestersTest extends SolrTestCaseJ4 {
     try {
       LinkedHashMap<Class<? extends Throwable>, List<Class<? extends Throwable>>> expected = new LinkedHashMap<>();
       expected.put(RuntimeException.class, Arrays.asList
-          (SolrCoreState.CoreIsClosedException.class, SolrException.class, IllegalStateException.class, NullPointerException.class));
+          (AlreadyClosedException.class, SolrException.class, IllegalStateException.class, NullPointerException.class));
       final Throwable[] outerException = new Throwable[1];
       // Build the suggester in the background with a long dictionary
       Future job = executor.submit(() -> outerException[0] = expectThrowsAnyOf(expected,
@@ -141,7 +143,7 @@ public class InfixSuggestersTest extends SolrTestCaseJ4 {
             + "' but message is '" + wrappedException.getMessage() + "'", 
             wrappedException.getMessage().contains(expectedMessage));
       } else if (wrappedException instanceof IllegalStateException
-          && ! (wrappedException instanceof SolrCoreState.CoreIsClosedException)) { // CoreIsClosedException extends IllegalStateException
+          && ! (wrappedException instanceof AlreadyClosedException)) { // CoreIsClosedException extends IllegalStateException
         String expectedMessage = "Cannot commit on an closed writer. Add documents first";
         assertTrue("Expected wrapped IllegalStateException message to contain '" + expectedMessage
                 + "' but message is '" + wrappedException.getMessage() + "'",

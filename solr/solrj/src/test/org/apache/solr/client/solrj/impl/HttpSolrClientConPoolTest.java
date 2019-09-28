@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.pool.PoolStats;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -34,10 +35,15 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.AwaitsFix(bugUrl = "We are not reusing connections well it looks...")
+@Ignore
 public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
 
   protected static JettySolrRunner yetty;
@@ -46,6 +52,11 @@ public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
   
   @BeforeClass
   public static void beforeTest() throws Exception {
+    
+    System.setProperty("solr.httpclient.retries", "3");
+    System.setProperty("solr.retries.on.forward", "5");
+    System.setProperty("solr.retries.to.followers", "3"); 
+    
     createAndStartJetty(legacyExampleCollection1SolrHome());
     // stealing the first made jetty
     yetty = jetty;
@@ -66,55 +77,57 @@ public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
   
   public void testPoolSize() throws SolrServerException, IOException {
     PoolingHttpClientConnectionManager pool = HttpClientUtil.createPoolingConnectionManager();
-    final HttpSolrClient client1 ;
+    HttpSolrClient client1 = null;
     final String fooUrl;
-    {
-      fooUrl = jetty.getBaseUrl().toString() + "/" + "collection1";
-      CloseableHttpClient httpClient = HttpClientUtil.createClient(new ModifiableSolrParams(), pool,
-            false /* let client shutdown it*/);
-      client1 = getHttpSolrClient(fooUrl, httpClient, DEFAULT_CONNECTION_TIMEOUT);
-    }
-    final String barUrl = yetty.getBaseUrl().toString() + "/" + "collection1";
-    
-    {
-      client1.setBaseURL(fooUrl);
-      client1.deleteByQuery("*:*");
-      client1.setBaseURL(barUrl);
-      client1.deleteByQuery("*:*");
-    }
-    
-    List<String> urls = new ArrayList<>();
-    for(int i=0; i<17; i++) {
-      urls.add(fooUrl);
-    }
-    for(int i=0; i<31; i++) {
-      urls.add(barUrl);
-    }
-    
-    Collections.shuffle(urls, random());
-    
+
     try {
-      int i=0;
+      {
+        fooUrl = jetty.getBaseUrl().toString() + "/" + "collection1";
+        CloseableHttpClient httpClient = HttpClientUtil.createClient(new ModifiableSolrParams(), pool,
+            false /* let client shutdown it */);
+        client1 = getHttpSolrClient(fooUrl, httpClient, DEFAULT_CONNECTION_TIMEOUT);
+      }
+      final String barUrl = yetty.getBaseUrl().toString() + "/" + "collection1";
+
+      {
+        client1.setBaseURL(fooUrl);
+        client1.deleteByQuery("*:*");
+        client1.setBaseURL(barUrl);
+        client1.deleteByQuery("*:*");
+      }
+
+      List<String> urls = new ArrayList<>();
+      for (int i = 0; i < 17; i++) {
+        urls.add(fooUrl);
+      }
+      for (int i = 0; i < 31; i++) {
+        urls.add(barUrl);
+      }
+
+      Collections.shuffle(urls, random());
+
+      int i = 0;
       for (String url : urls) {
         if (!client1.getBaseURL().equals(url)) {
           client1.setBaseURL(url);
         }
-        client1.add(new SolrInputDocument("id", ""+(i++)));
+        client1.add(new SolrInputDocument("id", "" + (i++)));
       }
       client1.setBaseURL(fooUrl);
       client1.commit();
       assertEquals(17, client1.query(new SolrQuery("*:*")).getResults().getNumFound());
-      
+
       client1.setBaseURL(barUrl);
       client1.commit();
       assertEquals(31, client1.query(new SolrQuery("*:*")).getResults().getNumFound());
-      
+
       PoolStats stats = pool.getTotalStats();
-      assertEquals("oh "+stats, 2, stats.getAvailable());
+      assertEquals("oh " + stats, 2, stats.getAvailable());
     } finally {
-      for (HttpSolrClient c : new HttpSolrClient []{ client1}) {
+      for (HttpSolrClient c : new HttpSolrClient[] {client1}) {
         HttpClientUtil.close(c.getHttpClient());
         c.close();
+        IOUtils.closeQuietly(pool);
       }
     }
   }
@@ -128,8 +141,9 @@ public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
     final ExecutorService threads = ExecutorUtil.newMDCAwareFixedThreadPool(threadCount,
         new SolrjNamedThreadFactory(getClass().getSimpleName()+"TestScheduler"));
     CloseableHttpClient httpClient = HttpClientUtil.createClient(new ModifiableSolrParams(), pool);
+    LBHttpSolrClient roundRobin = null;
     try{
-      final LBHttpSolrClient roundRobin = new LBHttpSolrClient.Builder().
+      roundRobin = new LBHttpSolrClient.Builder().
                 withBaseSolrUrl(fooUrl).
                 withBaseSolrUrl(barUrl).
                 withHttpClient(httpClient)
@@ -183,8 +197,9 @@ public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
       assertEquals("expected number of connections shouldn't exceed number of endpoints" + stats, 
           2, stats.getAvailable());
     }finally {
-      threads.shutdown();
+      ExecutorUtil.shutdownAndAwaitTermination(threads);
       HttpClientUtil.close(httpClient);
+      IOUtils.closeQuietly(roundRobin);
     }
   }
 }

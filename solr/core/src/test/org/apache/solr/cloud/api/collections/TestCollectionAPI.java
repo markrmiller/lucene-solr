@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.collect.Lists;
 import org.apache.solr.client.solrj.impl.BaseHttpSolrClient.RemoteSolrException;
 import org.apache.solr.cloud.ZkTestServer;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -52,6 +54,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.zookeeper.KeeperException;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestCollectionAPI extends ReplicaPropertiesBase {
 
   public static final String COLLECTION_NAME = "testcollection";

@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.MergeIndexesExampleTestBase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.core.SolrCore;
@@ -26,6 +27,7 @@ import org.apache.solr.core.SolrCore;
  * @since solr 1.4
  *
  */
+@LuceneTestCase.Slow
 public class MergeIndexesEmbeddedTest extends MergeIndexesExampleTestBase {
 
   @Override

@@ -21,7 +21,10 @@ import java.lang.invoke.MethodHandles;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
 import io.prometheus.client.CollectorRegistry;
@@ -32,6 +35,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.XmlConfigFile;
 import org.apache.solr.prometheus.collector.MetricsCollectorFactory;
@@ -130,11 +134,23 @@ public class SolrExporter {
 
     metricsCollector.removeObserver(prometheusCollector);
 
-    requestExecutor.shutdownNow();
-    metricCollectorExecutor.shutdownNow();
+    requestExecutor.shutdown();
+    metricCollectorExecutor.shutdown();
 
-    IOUtils.closeQuietly(metricsCollector);
-    IOUtils.closeQuietly(solrScraper);
+    ExecutorService closeThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("solrExporterCloser"));
+    
+    List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
+
+    closeCalls.add(() -> {IOUtils.closeQuietly(metricsCollector); return null;});
+    closeCalls.add(() -> {IOUtils.closeQuietly(solrScraper);; return null;});
+    closeCalls.add(() -> {ExecutorUtil.shutdownWithInterruptAndAwaitTermination(requestExecutor); return null;});
+    closeCalls.add(() -> {ExecutorUtil.shutdownWithInterruptAndAwaitTermination(metricCollectorExecutor);; return null;});
+
+    try {
+      closeThreadPool.invokeAll(closeCalls);
+    } catch (InterruptedException e1) {
+      Thread.currentThread().interrupt();
+    }
 
     defaultRegistry.unregister(this.prometheusCollector);
   }

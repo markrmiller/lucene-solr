@@ -25,6 +25,13 @@ import org.apache.solr.handler.component.StatsComponent;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+@LuceneTestCase.Slow
 public class TestComponentsName extends SolrTestCaseJ4{
   
   @BeforeClass

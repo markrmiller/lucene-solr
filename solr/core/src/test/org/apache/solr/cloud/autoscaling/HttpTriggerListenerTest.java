@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -49,6 +50,7 @@ import org.junit.Test;
  */
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG")
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class HttpTriggerListenerTest extends SolrCloudTestCase {
 
   private static CountDownLatch triggerFiredLatch;

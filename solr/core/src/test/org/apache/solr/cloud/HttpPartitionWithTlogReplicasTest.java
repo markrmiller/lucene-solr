@@ -18,10 +18,12 @@
 package org.apache.solr.cloud;
 
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Nightly;
 import org.apache.solr.SolrTestCaseJ4;
 
 @LuceneTestCase.Slow
 @SolrTestCaseJ4.SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@Nightly
 public class HttpPartitionWithTlogReplicasTest extends HttpPartitionTest {
 
   @Override

@@ -16,11 +16,16 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.ignoreException;
+import static org.apache.solr.SolrTestCaseJ4.unIgnoreException;
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.SentinelIntSet;
 import org.apache.lucene.util.TestUtil;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.CursorPagingTest;
+import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.LukeRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -40,6 +45,7 @@ import static org.apache.solr.common.params.CursorMarkParams.CURSOR_MARK_PARAM;
 import static org.apache.solr.common.params.CursorMarkParams.CURSOR_MARK_NEXT;
 import static org.apache.solr.common.params.CursorMarkParams.CURSOR_MARK_START;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,50 +66,21 @@ import java.util.Map;
  */
 @Slow
 @SuppressSSL(bugUrl="https://issues.apache.org/jira/browse/SOLR-9182 - causes OOM")
-public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
+public class DistribCursorPagingTest extends SolrCloudBridgeTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public DistribCursorPagingTest() {
+  
+  @BeforeClass
+  public static void beforeDistribCursorPagingTest() throws Exception {
     System.setProperty("solr.test.useFilterForSortedQuery", Boolean.toString(random().nextBoolean()));
-    configString = CursorPagingTest.TEST_SOLRCONFIG_NAME;
+    numShards = TEST_NIGHTLY ? 4 : 2;
+    solrconfigString = CursorPagingTest.TEST_SOLRCONFIG_NAME;
     schemaString = CursorPagingTest.TEST_SCHEMAXML_NAME;
   }
 
-  @Override
-  protected String getCloudSolrConfig() {
-    return configString;
-  }
-
   @Test
-  // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 23-Aug-2018
-  public void test() throws Exception {
-    boolean testFinished = false;
-    try {
-      handle.clear();
-      handle.put("timestamp", SKIPVAL);
-
-      doBadInputTest();
-      del("*:*");
-      commit();
-
-      doSimpleTest();
-      del("*:*");
-      commit();
-
-      doRandomSortsOnLargeIndex();
-      del("*:*");
-      commit();
-
-      testFinished = true;
-    } finally {
-      if (!testFinished) {
-        printLayoutOnTearDown = true;
-      }
-    }
-  }
-
-  private void doBadInputTest() throws Exception {
+  public void doBadCursorInputTest() throws Exception {
     // sometimes seed some data, other times use an empty index
     if (random().nextBoolean()) {
       indexDoc(sdoc("id", "42", "str", "z", "float", "99.99", "int", "42"));
@@ -148,7 +125,8 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
                ErrorCode.BAD_REQUEST, "Grouping");
   }
 
-  private void doSimpleTest() throws Exception {
+  @Test
+  public void doSimpleCursorTest() throws Exception {
     String cursorMark = CURSOR_MARK_START;
     SolrParams params = null;
     QueryResponse rsp = null;
@@ -487,6 +465,7 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
     del("id:3");
     commit();
     rsp = query(p(params, CURSOR_MARK_PARAM, cursorMark));
+    
     assertNumFound(9, rsp);
     assertStartsAt(0, rsp);
     assertDocList(rsp, 4, 6);
@@ -524,11 +503,12 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
 
   /** randomized testing of a non-trivial number of docs using assertFullWalkNoDups 
    */
+  @Test
   public void doRandomSortsOnLargeIndex() throws Exception {
     final Collection<String> allFieldNames = getAllSortFieldNames();
 
-    final int numInitialDocs = TestUtil.nextInt(random(), 100, 200);
-    final int totalDocs = atLeast(500);
+    final int numInitialDocs = TEST_NIGHTLY ? TestUtil.nextInt(random(), 100, 200) : 10;
+    final int totalDocs = atLeast(TEST_NIGHTLY ? 500 : 25);
 
     // start with a smallish number of documents, and test that we can do a full walk using a 
     // sort on *every* field in the schema...
@@ -588,7 +568,7 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
     final int numRandomSorts = atLeast(3);
     for (int i = 0; i < numRandomSorts; i++) {
       final String sort = CursorPagingTest.buildRandomSort(allFieldNames);
-      final String rows = "" + TestUtil.nextInt(random(), 63, 113);
+      final String rows = "" + TestUtil.nextInt(random(), TEST_NIGHTLY ? 63 : 13, TEST_NIGHTLY ? 113 : 27);
       final String fl = random().nextBoolean() ? "id" : "id,score";
       final boolean matchAll = random().nextBoolean();
       final String q = matchAll ? "*:*" : CursorPagingTest.buildRandomQuery();
@@ -614,7 +594,7 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
   private List<String> getAllSortFieldNames() throws SolrServerException, IOException {
     LukeRequest req = new LukeRequest("/admin/luke");
     req.setShowSchema(true); 
-    NamedList<Object> rsp = controlClient.request(req);
+    NamedList<Object> rsp = cloudClient.request(req);
     NamedList<Object> fields = (NamedList) ((NamedList)rsp.get("schema")).get("fields");
     ArrayList<String> names = new ArrayList<>(fields.size());
     for (Map.Entry<String,Object> item : fields) {
@@ -736,12 +716,12 @@ public class DistribCursorPagingTest extends AbstractFullDistribZkTestBase {
         int id = Integer.parseInt(doc.getFieldValue("id").toString());
         if (ids.exists(id)) {
           String msg = "(" + p + ") walk already seen: " + id;
-          try {
-            queryAndCompareShards(params("distrib","false",
-                                         "q","id:"+id));
-          } catch (AssertionError ae) {
-            throw new AssertionError(msg + ", found shard inconsistency that would explain it...", ae);
-          }
+//          try {
+//            queryAndCompareShards(params("distrib","false",
+//                                         "q","id:"+id));
+//          } catch (AssertionError ae) {
+//            throw new AssertionError(msg + ", found shard inconsistency that would explain it...", ae);
+//          }
           rsp = cloudClient.query(params("q","id:"+id));
           throw new AssertionError(msg + ", don't know why; q=id:"+id+" gives: " + rsp.toString());
         }

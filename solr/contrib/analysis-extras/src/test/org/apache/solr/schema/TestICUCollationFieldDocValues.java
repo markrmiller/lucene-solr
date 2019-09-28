@@ -21,6 +21,7 @@ import java.io.FileOutputStream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
@@ -31,6 +32,7 @@ import com.ibm.icu.util.ULocale;
 /**
  * Tests {@link ICUCollationField} with docValues.
  */
+@LuceneTestCase.Slow
 public class TestICUCollationFieldDocValues extends SolrTestCaseJ4 {
   
   @BeforeClass

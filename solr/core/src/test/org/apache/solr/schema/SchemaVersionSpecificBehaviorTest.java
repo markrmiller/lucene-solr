@@ -16,9 +16,10 @@
  */
 package org.apache.solr.schema;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 
-
+@LuceneTestCase.Slow
 public class SchemaVersionSpecificBehaviorTest extends SolrTestCaseJ4 {
 
   public void testVersionBehavior() throws Exception {

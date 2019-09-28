@@ -37,6 +37,7 @@ import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -68,6 +69,7 @@ import static org.apache.solr.security.AuditEvent.RequestType.SEARCH;
  * Validate that audit logging works in a live cluster
  */
 @SolrTestCaseJ4.SuppressSSL
+@LuceneTestCase.Slow
 public class AuditLoggerIntegrationTest extends SolrCloudAuthTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Iterables;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrException;
@@ -34,6 +35,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestChildDocTransformerHierarchy extends SolrTestCaseJ4 {
 
   private static AtomicInteger idCounter = new AtomicInteger();

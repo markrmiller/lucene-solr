@@ -17,6 +17,9 @@
 
 package org.apache.solr.update.processor;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.time.Instant;
@@ -26,6 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.RoutedAliasTypes;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -52,6 +56,9 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.client.solrj.request.CollectionAdminRequest.createCategoryRoutedAlias;
 import static org.apache.solr.client.solrj.request.CollectionAdminRequest.createTimeRoutedAlias;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class DimensionalRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcessorTest {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

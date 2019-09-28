@@ -16,6 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.lang.invoke.MethodHandles;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 import com.carrotsearch.randomizedtesting.annotations.Repeat;
 import com.codahale.metrics.Metered;
 import com.codahale.metrics.MetricRegistry;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -53,6 +58,7 @@ import static org.apache.solr.cloud.TrollingIndexReaderFactory.catchTrace;
 /**
 * Distributed test for {@link org.apache.lucene.index.ExitableDirectoryReader} 
 */
+@LuceneTestCase.Slow
 public class CloudExitableDirectoryReaderTest extends SolrCloudTestCase {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

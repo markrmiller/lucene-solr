@@ -28,8 +28,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.JSONTestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -59,7 +61,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.update.processor.DistributedUpdateProcessor.DISTRIB_FROM;
 import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
-@Slow
+@LuceneTestCase.Slowest
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
 public class DistributedVersionInfoTest extends SolrCloudTestCase {
 
@@ -82,9 +84,9 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 1, 3)
         .processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
 
+    cluster.waitForActiveCollection(COLLECTION, 1, 3);
+    
     final ZkStateReader stateReader = cluster.getSolrClient().getZkStateReader();
-    stateReader.waitForState(COLLECTION, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 3));
 
     final Replica leader = stateReader.getLeaderRetry(COLLECTION, shardId);
 
@@ -140,8 +142,8 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
 
     // now start sending docs while collection is reloading
 
-    delQ("*:*");
-    commit();
+    SolrTestCaseJ4.delQ("*:*");
+    SolrTestCaseJ4.commit();
 
     final Set<Integer> deletedDocs = new HashSet<>();
     final AtomicInteger docsSent = new AtomicInteger(0);
@@ -205,7 +207,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
           if (ds > 0) {
             int docToDelete = rand.nextInt(ds) + 1;
             if (!deletedDocs.contains(docToDelete)) {
-              delI(String.valueOf(docToDelete));
+              SolrTestCaseJ4.delI(String.valueOf(docToDelete));
               deletedDocs.add(docToDelete);
             }
           }
@@ -337,7 +339,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
    */
   @SuppressWarnings("rawtypes")
   protected Long assertDocExists(HttpSolrClient solr, String coll, String docId, Long expVers) throws Exception {
-    QueryRequest qr = new QueryRequest(params("qt", "/get", "id", docId, "distrib", "false", "fl", "id,_version_"));
+    QueryRequest qr = new QueryRequest(SolrTestCaseJ4.params("qt", "/get", "id", docId, "distrib", "false", "fl", "id,_version_"));
     NamedList rsp = solr.request(qr);
     SolrDocument doc = (SolrDocument)rsp.get("doc");
     String match = JSONTestUtil.matchObj("/id", doc, docId);
@@ -360,13 +362,10 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
       CoreAdminResponse statusResp = CoreAdminRequest.getStatus(coreName, client);
       long leaderCoreStartTime = statusResp.getStartTime(coreName).getTime();
 
-      Thread.sleep(1000);
-
       // send reload command for the collection
       log.info("Sending RELOAD command for " + testCollectionName);
       CollectionAdminRequest.reloadCollection(testCollectionName)
           .process(client);
-      Thread.sleep(2000); // reload can take a short while
 
       // verify reload is done, waiting up to 30 seconds for slow test environments
       long timeout = System.nanoTime() + TimeUnit.NANOSECONDS.convert(30, TimeUnit.SECONDS);
@@ -378,7 +377,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
           break;
         }
         // else ... still waiting to see the reloaded core report a later start time
-        Thread.sleep(1000);
+        Thread.sleep(500);
       }
     }
     return reloadedOk;

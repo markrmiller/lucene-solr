@@ -20,7 +20,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -30,19 +32,21 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-@Slow
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
-  private final static int NUM_REPLICAS_OF_SHARD1 = 5;
+  private final static int NUM_REPLICAS_OF_SHARD1 = 3;
 
   @BeforeClass
   public static void beforeClass() {
-    System.setProperty("solrcloud.skip.autorecovery", "true");
+   // System.setProperty("solrcloud.skip.autorecovery", "true");
   }
 
   @Override
   public void setUp() throws Exception {
     super.setUp();
-    configureCluster(6)
+    configureCluster(4)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
@@ -52,11 +56,13 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
     assertEquals(0, CollectionAdminRequest.createCollection(collection,
         "conf", 2, 1)
         .setMaxShardsPerNode(1).process(cluster.getSolrClient()).getStatus());
+    cluster.waitForActiveCollection(collection, 2, 2);
     for (int i = 1; i < NUM_REPLICAS_OF_SHARD1; i++) {
       assertTrue(
           CollectionAdminRequest.addReplicaToShard(collection, "shard1").process(cluster.getSolrClient()).isSuccess()
       );
     }
+    cluster.waitForActiveCollection(collection, 2, NUM_REPLICAS_OF_SHARD1);
   }
 
   @Test
@@ -67,7 +73,7 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
     createCollection(collection);
 
     List<JettySolrRunner> stoppedRunners = new ArrayList<>();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
       // who is the leader?
       String leader = getLeader(collection);
       JettySolrRunner jetty = getRunner(leader);
@@ -109,10 +115,10 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
     }
     waitForState("Expected to see nodes come back " + collection, collection,
         (n, c) -> {
-          return n.size() == 6;
+          return n.size() == 4;
         });
     CollectionAdminRequest.deleteCollection(collection).process(cluster.getSolrClient());
-
+    cluster.waitForRemovedCollection(collection);
     // testLeaderElectionAfterClientTimeout
     collection = "collection2";
     createCollection(collection);
@@ -141,6 +147,7 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
     for (JettySolrRunner jetty2 : cluster.getJettySolrRunners()) {
       if (jetty != jetty2) {
         jetty2.stop();
+        cluster.waitForJettyToStop(jetty2);
       }
     }
 

@@ -23,7 +23,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -39,7 +39,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-@Slow
+@LuceneTestCase.Slow
 public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
   final String collection = getClass().getSimpleName();
   
@@ -48,10 +48,10 @@ public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    useFactory(null);
     configureCluster(2)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
-    useFactory("solr.StandardDirectoryFactory");
   }
 
   @Before
@@ -59,7 +59,7 @@ public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(collection, "conf", 1, 2)
         .setMaxShardsPerNode(1)
         .process(cluster.getSolrClient());
-    waitForState("Expected a collection with one shard and two replicas", collection, clusterShape(1, 2));
+    cluster.waitForActiveCollection(collection, 1, 2);
     cluster.getSolrClient().setDefaultCollection(collection);
 
     List<SolrInputDocument> docs = new ArrayList<>();
@@ -85,6 +85,7 @@ public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
     }
     System.clearProperty("CoreInitFailedAction");
     CollectionAdminRequest.deleteCollection(collection).process(cluster.getSolrClient());
+    cluster.waitForRemovedCollection(collection);
   }
 
   @AfterClass
@@ -105,9 +106,11 @@ public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
     // Might not need a sledge-hammer to reload the core
     JettySolrRunner jetty = cluster.getReplicaJetty(replica);
     jetty.stop();
+    cluster.waitForJettyToStop(jetty);
     jetty.start();
+    cluster.waitForNode(jetty, 30);
 
-    waitForState("Expected a collection with one shard and two replicas", collection, clusterShape(1, 2));
+    cluster.waitForActiveCollection(collection, 1, 2);
     
     QueryResponse resp = cluster.getSolrClient().query(collection, new SolrQuery("*:*"));
     assertEquals(10, resp.getResults().getNumFound());

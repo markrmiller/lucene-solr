@@ -17,6 +17,7 @@
 package org.apache.solr;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
@@ -31,6 +32,7 @@ import org.junit.BeforeClass;
 import java.io.File;
 import java.io.IOException;
 
+@LuceneTestCase.Slow
 public class AnalysisAfterCoreReloadTest extends SolrTestCaseJ4 {
   
   private static String tmpSolrHome;

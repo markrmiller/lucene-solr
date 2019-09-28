@@ -33,10 +33,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -69,8 +73,13 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Replica.State;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.params.CollectionAdminParams;
+import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.OrderedExecutor;
+import org.apache.solr.common.util.SmartClose;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -111,8 +120,8 @@ import org.apache.solr.security.SecurityPluginHolder;
 import org.apache.solr.update.SolrCoreState;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.solr.util.DefaultSolrThreadFactory;
-import org.apache.solr.util.OrderedExecutor;
 import org.apache.solr.util.RefCounted;
+import org.apache.solr.util.SolrFileCleaningTracker;
 import org.apache.solr.util.stats.MetricUtils;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -232,6 +241,12 @@ public class CoreContainer {
   private ExecutorService coreContainerAsyncTaskExecutor = ExecutorUtil.newMDCAwareCachedThreadPool("Core Container Async Task");
 
   private enum CoreInitFailedAction {fromleader, none}
+  
+  private final SolrFileCleaningTracker fileCleaningTracker = new SolrFileCleaningTracker();
+
+  public SolrFileCleaningTracker getFileCleaningTracker() {
+    return fileCleaningTracker;
+  }
 
   /**
    * This method instantiates a new instance of {@linkplain BackupRepository}.
@@ -251,6 +266,7 @@ public class CoreContainer {
   }
 
   public ExecutorService getCoreZkRegisterExecutorService() {
+    if (isShutDown) throw new AlreadyClosedException();
     return zkSys.getCoreZkRegisterExecutorService();
   }
 
@@ -338,6 +354,7 @@ public class CoreContainer {
         ExecutorUtil.newMDCAwareCachedThreadPool(
             cfg.getReplayUpdatesThreads(),
             new DefaultSolrThreadFactory("replayUpdatesExecutor")));
+    assert ObjectReleaseTracker.track(this);
   }
 
   private synchronized void initializeAuthorizationPlugin(Map<String, Object> authorizationConf) {
@@ -897,151 +914,142 @@ public class CoreContainer {
   }
 
   public void shutdown() {
+    try (SmartClose closer = new SmartClose(this)) {
 
-    ZkController zkController = getZkController();
-    if (zkController != null) {
-      OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
-      overseerCollectionQueue.allowOverseerPendingTasksToComplete();
-    }
-    log.info("Shutting down CoreContainer instance=" + System.identityHashCode(this));
+      ZkController zkController = getZkController();
+      if (zkController != null) {
+        OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
+        overseerCollectionQueue.allowOverseerPendingTasksToComplete();
+      }
+      log.info("Shutting down CoreContainer instance=" + System.identityHashCode(this));
 
-    ExecutorUtil.shutdownAndAwaitTermination(coreContainerAsyncTaskExecutor);
-    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
+      // stop accepting new tasks
+      replayUpdatesExecutor.shutdown();
+      coreContainerAsyncTaskExecutor.shutdown();
+      coreContainerWorkExecutor.shutdown();
 
-    isShutDown = true;
-    try {
+      isShutDown = true;
+
       if (isZooKeeperAware()) {
-        cancelCoreRecoveries();
-        zkSys.zkController.preClose();
-      }
-
-      ExecutorUtil.shutdownAndAwaitTermination(coreContainerWorkExecutor);
-
-      // First wake up the closer thread, it'll terminate almost immediately since it checks isShutDown.
-      synchronized (solrCores.getModifyLock()) {
-        solrCores.getModifyLock().notifyAll(); // wake up anyone waiting
-      }
-      if (backgroundCloser != null) { // Doesn't seem right, but tests get in here without initializing the core.
         try {
-          while (true) {
-            backgroundCloser.join(15000);
-            if (backgroundCloser.isAlive()) {
-              synchronized (solrCores.getModifyLock()) {
-                solrCores.getModifyLock().notifyAll(); // there is a race we have to protect against
-              }
-            } else {
-              break;
-            }
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          if (log.isDebugEnabled()) {
-            log.debug("backgroundCloser thread was interrupted before finishing");
-          }
+          cancelCoreRecoveries();
+        } catch (Exception e) {
+          log.warn("Exception trying to cancel recoveries on shutdown", e);
         }
       }
-      // Now clear all the cores that are being operated upon.
-      solrCores.close();
 
-      // It's still possible that one of the pending dynamic load operation is waiting, so wake it up if so.
-      // Since all the pending operations queues have been drained, there should be nothing to do.
-      synchronized (solrCores.getModifyLock()) {
-        solrCores.getModifyLock().notifyAll(); // wake up the thread
-      }
-
-      customThreadPool.submit(() -> {
+      closer.add("workExecutor & replayUpdateExec", coreContainerWorkExecutor, () -> {
         replayUpdatesExecutor.shutdownAndAwaitTermination();
+        return replayUpdatesExecutor;
       });
+      closer.add("zkSys&MetricsHistory&WaitForSolrCores", zkSys, metricsHistoryHandler,
+          metricsHistoryHandler != null ? metricsHistoryHandler.getSolrClient() : null, () -> {
+            waitForSolrCores();
+            return solrCores;
+          });
 
-      if (metricsHistoryHandler != null) {
-        metricsHistoryHandler.close();
-        IOUtils.closeQuietly(metricsHistoryHandler.getSolrClient());
-      }
+      List<Callable<?>> callables = new ArrayList<>();
 
       if (metricManager != null) {
-        metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.node));
-        metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jvm));
-        metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jetty));
+        callables.add(() -> {
+          metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.node));
+          return metricManager.getClass().getName() + ":REP:NODE";
+        });
+        callables.add(() -> {
+          metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jvm));
+          return metricManager.getClass().getName() + ":REP:JVM";
+        });
+        callables.add(() -> {
+          metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jetty));
+          return metricManager.getClass().getName() + ":REP:JETTY";
+        });
 
-        metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.node), metricTag);
-        metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jvm), metricTag);
-        metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jetty), metricTag);
+        callables.add(() -> {
+          metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.node), metricTag);
+          return metricManager.getClass().getName() + ":GA:NODE";
+        });
+        callables.add(() -> {
+          metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jvm), metricTag);
+          return metricManager.getClass().getName() + ":GA:JVM";
+        });
+        callables.add(() -> {
+          metricManager.unregisterGauges(SolrMetricManager.getRegistryName(SolrInfoBean.Group.jetty), metricTag);
+          return metricManager.getClass().getName() + ":GA:JETTY";
+        });
       }
 
+      closer.add("Metrics reporters & guages", callables);
+
+      callables = new ArrayList<>();
       if (isZooKeeperAware()) {
-        cancelCoreRecoveries();
-
         if (metricManager != null) {
-          metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.cluster));
-        }
-      }
-
-      try {
-        if (coreAdminHandler != null) {
-          customThreadPool.submit(() -> {
-            coreAdminHandler.shutdown();
+          callables.add(() -> {
+            metricManager.closeReporters(SolrMetricManager.getRegistryName(SolrInfoBean.Group.cluster));
+            return metricManager.getClass().getName() + ":REP:CLUSTER";
           });
         }
-      } catch (Exception e) {
-        log.warn("Error shutting down CoreAdminHandler. Continuing to close CoreContainer.", e);
       }
 
-    } finally {
-      try {
-        if (shardHandlerFactory != null) {
-          customThreadPool.submit(() -> {
-            shardHandlerFactory.close();
-          });
-        }
-      } finally {
-        try {
-          if (updateShardHandler != null) {
-            customThreadPool.submit(() -> Collections.singleton(shardHandlerFactory).parallelStream().forEach(c -> {
-              updateShardHandler.close();
-            }));
-          }
-        } finally {
-          try {
-            // we want to close zk stuff last
-            zkSys.close();
-          } finally {
-            ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
-          }
-        }
-
+      if (coreAdminHandler != null) {
+        callables.add(() -> {
+          coreAdminHandler.shutdown();
+          return coreAdminHandler;
+        });
       }
-    }
 
-    // It should be safe to close the authorization plugin at this point.
-    try {
+      AuthorizationPlugin authPlugin = null;
       if (authorizationPlugin != null) {
-        authorizationPlugin.plugin.close();
+        authPlugin = authorizationPlugin.plugin;
       }
-    } catch (IOException e) {
-      log.warn("Exception while closing authorization plugin.", e);
-    }
-
-    // It should be safe to close the authentication plugin at this point.
-    try {
+      AuthenticationPlugin authenPlugin = null;
       if (authenticationPlugin != null) {
-        authenticationPlugin.plugin.close();
-        authenticationPlugin = null;
+        authenPlugin = authenticationPlugin.plugin;
       }
-    } catch (Exception e) {
-      log.warn("Exception while closing authentication plugin.", e);
-    }
-
-    // It should be safe to close the auditlogger plugin at this point.
-    try {
+      AuditLoggerPlugin auditPlugin = null;
       if (auditloggerPlugin != null) {
-        auditloggerPlugin.plugin.close();
-        auditloggerPlugin = null;
+        auditPlugin = auditloggerPlugin.plugin;
       }
-    } catch (Exception e) {
-      log.warn("Exception while closing auditlogger plugin.", e);
+
+      closer.add("Final Items", shardHandlerFactory, updateShardHandler, authPlugin, authenPlugin, auditPlugin,
+          loader, callables);
+
     }
 
-    org.apache.lucene.util.IOUtils.closeWhileHandlingException(loader); // best effort
+    assert ObjectReleaseTracker.release(this);
+  }
+
+  private void waitForSolrCores() {
+    // First wake up the closer thread, it'll terminate almost immediately since it checks isShutDown.
+    synchronized (solrCores.getModifyLock()) {
+      solrCores.getModifyLock().notifyAll(); // wake up anyone waiting
+    }
+    if (backgroundCloser != null) { // Doesn't seem right, but tests get in here without initializing the core.
+      try {
+        while (true) {
+          backgroundCloser.join(15000);
+          if (backgroundCloser.isAlive()) {
+            synchronized (solrCores.getModifyLock()) {
+              solrCores.getModifyLock().notifyAll(); // there is a race we have to protect against
+            }
+          } else {
+            break;
+          }
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        if (log.isDebugEnabled()) {
+          log.debug("backgroundCloser thread was interrupted before finishing");
+        }
+      }
+    }
+    // Now clear all the cores that are being operated upon.
+    solrCores.close();
+
+    // It's still possible that one of the pending dynamic load operation is waiting, so wake it up if so.
+    // Since all the pending operations queues have been drained, there should be nothing to do.
+    synchronized (solrCores.getModifyLock()) {
+      solrCores.getModifyLock().notifyAll(); // wake up the thread
+    }
   }
 
   public void cancelCoreRecoveries() {
@@ -1224,7 +1232,6 @@ public class CoreContainer {
     if (isShutDown) {
       throw new SolrException(ErrorCode.SERVICE_UNAVAILABLE, "Solr has been shutdown.");
     }
-
     SolrCore core = null;
     try {
       MDCLoggingContext.setCoreDescriptor(this, dcore);
@@ -1251,6 +1258,7 @@ public class CoreContainer {
 
       return core;
     } catch (Exception e) {
+      log.error("Error loading core",e);
       coreInitFailures.put(dcore.getName(), new CoreLoadFailure(dcore, e));
       if (e instanceof ZkController.NotInClusterStateException && !newCollection) {
         // this mostly happen when the core is deleted when this node is down
@@ -1491,6 +1499,9 @@ public class CoreContainer {
       boolean success = false;
       try {
         solrCores.waitAddPendingCoreOps(cd.getName());
+        if (isShutDown) {
+          throw new AlreadyClosedException();
+        }
         ConfigSet coreConfig = coreConfigService.getConfig(cd);
         log.info("Reloading SolrCore '{}' using configuration from {}", cd.getName(), coreConfig.getName());
         newCore = core.reload(coreConfig);
@@ -1502,6 +1513,10 @@ public class CoreContainer {
           if (docCollection.getBool(ZkStateReader.READ_ONLY, false)) {
             newCore.readOnly = true;
           }
+        }
+        
+        if (isShutDown) {
+          throw new AlreadyClosedException();
         }
 
         registerCore(cd, newCore, false, false);
@@ -1539,13 +1554,14 @@ public class CoreContainer {
           }
         }
         success = true;
-      } catch (SolrCoreState.CoreIsClosedException e) {
+      } catch (AlreadyClosedException.CoreIsClosedException e) {
         throw e;
       } catch (Exception e) {
+        log.error("Error loading core",e);
         coreInitFailures.put(cd.getName(), new CoreLoadFailure(cd, e));
         throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to reload core [" + cd.getName() + "]", e);
       } finally {
-        if (!success && newCore != null && newCore.getOpenCount() > 0) {
+        if (!success) {
           IOUtils.closeQuietly(newCore);
         }
         solrCores.removeFromPendingOps(cd.getName());
@@ -1607,6 +1623,7 @@ public class CoreContainer {
         // getting the index directory requires opening a DirectoryFactory with a SolrConfig, etc,
         // which we may not be able to do because of the init error.  So we just go with what we
         // can glean from the CoreDescriptor - datadir and instancedir
+        System.out.println("delete core?");
         SolrCore.deleteUnloadedCore(loadFailure.cd, deleteDataDir, deleteInstanceDir);
         // If last time around we didn't successfully load, make sure that all traces of the coreDescriptor are gone.
         if (cd != null) {

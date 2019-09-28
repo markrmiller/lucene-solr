@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.component;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.core.CoreContainer;
@@ -25,7 +26,7 @@ import org.apache.solr.spelling.suggest.SuggesterParams;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Slowest
 public class SuggestComponentTest extends SolrTestCaseJ4 {
 
   private static final String rh = "/suggest";
@@ -34,6 +35,7 @@ public class SuggestComponentTest extends SolrTestCaseJ4 {
 
   @BeforeClass
   public static void beforeClass() throws Exception {
+    useFactory(null);
     initCore("solrconfig-suggestercomponent.xml","schema.xml");
   }
   
@@ -385,12 +387,14 @@ public class SuggestComponentTest extends SolrTestCaseJ4 {
         );
   }
   
+  //the core reload can make this test very slow on with bad timing
   public void testBuildOnStartupWithCoreReload() throws Exception {
-    doTestBuildOnStartup(false);
+    if (TEST_NIGHTLY) doTestBuildOnStartup(false);
   }
   
+  // the core reload can make this test very slow on with bad timing
   public void testBuildOnStartupWithNewCores() throws Exception {
-    doTestBuildOnStartup(true);
+    if (TEST_NIGHTLY) doTestBuildOnStartup(true);
   }
   
   private void doTestBuildOnStartup(boolean createNewCores) throws Exception {

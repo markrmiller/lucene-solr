@@ -21,13 +21,15 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.util.NamedList;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-
+@LuceneTestCase.Nightly
 public class LegacyFieldFacetCloudTest extends LegacyAbstractAnalyticsFacetCloudTest {
   public static final int INT = 71;
   public static final int LONG = 36;
@@ -132,7 +134,7 @@ public class LegacyFieldFacetCloudTest extends LegacyAbstractAnalyticsFacetCloud
     multiDateTestStart = new ArrayList<>();
     multiDateTestMissing = new ArrayList<>();
 
-    boolean multiCanHaveDuplicates = Boolean.getBoolean(NUMERIC_POINTS_SYSPROP);
+    boolean multiCanHaveDuplicates = Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP);
 
     UpdateRequest req = new UpdateRequest();
     for (int j = 0; j < NUM_LOOPS; ++j) {

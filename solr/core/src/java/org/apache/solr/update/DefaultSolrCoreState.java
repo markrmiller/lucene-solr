@@ -53,9 +53,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
   private final ReentrantLock recoveryLock = new ReentrantLock();
   
-  private final ActionThrottle recoveryThrottle = new ActionThrottle("recovery", 10000);
+  private final ActionThrottle recoveryThrottle = new ActionThrottle("recovery", Integer.getInteger("solr.recovery.recoveryThrottle", 10000));
   
-  private final ActionThrottle leaderThrottle = new ActionThrottle("leader", 5000);
+  private final ActionThrottle leaderThrottle = new ActionThrottle("leader", Integer.getInteger("solr.recovery.leaderThrottle", 5000));
   
   private final AtomicInteger recoveryWaiting = new AtomicInteger();
 
@@ -98,6 +98,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   }
   
   private void closeIndexWriter(IndexWriterCloser closer) {
+    System.out.println("Closing indexwriter");
     try {
       log.debug("SolrCoreState ref count has reached 0 - closing IndexWriter");
       if (closer != null) {

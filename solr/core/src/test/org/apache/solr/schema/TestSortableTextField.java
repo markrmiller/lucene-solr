@@ -29,6 +29,7 @@ import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 
 import org.apache.solr.SolrTestCaseJ4;
@@ -45,6 +46,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import static org.hamcrest.CoreMatchers.instanceOf;
 
+@LuceneTestCase.Slow
 public class TestSortableTextField extends SolrTestCaseJ4 {
 
   protected static final String BIG_CONST

@@ -61,7 +61,7 @@ public abstract class SolrCoreState {
   public void increfSolrCoreState() {
     synchronized (this) {
       if (solrCoreStateRefCnt == 0) {
-        throw new CoreIsClosedException("IndexWriter has been closed");
+        throw new AlreadyClosedException.CoreIsClosedException("IndexWriter has been closed");
       }
       solrCoreStateRefCnt++;
     }
@@ -172,17 +172,6 @@ public abstract class SolrCoreState {
   public abstract boolean getLastReplicateIndexSuccess();
 
   public abstract void setLastReplicateIndexSuccess(boolean success);
-
-  public static class CoreIsClosedException extends AlreadyClosedException {
-    
-    public CoreIsClosedException() {
-      super();
-    }
-    
-    public CoreIsClosedException(String s) {
-      super(s);
-    }
-  }
 
   public abstract Lock getRecoveryLock();
 

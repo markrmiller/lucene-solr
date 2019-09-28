@@ -16,6 +16,7 @@
  */
 package org.apache.solr.highlight;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -24,6 +25,7 @@ import org.junit.Test;
 /**
  * Tests the max offset limit of highlighter
  */
+@LuceneTestCase.Slow
 public class HighlighterMaxOffsetTest extends SolrTestCaseJ4 {
 
   @BeforeClass

@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 package org.apache.solr.search.function;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.SuppressCodecs;
 
 
@@ -25,6 +26,7 @@ import org.apache.lucene.util.LuceneTestCase.SuppressCodecs;
  * @see SortByFunctionTest
  **/
 @SuppressCodecs({"SimpleText"}) // see TestSortedSetSelector
+@LuceneTestCase.Slow
 public class TestSortByMinMaxFunction extends SortByFunctionTest {
 
   @Override

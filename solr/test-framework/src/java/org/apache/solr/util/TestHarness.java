@@ -17,6 +17,7 @@
 package org.apache.solr.util;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -71,9 +72,9 @@ import org.apache.solr.update.UpdateShardHandlerConfig;
  *
  *
  */
-public class TestHarness extends BaseTestHarness {
+public class TestHarness extends BaseTestHarness implements Closeable {
   public String coreName;
-  protected volatile CoreContainer container;
+  protected final CoreContainer container;
   public UpdateRequestHandler updater;
  
   /**
@@ -377,7 +378,6 @@ public class TestHarness extends BaseTestHarness {
   public void close() {
     if (container != null) {
       container.shutdown();
-      container = null;
     }
   }
 

@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.ConnectionManager;
@@ -35,7 +36,7 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.junit.Ignore;
 import org.junit.Test;
 
-@Slow
+@LuceneTestCase.Slow
 public class ConnectionManagerTest extends SolrTestCaseJ4 {
   
   static final int TIMEOUT = 3000;

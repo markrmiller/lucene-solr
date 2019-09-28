@@ -115,9 +115,10 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
   protected boolean useExplicitNodeNames;
   
   @BeforeClass
-  public static void initialize() {
+  public static void initialize() throws Exception {
     assumeFalse("SOLR-4147: ibm 64bit has jvm bugs!", Constants.JRE_IS_64BIT && Constants.JAVA_VENDOR.startsWith("IBM"));
     r = new Random(random().nextLong());
+    
   }
   
   /**
@@ -159,8 +160,9 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
       }
     }
     // paranoia, we *really* don't want to ever get "//" in a path...
-    final String hc = hostContext.toString().replaceAll("\\/+","/");
+    String hc = hostContext.toString().replaceAll("\\/+","/");
 
+    hc = "/solr";
     log.info("Setting hostContext system property: " + hc);
     System.setProperty("hostContext", hc);
   }
@@ -191,6 +193,8 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     if ("".equals(ctx)) ctx = "/solr";
     if (ctx.endsWith("/")) ctx = ctx.substring(0,ctx.length()-1);;
     if (!ctx.startsWith("/")) ctx = "/" + ctx;
+    // just / is causing url problems
+    if(ctx.equals("/") )  ctx = "/solr";
     return ctx;
   }
 
@@ -344,6 +348,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
 
   protected JettySolrRunner createControlJetty() throws Exception {
     Path jettyHome = testDir.toPath().resolve("control");
+    System.setProperty("configSetBaseDir", jettyHome.toString());
     File jettyHomeFile = jettyHome.toFile();
     seedSolrHome(jettyHomeFile);
     seedCoreRootDirWithDefaultTestCore(jettyHome.resolve("cores"));
@@ -353,8 +358,6 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
   }
 
   protected void createServers(int numShards) throws Exception {
-
-    System.setProperty("configSetBaseDir", getSolrHome());
 
     controlJetty = createControlJetty();
     controlClient = createNewSolrClient(controlJetty.getLocalPort());
@@ -368,6 +371,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
       File jettyHomeFile = jettyHome.toFile();
       seedSolrHome(jettyHomeFile);
       seedCoreRootDirWithDefaultTestCore(jettyHome.resolve("cores"));
+      System.setProperty("configSetBaseDir", jettyHome.toString());
       JettySolrRunner j = createJetty(jettyHomeFile, null, null, getSolrConfigFile(), getSchemaFile());
       j.start();
       jettys.add(j);
@@ -443,7 +447,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
       });
     }
 
-    ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
+    ExecutorUtil.shutdownAndAwaitTermination(customThreadPool, 10);
     
     clients.clear();
     jettys.clear();

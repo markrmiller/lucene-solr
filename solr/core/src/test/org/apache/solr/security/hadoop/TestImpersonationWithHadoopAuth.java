@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.lucene.util.Constants;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -42,6 +43,7 @@ import static org.apache.solr.security.hadoop.ImpersonationUtil.getExpectedGroup
 import static org.apache.solr.security.hadoop.ImpersonationUtil.getExpectedHostExMsg;
 import static org.apache.solr.security.hadoop.ImpersonationUtil.getProxyRequest;
 
+@LuceneTestCase.Slow
 public class TestImpersonationWithHadoopAuth  extends SolrCloudTestCase {
   protected static final int NUM_SERVERS = 2;
   private static final boolean defaultAddRequestHeadersToContext =

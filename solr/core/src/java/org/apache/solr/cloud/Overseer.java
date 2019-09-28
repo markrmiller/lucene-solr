@@ -223,7 +223,7 @@ public class Overseer implements SolrCloseable {
             // We do not need to filter any nodes here cause all processed nodes are removed once we flush clusterstate
             queue = new LinkedList<>(stateUpdateQueue.peekElements(1000, 3000L, (x) -> true));
           } catch (KeeperException.SessionExpiredException e) {
-            log.warn("Solr cannot talk to ZK, exiting Overseer main queue loop", e);
+            log.info("Solr cannot talk to ZK due to session expiration, exiting Overseer main queue loop");
             return;
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -743,11 +743,18 @@ public class Overseer implements SolrCloseable {
     return triggerThread;
   }
   
-  public synchronized void close() {
+  // dont sync or risk deadlock
+  public void close() {
+    if (closed) return;
+    
+    synchronized (this) {
+      this.closed = true;
+    }
+
     if (this.id != null) {
       log.info("Overseer (id=" + id + ") closing");
     }
-    this.closed = true;
+
     doClose();
 
     assert ObjectReleaseTracker.release(this);
@@ -759,7 +766,7 @@ public class Overseer implements SolrCloseable {
   }
 
   private void doClose() {
-    
+    try {
     if (updaterThread != null) {
       IOUtils.closeQuietly(updaterThread);
       updaterThread.interrupt();
@@ -786,6 +793,9 @@ public class Overseer implements SolrCloseable {
       try {
         triggerThread.join();
       } catch (InterruptedException e)  {}
+    }
+    } catch (Exception e) {
+      log.warn("Exception closing Overseer", e);
     }
     updaterThread = null;
     ccThread = null;

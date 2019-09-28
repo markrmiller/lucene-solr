@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;

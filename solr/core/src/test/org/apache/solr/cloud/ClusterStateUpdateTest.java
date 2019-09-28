@@ -21,7 +21,6 @@ import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.common.cloud.ClusterState;
@@ -35,7 +34,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Slow
 public class ClusterStateUpdateTest extends SolrCloudTestCase  {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -65,29 +63,17 @@ public class ClusterStateUpdateTest extends SolrCloudTestCase  {
     assertEquals(0, CollectionAdminRequest.createCollection("testcore", "conf", 1, 1)
         .setCreateNodeSet(cluster.getJettySolrRunner(0).getNodeName())
         .process(cluster.getSolrClient()).getStatus());
+    
+    cluster.waitForActiveCollection("testcore", 1, 1);
 
+    
     ZkController zkController2 = cluster.getJettySolrRunner(1).getCoreContainer().getZkController();
+    
+    ClusterState clusterState2 = zkController2.getClusterState();
+    DocCollection docCollection = clusterState2.getCollectionOrNull("testcore");
+    Map<String,Slice> slices = docCollection.getSlicesMap();
 
     String host = zkController2.getHostName();
-    
-    // slight pause - TODO: takes an oddly long amount of time to schedule tasks
-    // with almost no delay ...
-    ClusterState clusterState2 = null;
-    Map<String,Slice> slices = null;
-    for (int i = 75; i > 0; i--) {
-      clusterState2 = zkController2.getClusterState();
-      DocCollection docCollection = clusterState2.getCollectionOrNull("testcore");
-      slices = docCollection == null ? null : docCollection.getSlicesMap();
-      
-      if (slices != null && slices.containsKey("shard1")
-          && slices.get("shard1").getReplicasMap().size() > 0) {
-        break;
-      }
-      Thread.sleep(500);
-    }
-
-    assertNotNull(slices);
-    assertTrue(slices.containsKey("shard1"));
 
     Slice slice = slices.get("shard1");
     assertEquals("shard1", slice.getName());

@@ -30,14 +30,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -71,7 +73,9 @@ import org.apache.solr.handler.admin.CollectionsHandler;
 import org.apache.solr.handler.admin.ConfigSetsHandler;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.junit.After;
-import org.junit.Before;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -82,7 +86,8 @@ import org.slf4j.LoggerFactory;
 /**
  * This test would be faster if we simulated the zk state instead.
  */
-@Slow
+@LuceneTestCase.Slowest // we should break this up into 2 tests
+@Ignore // too long
 public class CloudSolrClientTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -97,9 +102,9 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
 
   private static CloudSolrClient httpBasedCloudSolrClient = null;
 
-  @Before
-  public void setupCluster() throws Exception {
-    configureCluster(NODE_COUNT)
+  @BeforeClass
+  public static void setupCluster() throws Exception {
+    cluster = configureCluster(NODE_COUNT)
         .addConfig("conf", getFile("solrj").toPath().resolve("solr").resolve("configsets").resolve("streaming").resolve("conf"))
         .configure();
 
@@ -109,8 +114,8 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
   }
 
   
-  @After 
-  public void tearDown() throws Exception {
+  @AfterClass
+  public static void afterClass() throws Exception {
     if (httpBasedCloudSolrClient != null) {
       try {
         httpBasedCloudSolrClient.close();
@@ -120,7 +125,12 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     }
     
     shutdownCluster();
-    super.tearDown();
+  }
+  
+  
+  @After
+  public void afterTest() throws Exception {
+    cluster.deleteAllCollections();
   }
 
   /**
@@ -197,24 +207,24 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     assertEquals(COLLECTION2, aliases.get("testalias2"));
     assertEquals(COLLECTION + "," + COLLECTION2, aliases.get("testaliascombined"));
 
-    assertEquals(1, client.query(COLLECTION, params("q", "*:*")).getResults().getNumFound());
-    assertEquals(1, client.query("testalias", params("q", "*:*")).getResults().getNumFound());
+    assertEquals(1, client.query(COLLECTION, SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
+    assertEquals(1, client.query("testalias", SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
 
-    assertEquals(1, client.query(COLLECTION2, params("q", "*:*")).getResults().getNumFound());
-    assertEquals(1, client.query("testalias2", params("q", "*:*")).getResults().getNumFound());
+    assertEquals(1, client.query(COLLECTION2, SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
+    assertEquals(1, client.query("testalias2", SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
 
-    assertEquals(2, client.query("testaliascombined", params("q", "*:*")).getResults().getNumFound());
+    assertEquals(2, client.query("testaliascombined", SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
 
-    ModifiableSolrParams paramsWithBothCollections = params("q", "*:*", "collection", COLLECTION + "," + COLLECTION2);
+    ModifiableSolrParams paramsWithBothCollections = SolrTestCaseJ4.params("q", "*:*", "collection", COLLECTION + "," + COLLECTION2);
     assertEquals(2, client.query(null, paramsWithBothCollections).getResults().getNumFound());
 
-    ModifiableSolrParams paramsWithBothAliases = params("q", "*:*", "collection", "testalias,testalias2");
+    ModifiableSolrParams paramsWithBothAliases = SolrTestCaseJ4.params("q", "*:*", "collection", "testalias,testalias2");
     assertEquals(2, client.query(null, paramsWithBothAliases).getResults().getNumFound());
 
-    ModifiableSolrParams paramsWithCombinedAlias = params("q", "*:*", "collection", "testaliascombined");
+    ModifiableSolrParams paramsWithCombinedAlias = SolrTestCaseJ4.params("q", "*:*", "collection", "testaliascombined");
     assertEquals(2, client.query(null, paramsWithCombinedAlias).getResults().getNumFound());
 
-    ModifiableSolrParams paramsWithMixedCollectionAndAlias = params("q", "*:*", "collection", "testalias," + COLLECTION2);
+    ModifiableSolrParams paramsWithMixedCollectionAndAlias = SolrTestCaseJ4.params("q", "*:*", "collection", "testalias," + COLLECTION2);
     assertEquals(2, client.query(null, paramsWithMixedCollectionAndAlias).getResults().getNumFound());
   }
 
@@ -270,7 +280,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     assertEquals(0, docs.getNumFound());
     
     // Test Multi-Threaded routed updates for UpdateRequest
-    try (CloudSolrClient threadedClient = new CloudSolrClientBuilder
+    try (CloudSolrClient threadedClient = new CloudSolrClient.Builder
         (Collections.singletonList(cluster.getZkServer().getZkAddress()), Optional.empty())
         .withParallelUpdates(true)
         .build()) {
@@ -751,7 +761,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     SolrInputDocument doc = new SolrInputDocument("id", "1", "title_s", "my doc");
     client.add(COLLECTION, doc);
     client.commit(COLLECTION);
-    assertEquals(1, client.query(COLLECTION, params("q", "*:*")).getResults().getNumFound());
+    assertEquals(1, client.query(COLLECTION, SolrTestCaseJ4.params("q", "*:*")).getResults().getNumFound());
   }
 
   @Test
@@ -762,6 +772,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     assertEquals("Collection not found: boguscollectionname", ex.getMessage());
   }
 
+  @Nightly
   public void testRetryUpdatesWhenClusterStateIsStale() throws Exception {
     final String COL = "stale_state_test_col";
     assert cluster.getJettySolrRunners().size() >= 2;
@@ -784,7 +795,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     final String old_leader_core_node_name = slice.getLeader().getName();
 
     // NOTE: creating our own CloudSolrClient whose settings we can muck with...
-    try (CloudSolrClient stale_client = new CloudSolrClientBuilder
+    try (CloudSolrClient stale_client = new CloudSolrClient.Builder
         (Collections.singletonList(cluster.getZkServer().getZkAddress()), Optional.empty())
         .sendDirectUpdatesToAnyShardReplica()
         .withParallelUpdates(true)
@@ -842,6 +853,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
    */
   @Test
   // commented 15-Sep-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2-Aug-2018
+  @Nightly
   public void preferReplicaTypesTest() throws Exception {
 
     String collectionName = "replicaTypesTestColl";
@@ -879,6 +891,9 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     queryWithPreferReplicaTypes(getRandomClient(), "NRT|PULL", true, collectionName);
     CollectionAdminRequest.deleteCollection(collectionName)
         .processAndWait(cluster.getSolrClient(), TIMEOUT);
+    cluster.getSolrClient().getZkStateReader().waitForState(collectionName, 15000, TimeUnit.MILLISECONDS,
+        (n, c) -> c == null);
+    
   }
 
   private void queryWithPreferReplicaTypes(CloudSolrClient cloudClient,

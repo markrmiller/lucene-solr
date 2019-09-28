@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 package org.apache.solr.schema;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+@LuceneTestCase.Slowest
 public class TestCloudManagedSchema extends AbstractFullDistribZkTestBase {
 
   public TestCloudManagedSchema() {

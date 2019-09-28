@@ -56,8 +56,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
 
   private static final int numShards = 2;
   private static final int numReplicas = 2;
-  private static final int maxShardsPerNode = 1;
-  private static final int nodeCount = 5;
+  private static final int maxShardsPerNode = 5;
+  private static final int nodeCount = LuceneTestCase.TEST_NIGHTLY ? 5 : 1;
   private static final String configName = "solrCloudCollectionConfig";
   private static final Map<String,String> collectionProperties  // ensure indexes survive core shutdown
       = Collections.singletonMap("solr.directoryFactory", "solr.StandardDirectoryFactory");
@@ -99,6 +99,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
   }
 
   @Test
+  @Nightly
+  // Runs Nightly with 5 nodes, std runs with 1
   public void testCollectionCreateSearchDelete() throws Exception {
     final CloudSolrClient client = cluster.getSolrClient();
     final String collectionName = "testcollection";

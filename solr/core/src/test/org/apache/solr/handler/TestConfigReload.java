@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.common.LinkedHashMapWriter;
 import org.apache.solr.common.MapWriter;
@@ -48,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Arrays.asList;
 
+@LuceneTestCase.Slow
 public class TestConfigReload extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -55,11 +57,7 @@ public class TestConfigReload extends AbstractFullDistribZkTestBase {
   @Test
   public void test() throws Exception {
     setupRestTestHarnesses();
-    try {
-      reloadTest();
-    } finally {
-      closeRestTestHarnesses();
-    }
+    reloadTest();
   }
 
   private void reloadTest() throws Exception {

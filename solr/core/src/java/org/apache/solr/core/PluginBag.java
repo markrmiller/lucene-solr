@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
@@ -54,7 +55,7 @@ import static org.apache.solr.api.ApiBag.HANDLER_NAME;
 /**
  * This manages the lifecycle of a set of plugin of the same type .
  */
-public class PluginBag<T> implements AutoCloseable {
+public class PluginBag<T> implements AutoCloseable, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final Map<String, PluginHolder<T>> registry;

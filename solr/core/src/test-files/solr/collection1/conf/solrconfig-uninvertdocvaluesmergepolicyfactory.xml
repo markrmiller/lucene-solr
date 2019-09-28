@@ -29,8 +29,8 @@
       <str name="inner.class">org.apache.solr.index.DefaultMergePolicyFactory</str>
       <bool name="skipIntegrityCheck">${solr.tests.skipIntegrityCheck:false}</bool>
     </mergePolicyFactory>
-     
     <mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler"/>
+    <lockType>${solr.tests.lockType:single}</lockType>
   </indexConfig>
 
   <requestHandler name="/select" class="solr.SearchHandler"></requestHandler>

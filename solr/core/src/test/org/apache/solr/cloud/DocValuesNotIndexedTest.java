@@ -17,6 +17,10 @@
 
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.RANDOMIZED_NUMERIC_FIELDTYPES;
+
+
+
 import static org.apache.lucene.util.LuceneTestCase.random;
 
 import java.io.IOException;
@@ -31,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -62,6 +68,7 @@ import org.slf4j.LoggerFactory;
 
 import com.carrotsearch.randomizedtesting.rules.SystemPropertiesRestoreRule;
 
+@LuceneTestCase.Slow
 public class DocValuesNotIndexedTest extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -79,6 +86,8 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void createCluster() throws Exception {
+    SolrTestCaseJ4.randomizeNumericTypesProperties();
+    
     System.setProperty("managed.schema.mutable", "true");
     configureCluster(2)
         .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-managed").resolve("conf"))
@@ -172,6 +181,7 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
   @AfterClass
   public static void shutdown() throws Exception {
     shutdownCluster();
+    SolrTestCaseJ4.clearNumericTypesProperties();
   }
 
   @Before
@@ -179,7 +189,7 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
     CloudSolrClient client = cluster.getSolrClient();
     client.deleteByQuery("*:*");
     client.commit();
-    Solr11035BandAid(client, COLLECTION, "id", 0, "*:*", "DocValuesNotINdexedTest.clean");
+    SolrTestCaseJ4.Solr11035BandAid(client, COLLECTION, "id", 0, "*:*", "DocValuesNotINdexedTest.clean");
     resetFields(fieldsToTestSingle);
     resetFields(fieldsToTestMulti);
     resetFields(fieldsToTestGroupSortFirst);
@@ -255,7 +265,7 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
     new UpdateRequest()
         .add(docs)
         .commit(client, COLLECTION);
-    Solr11035BandAid(client, COLLECTION, "id", 4, "*:*", "DocValuesNotINdexedTest.testGroupSorting");
+    SolrTestCaseJ4.Solr11035BandAid(client, COLLECTION, "id", 4, "*:*", "DocValuesNotINdexedTest.testGroupSorting");
 
     checkSortOrder(client, fieldsToTestGroupSortFirst, "asc", new String[]{"4", "2", "1", "3"}, new String[]{"4", "1", "2", "3"});
     checkSortOrder(client, fieldsToTestGroupSortFirst, "desc", new String[]{"3", "1", "2", "4"}, new String[]{"2", "3", "1", "4"});
@@ -298,7 +308,7 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
         .add(docs)
         .commit(client, COLLECTION);
 
-    Solr11035BandAid(client, COLLECTION, "id", 4, "*:*", "DocValuesNotINdexedTest.testGroupingDocAbsent");
+    SolrTestCaseJ4.Solr11035BandAid(client, COLLECTION, "id", 4, "*:*", "DocValuesNotINdexedTest.testGroupingDocAbsent");
     // when grouping on any of these DV-only (not indexed) fields we expect exactly 4 groups except for Boolean.
     for (FieldProps prop : fieldsToTestGroupSortFirst) {
       // Special handling until SOLR-9802 is fixed
@@ -362,7 +372,7 @@ public class DocValuesNotIndexedTest extends SolrCloudTestCase {
         .add(docs)
         .commit(client, COLLECTION);
 
-    Solr11035BandAid(client, COLLECTION,"id", 59, "*:*", "DocValuesNotINdexedTest.doGroupingDvOnly");
+    SolrTestCaseJ4.Solr11035BandAid(client, COLLECTION,"id", 59, "*:*", "DocValuesNotINdexedTest.doGroupingDvOnly");
 
     // OK, we should have one group with 10 entries for null, a group with 1 entry and 7 groups with 7
     for (FieldProps prop : fieldProps) {

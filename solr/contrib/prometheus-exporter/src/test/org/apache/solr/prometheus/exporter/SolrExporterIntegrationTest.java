@@ -21,10 +21,12 @@ import java.util.stream.Collectors;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 @org.apache.lucene.util.LuceneTestCase.AwaitsFix(bugUrl="https://issues.apache.org/jira/browse/SOLR-13786")
 @Slow
+@Ignore
 public class SolrExporterIntegrationTest extends SolrExporterTestBase {
 
   @Override

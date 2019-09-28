@@ -18,6 +18,7 @@ package org.apache.solr.cloud;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import com.carrotsearch.randomizedtesting.annotations.TimeoutSuite;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.LuceneTestCase.Slow;
@@ -38,6 +39,7 @@ import org.junit.Test;
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 @TimeoutSuite(millis = TimeUnits.HOUR)
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class MoveReplicaHDFSTest extends MoveReplicaTest {
   private static MiniDFSCluster dfsCluster;
 

@@ -16,7 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -44,7 +46,9 @@ import java.util.Set;
  * Test sync phase that occurs when Leader goes down and a new Leader is
  * elected.
  */
-@Slow
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class SyncSliceTest extends AbstractFullDistribZkTestBase {
   private boolean success = false;
 

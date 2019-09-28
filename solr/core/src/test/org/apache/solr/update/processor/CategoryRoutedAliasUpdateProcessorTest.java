@@ -17,6 +17,9 @@
 
 package org.apache.solr.update.processor;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -25,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -41,10 +45,14 @@ import org.apache.solr.update.UpdateCommand;
 import org.apache.solr.util.LogLevel;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@Ignore
 public class CategoryRoutedAliasUpdateProcessorTest extends RoutedAliasUpdateProcessorTest {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -87,6 +95,7 @@ public class CategoryRoutedAliasUpdateProcessorTest extends RoutedAliasUpdatePro
 
   @Test
   @Slow
+  @Nightly
   public void testNonEnglish() throws Exception {
     // test to document the expected behavior with non-english text for categories
     // the present expectation is that non-latin text and many accented latin characters
@@ -354,6 +363,7 @@ public class CategoryRoutedAliasUpdateProcessorTest extends RoutedAliasUpdatePro
   @Slow
   @Test
   @LogLevel("org.apache.solr.update.processor.TrackingUpdateProcessorFactory=DEBUG")
+  @Nightly
   public void testSliceRouting() throws Exception {
     String configName = getSaferTestName();
     createConfigSet(configName);

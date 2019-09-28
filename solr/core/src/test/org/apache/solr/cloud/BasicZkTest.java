@@ -20,7 +20,7 @@ import java.util.Map;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -36,7 +36,7 @@ import org.junit.Test;
  * detect if a node is trying to do an update to itself with http - it shouldn't
  * do that.
  */
-@Slow
+@LuceneTestCase.Slow
 public class BasicZkTest extends AbstractZkTestCase {
   
   @BeforeClass

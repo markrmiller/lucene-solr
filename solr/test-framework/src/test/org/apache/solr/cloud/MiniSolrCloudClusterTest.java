@@ -32,6 +32,7 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "Solr logs to JUL")
+@LuceneTestCase.Slowest // TODO: normally fast, but can be slow
 public class MiniSolrCloudClusterTest extends SolrTestCase {
 
   @ClassRule

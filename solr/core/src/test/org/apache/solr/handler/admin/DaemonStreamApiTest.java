@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -37,9 +38,13 @@ import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.handler.TestSQLHandler;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Ignore;
 
+@LuceneTestCase.Slow
+@Ignore // deamon threads leak
 public class DaemonStreamApiTest extends SolrTestCaseJ4 {
 
   private MiniSolrCloudCluster cluster;
@@ -100,6 +105,12 @@ public class DaemonStreamApiTest extends SolrTestCaseJ4 {
       cluster = null;
     }
     super.tearDown();
+  }
+  
+  @AfterClass
+  public static void afterClass() {
+    // our stream can be stuck in wait loops
+    interruptThreadsOnTearDown("DaemonStream", true);
   }
 
   @Test

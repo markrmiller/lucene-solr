@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -48,6 +49,7 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.Timer;
 
+@LuceneTestCase.Slow
 public class TestCloudRecovery extends SolrCloudTestCase {
 
   private static final String COLLECTION = "collection1";
@@ -111,19 +113,22 @@ public class TestCloudRecovery extends SolrCloudTestCase {
     QueryResponse resp = cloudClient.query(COLLECTION, params);
     assertEquals(0, resp.getResults().getNumFound());
 
-    ChaosMonkey.stop(cluster.getJettySolrRunners());
+    List<JettySolrRunner> runners = cluster.getJettySolrRunners();
+    
+    ChaosMonkey.stop(runners);
 
     
     for (JettySolrRunner jettySolrRunner : cluster.getJettySolrRunners()) {
       cluster.waitForJettyToStop(jettySolrRunner);
     }
     assertTrue("Timeout waiting for all not live", ClusterStateUtil.waitForAllReplicasNotLive(cloudClient.getZkStateReader(), 45000));
-    ChaosMonkey.start(cluster.getJettySolrRunners());
+    
+    ChaosMonkey.start(runners);
     
     cluster.waitForAllNodes(30);
     
-    assertTrue("Timeout waiting for all live and active", ClusterStateUtil.waitForAllActiveAndLiveReplicas(cloudClient.getZkStateReader(), COLLECTION, 120000));
-
+    cluster.waitForActiveCollection(COLLECTION, 2, 2 * (nrtReplicas + tlogReplicas));
+    
     resp = cloudClient.query(COLLECTION, params);
     assertEquals(4, resp.getResults().getNumFound());
     // Make sure all nodes is recover from tlog

@@ -22,6 +22,8 @@ import java.util.Date;
 import java.util.List;
 
 import junit.framework.AssertionFailedError;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -34,6 +36,7 @@ import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.SolrParams;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class DistributedFacetPivotLargeTest extends BaseDistributedSearchTestCase {
   
   public static final String SPECIAL = ""; 

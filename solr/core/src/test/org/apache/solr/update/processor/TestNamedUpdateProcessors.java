@@ -26,6 +26,7 @@ import java.util.function.UnaryOperator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -41,6 +42,7 @@ import org.apache.solr.util.RestTestHarness;
 import org.apache.solr.util.SimplePostTool;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestNamedUpdateProcessors extends AbstractFullDistribZkTestBase {
 
   @Test

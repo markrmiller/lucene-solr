@@ -20,6 +20,7 @@ package org.apache.solr.cloud;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -29,6 +30,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class NestedShardedAtomicUpdateTest extends AbstractFullDistribZkTestBase {
 
   public NestedShardedAtomicUpdateTest() {

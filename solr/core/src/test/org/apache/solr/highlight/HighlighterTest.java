@@ -32,6 +32,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.queries.payloads.SpanPayloadCheckQuery;
 import org.apache.lucene.search.spans.SpanTermQuery;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.HighlightParams;
 import org.apache.solr.handler.component.HighlightComponent;
@@ -46,6 +48,7 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class HighlighterTest extends SolrTestCaseJ4 {
 
   private static String LONG_TEXT = "a long days night this should be a piece of text which is is is is is is is is is is is is is is is is is is is " +

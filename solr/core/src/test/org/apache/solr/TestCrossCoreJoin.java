@@ -20,6 +20,8 @@ import java.io.StringWriter;
 import java.util.Collections;
 
 import com.google.common.collect.ImmutableMap;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.core.CoreContainer;
@@ -36,6 +38,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestCrossCoreJoin extends SolrTestCaseJ4 {
 
   private static SolrCore fromCore;

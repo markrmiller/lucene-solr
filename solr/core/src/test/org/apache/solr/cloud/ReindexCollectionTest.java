@@ -17,6 +17,8 @@
 
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -49,10 +51,13 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.carrotsearch.randomizedtesting.annotations.Nightly;
+
 /**
  *
  */
 @LogLevel("org.apache.solr.cloud.api.collections.ReindexCollectionCmd=DEBUG")
+@Nightly // too slow for non Nightly
 public class ReindexCollectionTest extends SolrCloudTestCase {
 
   @BeforeClass
@@ -76,7 +81,7 @@ public class ReindexCollectionTest extends SolrCloudTestCase {
     ZkController zkController = cluster.getJettySolrRunner(0).getCoreContainer().getZkController();
     cloudManager = zkController.getSolrCloudManager();
     stateManager = cloudManager.getDistribStateManager();
-    solrClient = new CloudSolrClientBuilder(Collections.singletonList(zkController.getZkServerAddress()),
+    solrClient = new CloudSolrClient.Builder(Collections.singletonList(zkController.getZkServerAddress()),
         Optional.empty()).build();
   }
 

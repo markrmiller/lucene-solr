@@ -17,6 +17,7 @@
 package org.apache.solr.schema;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.BeforeClass;
 
@@ -25,6 +26,7 @@ import java.io.File;
 /**
  * Tests expert options of {@link ICUCollationField}.
  */
+@LuceneTestCase.Slow
 public class TestICUCollationFieldOptions extends SolrTestCaseJ4 {
   @BeforeClass
   public static void beforeClass() throws Exception {

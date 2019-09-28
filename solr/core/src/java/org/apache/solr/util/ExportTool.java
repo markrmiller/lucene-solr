@@ -65,6 +65,7 @@ import org.apache.solr.common.params.CursorMarkParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
@@ -381,8 +382,8 @@ public class ExportTool extends SolrCLI.ToolBase {
       } finally {
         sink.end();
         solrClient.close();
-        producerThreadpool.shutdownNow();
-        consumerThreadpool.shutdownNow();
+        ExecutorUtil.shutdownWithInterruptAndAwaitTermination(producerThreadpool);
+        ExecutorUtil.shutdownWithInterruptAndAwaitTermination(consumerThreadpool);
         if (failed) {
           try {
             Files.delete(new File(out).toPath());

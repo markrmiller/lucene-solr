@@ -110,6 +110,7 @@ final class TestRuleSetupAndRestoreClassEnv extends AbstractBeforeAfterRule {
 
   @Override
   protected void before() throws Exception {
+    
     // enable this by default, for IDE consistency with ant tests (as it's the default from ant)
     // TODO: really should be in solr base classes, but some extend LTC directly.
     // we do this in beforeClass, because some tests currently disable it
@@ -276,8 +277,8 @@ final class TestRuleSetupAndRestoreClassEnv extends AbstractBeforeAfterRule {
    */
   @Override
   protected void after() throws Exception {
-    Codec.setDefault(savedCodec);
-    InfoStream.setDefault(savedInfoStream);
+    if (savedCodec != null) Codec.setDefault(savedCodec);
+    if (savedInfoStream != null) InfoStream.setDefault(savedInfoStream);
     if (savedLocale != null) Locale.setDefault(savedLocale);
     if (savedTimeZone != null) TimeZone.setDefault(savedTimeZone);
   }

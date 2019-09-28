@@ -19,9 +19,11 @@ package org.apache.solr.analytics.facet;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class PivotFacetTest extends SolrAnalyticsFacetTestCase {
 
   @BeforeClass

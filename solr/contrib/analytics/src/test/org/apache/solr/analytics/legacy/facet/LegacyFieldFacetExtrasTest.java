@@ -22,9 +22,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class LegacyFieldFacetExtrasTest extends LegacyAbstractAnalyticsFacetTest {
   static String fileName = "fieldFacetExtras.txt";
 

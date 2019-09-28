@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -29,6 +30,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class TestZkChroot extends SolrTestCaseJ4 {
   protected CoreContainer cores = null;
   private Path home;

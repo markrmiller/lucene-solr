@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.common.LinkedHashMapWriter;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -33,28 +34,30 @@ import org.apache.solr.handler.TestBlobHandler;
 import org.apache.solr.util.CryptoKeys;
 import org.apache.solr.util.RestTestHarness;
 import org.apache.zookeeper.CreateMode;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static java.util.Arrays.asList;
 import static org.apache.solr.handler.TestSolrConfigHandlerCloud.compareValues;
 
-public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
-
-  public TestCryptoKeys() {
-    super();
+@LuceneTestCase.Slow
+public class TestCryptoKeys extends SolrCloudBridgeTestCase {
+  
+  @BeforeClass
+  public static void beforeTestCryptoKeys() {
     sliceCount = 1;
+    System.setProperty("enable.runtime.lib", "true");
   }
 
   @Test
-  public void test() throws Exception {
-    System.setProperty("enable.runtime.lib", "true");
+  public void testCryptoKeys() throws Exception {
     setupRestTestHarnesses();
     String pk1sig = "G8LEW7uJ1is81Aqqfl3Sld3qDtOxPuVFeTLJHFJWecgDvUkmJNFXmf7nkHOVlXnDWahp1vqZf0W02VHXg37lBw==";
     String pk2sig = "pCyBQycB/0YvLVZfKLDIIqG1tFwM/awqzkp2QNpO7R3ThTqmmrj11wEJFDRLkY79efuFuQPHt40EE7jrOKoj9jLNELsfEqvU3jw9sZKiDONY+rV9Bj9QPeW8Pgt+F9Y1";
     String wrongKeySig = "xTk2hTipfpb+J5s4x3YZGOXkmHWtnJz05Vvd8RTm/Q1fbQVszR7vMk6dQ1URxX08fcg4HvxOo8g9bG2TSMOGjg==";
     String result = null;
     CryptoKeys cryptoKeys = null;
-    SolrZkClient zk = getCommonCloudSolrClient().getZkStateReader().getZkClient();
+    SolrZkClient zk = cloudClient.getZkStateReader().getZkClient();
     cryptoKeys = new CryptoKeys(CloudUtil.getTrustedKeys(zk, "exe"));
     ByteBuffer samplefile = ByteBuffer.wrap(readFile("cryptokeys/samplefile.bin"));
     //there are no keys yet created in ZK
@@ -94,7 +97,7 @@ public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
     baseURL = baseURL.substring(0, baseURL.lastIndexOf('/'));
 
     TestBlobHandler.createSystemCollection(getHttpSolrClient(baseURL, randomClient.getHttpClient()));
-    waitForRecoveriesToFinish(".system", true);
+    waitForRecoveriesToFinish(".system");
 
     ByteBuffer jar = TestDynamicLoading.getFileContent("runtimecode/runtimelibs.jar.bin");
     String blobName = "signedjar";
@@ -126,10 +129,16 @@ public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
         Arrays.asList("overlay", "runtimeLib", blobName, "version"),
         1l, 10);
 
-    LinkedHashMapWriter map = TestSolrConfigHandler.getRespMap("/runtime", client);
-    String s = map._getStr( "error/msg",null);
-    assertNotNull(map.toString(), s);
-    assertTrue(map.toString(), s.contains("should be signed with one of the keys in ZK /keys/exe"));
+    String response = client.query("/runtime");
+    System.out.println("response:" + response);
+    
+   // LinkedHashMapWriter map = TestSolrConfigHandler.getRespMap("/runtime", client);
+    
+    LinkedHashMapWriter map;
+    
+
+    assertNotNull(response, response);
+    assertTrue(response, response.contains("should be signed with one of the keys in ZK /keys/exe"));
 
     String wrongSig = "QKqHtd37QN02iMW9UEgvAO9g9qOOuG5vEBNkbUsN7noc2hhXKic/ABFIOYJA9PKw61mNX2EmNFXOcO3WClYdSw==";
 
@@ -145,10 +154,9 @@ public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
         Arrays.asList("overlay", "runtimeLib", blobName, "sig"),
         wrongSig, 10);
 
-    map = TestSolrConfigHandler.getRespMap("/runtime", client);
-    s = (String) Utils.getObjectByPath(map, false, Arrays.asList("error", "msg"));
-    assertNotNull(map.toString(), s);//No key matched signature for jar
-    assertTrue(map.toString(), s.contains("No key matched signature for jar"));
+    response = client.query("/runtime");
+    assertNotNull(response, response);//No key matched signature for jar
+    assertTrue(response, response.contains("No key matched signature for jar"));
 
     String rightSig = "YkTQgOtvcM/H/5EQdABGl3wjjrPhonAGlouIx59vppBy2cZEofX3qX1yZu5sPNRmJisNXEuhHN2149dxeUmk2Q==";
 
@@ -166,7 +174,7 @@ public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
 
     map = TestSolrConfigHandler.testForResponseElement(client,
         null,
-        "/runtime",
+        "/runtime?wt=json",
         null,
         Arrays.asList("class"),
         "org.apache.solr.core.RuntimeLibReqHandler", 10);
@@ -180,14 +188,14 @@ public class TestCryptoKeys extends AbstractFullDistribZkTestBase {
     TestSolrConfigHandler.runConfigCommand(client, "/config", payload);
     TestSolrConfigHandler.testForResponseElement(client,
         null,
-        "/config/overlay",
+        "/config/overlay?wt=json",
         null,
         Arrays.asList("overlay", "runtimeLib", blobName, "sig"),
         rightSig, 10);
 
     map = TestSolrConfigHandler.testForResponseElement(client,
         null,
-        "/runtime",
+        "/runtime?wt=json",
         null,
         Arrays.asList("class"),
         "org.apache.solr.core.RuntimeLibReqHandler", 10);

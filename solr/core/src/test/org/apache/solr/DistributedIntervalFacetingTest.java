@@ -104,7 +104,7 @@ public class DistributedIntervalFacetingTest extends
 
   private void testRandom() throws Exception {
     // All field values will be a number between 0 and cardinality
-    int cardinality = 1000000;
+    int cardinality = TEST_NIGHTLY ? 1000000 : 1000;
     // Fields to use for interval faceting
     String[] fields = new String[]{"test_s_dv", "test_i_dv", "test_l_dv", "test_f_dv", "test_d_dv",
         "test_ss_dv", "test_is_dv", "test_fs_dv", "test_ls_dv", "test_ds_dv"};

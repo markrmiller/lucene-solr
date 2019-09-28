@@ -30,12 +30,14 @@ import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.MergeInfo;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 // commented out on: 24-Dec-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 12-Jun-2018
+@LuceneTestCase.Slow
 public class BlockDirectoryTest extends SolrTestCaseJ4 {
 
   private static class MapperCache implements Cache {

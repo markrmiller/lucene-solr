@@ -24,8 +24,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
@@ -42,7 +44,9 @@ import com.google.common.hash.HashFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Slow
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-9062")
 @LogLevel("org.eclipse.jetty.client.HttpConnection=DEBUG")
 public class TestDistributedStatsComponentCardinality extends BaseDistributedSearchTestCase {

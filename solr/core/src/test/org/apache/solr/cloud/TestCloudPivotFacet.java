@@ -16,6 +16,10 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.skewed;
+import static org.apache.solr.SolrTestCaseJ4.randomDate;
+import static org.apache.solr.SolrTestCaseJ4.randomSkewedDate;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
@@ -26,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.FieldStatsInfo;
@@ -76,7 +82,8 @@ import static org.apache.solr.common.params.FacetParams.FACET_SORT;
  *
  */
 @SuppressSSL // Too Slow
-public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
+@LuceneTestCase.Slowest
+public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -94,7 +101,7 @@ public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
 
   public TestCloudPivotFacet() {
     // we need DVs on point fields to compute stats & facets
-    if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
+    if (Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP)) System.setProperty(SolrTestCaseJ4.NUMERIC_DOCVALUES_SYSPROP,"true");
   }
   
   /** 
@@ -112,13 +119,13 @@ public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
 
   @Test
   //commented 2-Aug-2018 @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 28-June-2018
-  public void test() throws Exception {
+  public void testDistPivotFacet() throws Exception {
 
-    waitForThingsToLevelOut(30000); // TODO: why would we have to wait?
+
     // 
-    handle.clear();
-    handle.put("QTime", SKIPVAL);
-    handle.put("timestamp", SKIPVAL);
+//    handle.clear();
+//    handle.put("QTime", SKIPVAL);
+//    handle.put("timestamp", SKIPVAL);
     
     final Set<String> fieldNameSet = new HashSet<>();
     
@@ -626,13 +633,13 @@ public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
     for (String prefix : new String[] { "pivot_x_s", "pivot_y_s", "pivot_z_s"}) {
       if (useField()) {
         doc.addField(prefix+"1", skewed(TestUtil.randomSimpleString(random(), 1, 1),
-                                        randomXmlUsableUnicodeString()));
+            SolrTestCaseJ4.randomXmlUsableUnicodeString()));
       }
       if (useField()) {
         int numMulti = atLeast(1);
         while (0 < numMulti--) {
           doc.addField(prefix, skewed(TestUtil.randomSimpleString(random(), 1, 1),
-                                      randomXmlUsableUnicodeString()));
+              SolrTestCaseJ4.randomXmlUsableUnicodeString()));
         }
       }
     }

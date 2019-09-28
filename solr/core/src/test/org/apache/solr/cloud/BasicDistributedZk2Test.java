@@ -26,6 +26,7 @@ import java.util.Arrays;
 import com.google.common.collect.Lists;
 
 import org.apache.lucene.mockfile.FilterPath;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -50,6 +51,9 @@ import org.junit.Test;
  * work as expected.
  */
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@LuceneTestCase.Nightly
 public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
   private static final String SHARD2 = "shard2";
   private static final String SHARD1 = "shard1";

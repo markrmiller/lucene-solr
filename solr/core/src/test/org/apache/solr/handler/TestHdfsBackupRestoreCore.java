@@ -23,7 +23,10 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -64,6 +67,8 @@ import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
 @SolrTestCaseJ4.SuppressSSL     // Currently unknown why SSL does not work with this test
+@Nightly
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
   public static final String HDFS_REPO_SOLR_XML = "<solr>\n" +
       "\n" +

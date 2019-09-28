@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -48,7 +49,11 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.codahale.metrics.Timer;
+
+import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.MetricsConfig;
 import org.apache.solr.core.PluginInfo;
@@ -1067,6 +1072,8 @@ public class SolrMetricManager {
       return Collections.emptySet();
     }
     log.info("Closing metric reporters for registry=" + registry + ", tag=" + tag);
+    
+    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("metricsReporterCloseThreadPool"));
     try {
       Map<String, SolrMetricReporter> perRegistry = reporters.get(registry);
       if (perRegistry != null) {
@@ -1077,11 +1084,7 @@ public class SolrMetricManager {
             return;
           }
           SolrMetricReporter reporter = perRegistry.remove(name);
-          try {
-            reporter.close();
-          } catch (IOException ioe) {
-            log.warn("Exception closing reporter " + reporter, ioe);
-          }
+          customThreadPool.submit(() -> Collections.singleton(reporter).parallelStream().forEach(IOUtils::closeQuietly));
           removed.add(name);
         });
         if (removed.size() == names.size()) {
@@ -1093,6 +1096,7 @@ public class SolrMetricManager {
       }
     } finally {
       reportersLock.unlock();
+      ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
     }
   }
 

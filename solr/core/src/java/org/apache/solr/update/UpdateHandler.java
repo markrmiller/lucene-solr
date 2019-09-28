@@ -16,6 +16,7 @@
  */
 package org.apache.solr.update;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Set;
@@ -42,7 +43,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since solr 0.9
  */
-public abstract class UpdateHandler implements SolrInfoBean {
+public abstract class UpdateHandler implements SolrInfoBean, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected final SolrCore core;

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.OverseerTest;
 import org.apache.solr.cloud.Stats;
@@ -37,6 +38,7 @@ import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.TimeOut;
 
+@LuceneTestCase.Slow
 public class ZkStateReaderTest extends SolrTestCaseJ4 {
 
   private static final long TIMEOUT = 30;

@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
@@ -39,6 +40,8 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class TestCloudNestedDocsSort extends SolrCloudTestCase {
 
   private static ArrayList<String> vals = new ArrayList<>();

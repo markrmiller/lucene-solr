@@ -1962,6 +1962,8 @@ public class IndexFetcher {
 
   public void destroy() {
     abortFetch();
+    
+    ExecutorUtil.shutdownAndAwaitTermination(fsyncService);
     HttpClientUtil.close(myHttpClient);
   }
 

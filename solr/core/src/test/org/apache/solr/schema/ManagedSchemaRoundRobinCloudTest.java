@@ -21,19 +21,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest;
 import org.apache.solr.client.solrj.response.schema.SchemaResponse;
 import org.apache.solr.cloud.SolrCloudTestCase;
-import org.apache.solr.common.cloud.DocCollection;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class ManagedSchemaRoundRobinCloudTest extends SolrCloudTestCase {
   private static final String COLLECTION = "managed_coll";
   private static final String CONFIG = "cloud-managed";
@@ -48,13 +48,12 @@ public class ManagedSchemaRoundRobinCloudTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(COLLECTION, CONFIG, NUM_SHARDS, 1)
         .setMaxShardsPerNode(1)
         .process(cluster.getSolrClient());
-    cluster.getSolrClient().waitForState(COLLECTION, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-        (n, c) -> DocCollection.isFullyActive(n, c, NUM_SHARDS, 1));
+    cluster.waitForActiveCollection(COLLECTION, NUM_SHARDS, NUM_SHARDS);
   }
-
+  
   @AfterClass
-  public static void clearSysProps() throws Exception {
-    System.clearProperty("managed.schema.mutable");
+  public static void afterManagedSchemaRoundRobinCloudTest() throws Exception {
+
   }
 
   @Test

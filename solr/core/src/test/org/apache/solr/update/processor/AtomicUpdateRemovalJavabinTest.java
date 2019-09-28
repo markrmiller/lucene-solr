@@ -17,6 +17,9 @@
 
 package org.apache.solr.update.processor;
 
+
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Date;

@@ -18,6 +18,7 @@ package org.apache.solr.core;
 
 import com.google.common.collect.Lists;
 import org.apache.http.annotation.Experimental;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.logging.MDCLoggingContext;
@@ -65,12 +66,14 @@ class SolrCores {
   private TransientSolrCoreCacheFactory transientCoreCache;
 
   private TransientSolrCoreCache transientSolrCoreCache = null;
+  private volatile boolean closed = false;
   
   SolrCores(CoreContainer container) {
     this.container = container;
   }
   
   protected void addCoreDescriptor(CoreDescriptor p) {
+    if (closed) throw new AlreadyClosedException();
     synchronized (modifyLock) {
       if (p.isTransient()) {
         if (getTransientCacheHandler() != null) {
@@ -97,11 +100,13 @@ class SolrCores {
   }
 
   public void load(SolrResourceLoader loader) {
+    if (closed) throw new AlreadyClosedException();
     transientCoreCache = TransientSolrCoreCacheFactory.newInstance(loader, container);
   }
   // We are shutting down. You can't hold the lock on the various lists of cores while they shut down, so we need to
   // make a temporary copy of the names and shut them down outside the lock.
   protected void close() {
+    this.closed  = true;
     waitForLoadingCoresToFinish(30*1000);
     Collection<SolrCore> coreList = new ArrayList<>();
 
@@ -150,6 +155,7 @@ class SolrCores {
         }
       } finally {
         ExecutorUtil.shutdownAndAwaitTermination(coreCloseExecutor);
+
       }
 
     } while (coreList.size() > 0);
@@ -388,11 +394,10 @@ class SolrCores {
             }
           }
         }
-        if (container.isShutDown()) return null; // Just stop already.
 
         if (pending) {
           try {
-            modifyLock.wait();
+            modifyLock.wait(10000);
           } catch (InterruptedException e) {
             return null; // Seems best not to do anything at all if the thread is interrupted
           }
@@ -407,6 +412,28 @@ class SolrCores {
       }
     }
     return null;
+  }
+  
+  protected void waitAddPendingCoreOps() {
+
+    // Keep multiple threads from operating on a core at one time.
+    synchronized (modifyLock) {
+      boolean pending;
+      do { // Are we currently doing anything to this core? Loading, unloading, reloading?
+        pending = pendingCoreOps.size() > 0; // wait for the core to be done being operated upon
+
+
+        if (pending) {
+          try {
+            modifyLock.wait(10000);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      } while (pending);
+
+    }
+
   }
 
   // We should always be removing the first thing in the list with our name! The idea here is to NOT do anything n
@@ -475,6 +502,7 @@ class SolrCores {
 
   // cores marked as loading will block on getCore
   public void markCoreAsLoading(CoreDescriptor cd) {
+    if (closed) throw new AlreadyClosedException();
     synchronized (modifyLock) {
       currentlyLoadingCores.add(cd.getName());
     }
@@ -484,6 +512,7 @@ class SolrCores {
   public void markCoreAsNotLoading(CoreDescriptor cd) {
     synchronized (modifyLock) {
       currentlyLoadingCores.remove(cd.getName());
+      modifyLock.notifyAll();
     }
   }
 
@@ -494,7 +523,7 @@ class SolrCores {
     synchronized (modifyLock) {
       while (!currentlyLoadingCores.isEmpty()) {
         try {
-          modifyLock.wait(500);
+          modifyLock.wait(5000);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
@@ -513,7 +542,7 @@ class SolrCores {
     synchronized (modifyLock) {
       while (isCoreLoading(core)) {
         try {
-          modifyLock.wait(500);
+          modifyLock.wait(1000);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }

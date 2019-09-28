@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 
 import java.io.IOException;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -39,6 +40,7 @@ import org.junit.Test;
 
 import static org.apache.solr.common.params.CommonParams.HEALTH_CHECK_HANDLER_PATH;
 
+@LuceneTestCase.Slow
 public class HealthCheckHandlerTest extends SolrCloudTestCase {
   @BeforeClass
   public static void setupCluster() throws Exception {

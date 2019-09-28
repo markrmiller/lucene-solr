@@ -61,6 +61,7 @@ import org.apache.lucene.index.PointValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexOrDocValuesQuery;
 import org.apache.lucene.search.PointRangeQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
@@ -74,6 +75,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /** Tests for PointField functionality */
+@LuceneTestCase.Slow
 public class TestPointFields extends SolrTestCaseJ4 {
 
   // long overflow can occur in some date calculations if gaps are too large, so we limit to a million years BC & AD.

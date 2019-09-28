@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.CursorPagingTest;
 import org.apache.solr.SolrTestCaseJ4;
@@ -49,7 +50,7 @@ public class TestRandomCollapseQParserPlugin extends SolrTestCaseJ4 {
   public static void buildIndexAndClient() throws Exception {
     initCore("solrconfig-minimal.xml", "schema-sorts.xml");
     
-    final int totalDocs = atLeast(500);
+    final int totalDocs = atLeast(TEST_NIGHTLY ? 500 : 15);
     for (int i = 1; i <= totalDocs; i++) {
       SolrInputDocument doc = CursorPagingTest.buildRandomDocument(i);
       // every doc will be in the same group for this (string) field
@@ -127,7 +128,7 @@ public class TestRandomCollapseQParserPlugin extends SolrTestCaseJ4 {
   
   public void testRandomCollpaseWithSort() throws Exception {
     
-    final int numMainQueriesPerCollapseField = atLeast(5);
+    final int numMainQueriesPerCollapseField = atLeast(TEST_NIGHTLY ? 5 : 2);
     
     for (String collapseField : ALL_COLLAPSE_FIELD_NAMES) {
       for (int i = 0; i < numMainQueriesPerCollapseField; i++) {
@@ -140,7 +141,7 @@ public class TestRandomCollapseQParserPlugin extends SolrTestCaseJ4 {
         final SolrParams mainP = params("q", q, "fl", "id,"+collapseField);
 
         final String csize = random().nextBoolean() ?
-          "" : " size=" + TestUtil.nextInt(random(),1,10000);
+          "" : " size=" + TestUtil.nextInt(random(),1,(TEST_NIGHTLY ? 10000 : 100));
 
         final String nullPolicy = randomNullPolicy();
         final String nullPs = NULL_IGNORE.equals(nullPolicy)

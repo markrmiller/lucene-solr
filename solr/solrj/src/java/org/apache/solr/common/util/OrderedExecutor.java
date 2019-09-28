@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.solr.util;
+package org.apache.solr.common.util;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -75,6 +75,10 @@ public class OrderedExecutor implements Executor {
       sparseStripedLock.remove(lockId);
       throw e;
     }
+  }
+  
+  public void shutdown() {
+    delegate.shutdown();
   }
 
   public void shutdownAndAwaitTermination() {

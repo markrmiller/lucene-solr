@@ -29,6 +29,7 @@ import java.util.Properties;
 import com.carrotsearch.randomizedtesting.rules.SystemPropertiesRestoreRule;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.Constants;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -44,17 +45,25 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.response.SolrQueryResponse;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
+@LuceneTestCase.Slow
 public class CoreAdminHandlerTest extends SolrTestCaseJ4 {
   
   @BeforeClass
   public static void beforeClass() throws Exception {
     initCore("solrconfig.xml", "schema.xml");
+  }
+  
+  @After
+  public void tearDown() throws Exception {
+    super.tearDown();
+    resetFactory();
   }
 
   @Rule
@@ -352,6 +361,8 @@ public class CoreAdminHandlerTest extends SolrTestCaseJ4 {
   @Test
   public void testDeleteInstanceDirAfterCreateFailure() throws Exception  {
     assumeFalse("Ignore test on windows because it does not delete data directory immediately after unload", Constants.WINDOWS);
+    
+    useFactory(null);
     File solrHomeDirectory = createTempDir("solr-home").toFile();
     copySolrHomeToTemp(solrHomeDirectory, "corex");
     File corex = new File(solrHomeDirectory, "corex");

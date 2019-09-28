@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.LinkedHashMapWriter;
@@ -56,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import static java.util.Arrays.asList;
 import static org.apache.solr.common.util.Utils.getObjectByPath;
 
+@LuceneTestCase.Slow
 public class TestSolrConfigHandler extends RestTestBase {
   private static final int TIMEOUT_S = 10;
 
@@ -859,12 +861,15 @@ public class TestSolrConfigHandler extends RestTestBase {
 
 
   public static LinkedHashMapWriter getRespMap(String path, RestTestHarness restHarness) throws Exception {
+    path = path + "";
     String response = restHarness.query(path);
+    System.out.println("response:" + response);
     try {
       return (LinkedHashMapWriter) Utils.MAPWRITEROBJBUILDER.apply(Utils.getJSONParser(new StringReader(response))).getVal();
     } catch (JSONParser.ParseException e) {
-      log.error(response);
-      return new LinkedHashMapWriter();
+      log.error(response, e);
+      fail("failed parsing response");
+      return null;
     }
   }
 }

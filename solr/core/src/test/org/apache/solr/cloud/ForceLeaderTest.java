@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
+
+import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.LuceneTestCase.Slowest;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
@@ -44,6 +47,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Nightly // this test is currently too slow for non nightly
+@Slow
+@Slowest
 public class ForceLeaderTest extends HttpPartitionTest {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

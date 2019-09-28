@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -31,8 +32,15 @@ import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import com.carrotsearch.randomizedtesting.annotations.TimeoutSuite;
+
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
+@TimeoutSuite(millis = 90000)
+@Ignore
 public class CloudMLTQParserTest extends SolrCloudTestCase {
   
   @Before

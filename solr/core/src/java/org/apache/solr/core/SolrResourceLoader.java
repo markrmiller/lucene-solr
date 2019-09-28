@@ -114,6 +114,8 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
   // initialize themselves. This two-step process is required because not all resources are available
   // (such as the SolrZkClient) when XML docs are being parsed.    
   private RestManager.Registry managedResourceRegistry;
+
+  private boolean closed;
   
   public synchronized RestManager.Registry getManagedResourceRegistry() {
     if (managedResourceRegistry == null) {
@@ -165,13 +167,14 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
       parent = getClass().getClassLoader();
     }
     this.classLoader = URLClassLoader.newInstance(new URL[0], parent);
-
+    
     /* 
      * Skip the lib subdirectory when we are loading from the solr home.
      * Otherwise load it, so core lib directories still get loaded.
      * The default sharedLib will pick this up later, and if the user has
      * changed sharedLib, then we don't want to load that location anyway.
      */
+    boolean reloadSPI = true;
     if (!this.instanceDir.equals(SolrResourceLoader.locateSolrHome())) {
       Path libDir = this.instanceDir.resolve("lib");
       if (Files.exists(libDir)) {
@@ -179,8 +182,9 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
           addToClassLoader(getURLs(libDir));
         } catch (IOException e) {
           log.warn("Couldn't add files from {} to classpath: {}", libDir, e.getMessage());
+          reloadSPI = false;
         }
-        reloadLuceneSPI();
+        if (reloadSPI) reloadLuceneSPI();
       }
     }
     this.coreProperties = coreProperties;
@@ -234,14 +238,17 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
    * and before using this ResourceLoader.
    */
   void reloadLuceneSPI() {
-    // Codecs:
-    PostingsFormat.reloadPostingsFormats(this.classLoader);
-    DocValuesFormat.reloadDocValuesFormats(this.classLoader);
-    Codec.reloadCodecs(this.classLoader);
-    // Analysis:
-    CharFilterFactory.reloadCharFilters(this.classLoader);
-    TokenFilterFactory.reloadTokenFilters(this.classLoader);
-    TokenizerFactory.reloadTokenizers(this.classLoader);
+
+    synchronized (classLoader) {
+      // Codecs:
+      PostingsFormat.reloadPostingsFormats(this.classLoader);
+      DocValuesFormat.reloadDocValuesFormats(this.classLoader);
+      Codec.reloadCodecs(this.classLoader);
+      // Analysis:
+      CharFilterFactory.reloadCharFilters(this.classLoader);
+      TokenFilterFactory.reloadTokenFilters(this.classLoader);
+      TokenizerFactory.reloadTokenizers(this.classLoader);
+    }
   }
 
   private static URLClassLoader addURLsToClassLoader(final URLClassLoader oldLoader, List<URL> urls) {
@@ -395,13 +402,11 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
 
     // Delegate to the class loader (looking into $INSTANCE_DIR/lib jars).
     // We need a ClassLoader-compatible (forward-slashes) path here!
-    InputStream is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'));
-
-    // This is a hack just for tests (it is not done in ZKResourceLoader)!
-    // TODO can we nuke this?
-    if (is == null && System.getProperty("jetty.testMode") != null) {
-      is = classLoader.getResourceAsStream(("conf/" + resource).replace(File.separatorChar, '/'));
+    InputStream is;
+    synchronized (classLoader) {
+      is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'));
     }
+
 
     if (is == null) {
       throw new SolrResourceNotFoundException("Can't find resource '" + resource + "' in classpath or '" + instanceDir + "'");
@@ -421,11 +426,14 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
     if (Files.exists(inInstanceDir) && Files.isReadable(inInstanceDir))
       return inInstanceDir.toAbsolutePath().normalize().toString();
 
-    try (InputStream is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'))) {
-      if (is != null)
-        return "classpath:" + resource;
-    } catch (IOException e) {
-      // ignore
+
+    synchronized (classLoader) {
+      try (InputStream is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'))) {
+        if (is != null)
+          return "classpath:" + resource;
+      } catch (IOException e) {
+        // ignore
+      }
     }
 
     return resource;
@@ -923,6 +931,7 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
 
   @Override
   public void close() throws IOException {
+    this.closed = true;
     IOUtils.close(classLoader);
   }
   public List<SolrInfoBean> getInfoMBeans(){
@@ -958,6 +967,10 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
         log.error(msg, e);
       }
     }
+  }
+
+  public boolean isClosed() {
+    return closed;
   }
 
 }

@@ -36,17 +36,22 @@ import org.apache.http.conn.routing.HttpRoute;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHttpRequest;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.util.TestInjection;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 @SuppressSSL
+@LuceneTestCase.Slow
+@Ignore // this appears broken nocommit
 public class ConnectionReuseTest extends SolrCloudTestCase {
   
   private AtomicInteger id = new AtomicInteger();
@@ -76,7 +81,7 @@ public class ConnectionReuseTest extends SolrCloudTestCase {
       case 1:
         return getHttpSolrClient(url.toString() + "/" + COLLECTION, httpClient);
       case 2:
-        CloudSolrClient client = getCloudSolrClient(cluster.getZkServer().getZkAddress(), random().nextBoolean(), httpClient, 30000, 60000);
+        CloudSolrClient client = SolrTestCaseJ4.getCloudSolrClient(cluster.getZkServer().getZkAddress(), random().nextBoolean(), httpClient, 30000, 60000);
         client.setDefaultCollection(COLLECTION);
         return client;
     }

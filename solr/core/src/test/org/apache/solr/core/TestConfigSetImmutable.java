@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.common.util.NamedList;
@@ -36,6 +37,7 @@ import org.junit.Test;
  * the known APIs, i.e. SolrConfigHandler and SchemaHandler.
  */
 // See: https://issues.apache.org/jira/browse/SOLR-12028 Tests cannot remove files on Windows machines occasionally
+@LuceneTestCase.Slow
 public class TestConfigSetImmutable extends RestTestBase {
 
   private static final String collection = "collection1";

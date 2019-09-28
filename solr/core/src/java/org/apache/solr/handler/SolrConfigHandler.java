@@ -48,6 +48,7 @@ import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
@@ -342,7 +343,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             if (verifyResponse(resp, attempts)) break;
             attempts++;
           } catch (Exception e) {
-            if (e instanceof InterruptedException) {
+            if (e instanceof InterruptedException || e instanceof AlreadyClosedException) {
               break; // stop looping
             } else {
               log.warn("Failed to get /schema/zkversion from " + coreUrl + " due to: " + e);
@@ -479,6 +480,9 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
                   return;
                 }
                 try {
+                  if (req.getCore().isClosed()) {
+                    throw new AlreadyClosedException();
+                  }
                   log.info("Trying to update my configs");
                   SolrCore.getConfListener(req.getCore(), (ZkSolrResourceLoader) req.getCore().getResourceLoader()).run();
                 } catch (Exception e) {

@@ -73,10 +73,10 @@
   <!--
     Default numeric field types. For faster range queries, consider the tint/tfloat/tlong/tdouble types.
   -->
-  <fieldType name="int" class="${solr.tests.IntegerFieldType}" docValues="${solr.tests.numeric.dv}" precisionStep="0" positionIncrementGap="0"/>
-  <fieldType name="float" class="${solr.tests.FloatFieldType}" docValues="${solr.tests.numeric.dv}" precisionStep="0" positionIncrementGap="0"/>
-  <fieldType name="long" class="${solr.tests.LongFieldType}" docValues="${solr.tests.numeric.dv}" precisionStep="0" positionIncrementGap="0"/>
-  <fieldType name="double" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" precisionStep="0" positionIncrementGap="0"/>
+  <fieldType name="int" class="${solr.tests.IntegerFieldType}" docValues="${solr.tests.numeric.dv}" positionIncrementGap="0"/>
+  <fieldType name="float" class="${solr.tests.FloatFieldType}" docValues="${solr.tests.numeric.dv}" positionIncrementGap="0"/>
+  <fieldType name="long" class="${solr.tests.LongFieldType}" docValues="${solr.tests.numeric.dv}" positionIncrementGap="0"/>
+  <fieldType name="double" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" positionIncrementGap="0"/>
   
   <!-- Point Fields -->
   <fieldType name="pint" class="solr.IntPointField" docValues="true"/>
@@ -254,15 +254,15 @@
     <fieldType name="tfloat" class="${solr.tests.FloatFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0"/>
     <fieldType name="tlong" class="${solr.tests.LongFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0"/>
     <fieldType name="tdouble" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0"/>
-    <fieldType name="tdouble4" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" precisionStep="4" omitNorms="true" positionIncrementGap="0"/>
+    <fieldType name="tdouble4" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0"/>
     <fieldType name="tdate" class="${solr.tests.DateFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0"/>
 
     
-    <fieldType name="tints" class="${solr.tests.IntegerFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" precisionStep="0" multiValued="true" />
-    <fieldType name="tfloats" class="${solr.tests.FloatFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" precisionStep="0" multiValued="true"/>
-    <fieldType name="tlongs" class="${solr.tests.LongFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" precisionStep="0" multiValued="true"/>
-    <fieldType name="tdoubles" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" precisionStep="0" multiValued="true" />
-    <fieldType name="tdates" class="${solr.tests.DateFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" precisionStep="0" multiValued="true" />
+    <fieldType name="tints" class="${solr.tests.IntegerFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" multiValued="true" />
+    <fieldType name="tfloats" class="${solr.tests.FloatFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" multiValued="true"/>
+    <fieldType name="tlongs" class="${solr.tests.LongFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" multiValued="true"/>
+    <fieldType name="tdoubles" class="${solr.tests.DoubleFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" multiValued="true" />
+    <fieldType name="tdates" class="${solr.tests.DateFieldType}" docValues="${solr.tests.numeric.dv}" omitNorms="true" positionIncrementGap="0" multiValued="true" />
  
 
     <!-- Poly field -->
@@ -277,7 +277,7 @@ valued. -->
     <fieldType name="location" class="solr.LatLonType" subFieldSuffix="_coordinate"/>
 
   <!-- eff_tint class can't be randomized, because ExternalFileField disallows point-based keyField.  See SOLR-10846. -->
-  <fieldType name="eff_tint" class="solr.TrieDoubleField" docValues="${solr.tests.numeric.dv}" precisionStep="8"/>
+  <fieldType name="eff_tint" class="solr.TrieDoubleField" docValues="${solr.tests.numeric.dv}"/>
   <field name="eff_tint" type="eff_tint" indexed="true" stored="true"/>
   <fieldType name="eff_tfloat" keyField="eff_tint" defVal="0"
                stored="false" indexed="true"

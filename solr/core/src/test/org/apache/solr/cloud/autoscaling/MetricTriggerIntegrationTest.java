@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
@@ -38,6 +39,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
@@ -54,6 +56,7 @@ import static org.apache.solr.cloud.autoscaling.TriggerIntegrationTest.WAIT_FOR_
  * Integration test for {@link MetricTrigger}
  */
 @LogLevel("org.apache.solr.cloud.autoscaling=DEBUG;org.apache.solr.client.solrj.cloud.autoscaling=DEBUG")
+@LuceneTestCase.Slowest
 public class MetricTriggerIntegrationTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -149,8 +152,14 @@ public class MetricTriggerIntegrationTest extends SolrCloudTestCase {
     boolean await = triggerFiredLatch.await(20, TimeUnit.SECONDS);
     assertTrue("The trigger did not fire at all", await);
     // wait for listener to capture the SUCCEEDED stage
-    Thread.sleep(2000);
-    assertEquals(listenerEvents.toString(), 4, listenerEvents.get("srt").size());
+    
+    
+    TimeOut timeout = new TimeOut(10, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+    
+    timeout.waitFor("Timeout waiting for 4 listener events", () ->  4 >= listenerEvents.get("srt").size());
+    
+    assertNotNull(listenerEvents.get("srt"));
+
     CapturedEvent ev = listenerEvents.get("srt").get(0);
     long now = timeSource.getTimeNs();
     // verify waitFor
@@ -192,8 +201,11 @@ public class MetricTriggerIntegrationTest extends SolrCloudTestCase {
     await = triggerFiredLatch.await(20, TimeUnit.SECONDS);
     assertTrue("The trigger did not fire at all", await);
     // wait for listener to capture the SUCCEEDED stage
-    Thread.sleep(2000);
-    assertEquals(listenerEvents.toString(), 4, listenerEvents.get("srt").size());
+
+    timeout = new TimeOut(15, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+    
+    timeout.waitFor("Timeout waiting for 4 listener events", () ->  listenerEvents.get("srt") != null && 4 >= listenerEvents.get("srt").size());
+
     ev = listenerEvents.get("srt").get(0);
     now = timeSource.getTimeNs();
     // verify waitFor

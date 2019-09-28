@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -34,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
+@LuceneTestCase.Slow
 public class TestDistribDocBasedVersion extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

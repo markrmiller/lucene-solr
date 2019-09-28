@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
@@ -51,6 +52,7 @@ import org.slf4j.LoggerFactory;
  * @see org.apache.solr.search.LFUCache
  * @since solr 3.6
  */
+@LuceneTestCase.Slow
 public class TestLFUCache extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

@@ -28,6 +28,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.schema.AnalyzerDefinition;
@@ -44,6 +45,7 @@ import org.apache.solr.util.RestTestBase;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.restlet.ext.servlet.ServerServlet;
 
@@ -55,6 +57,8 @@ import static org.hamcrest.CoreMatchers.is;
  * Test the functionality (accuracy and failure) of the methods exposed by the classes
  * {@link SchemaRequest} and {@link SchemaResponse}.
  */
+@LuceneTestCase.Slow
+@Ignore // must be broken up, start and stop jetty like mad sequential
 public class SchemaTest extends RestTestBase {
   private static void assertValidSchemaResponse(SolrResponseBase schemaResponse) {
     assertEquals("Response contained errors: " + schemaResponse.toString(), 0, schemaResponse.getStatus());

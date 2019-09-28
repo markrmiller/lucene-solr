@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
@@ -40,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class MemClassLoader extends ClassLoader implements AutoCloseable, ResourceLoader {
+public class MemClassLoader extends ClassLoader implements AutoCloseable, ResourceLoader, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private boolean allJarsLoaded = false;
   private final SolrResourceLoader parentLoader;
@@ -161,7 +162,7 @@ public class MemClassLoader extends ClassLoader implements AutoCloseable, Resour
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     for (RuntimeLib lib : libs) {
       try {
         lib.close();

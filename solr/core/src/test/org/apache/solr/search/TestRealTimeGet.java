@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -38,6 +39,7 @@ import org.junit.Test;
 import static org.apache.solr.core.SolrCore.verbose;
 import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
+@LuceneTestCase.Slow
 public class TestRealTimeGet extends TestRTGBase {
 
   @BeforeClass

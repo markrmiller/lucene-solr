@@ -38,6 +38,10 @@
   <schemaFactory class="ClassicIndexSchemaFactory"/>
 
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
+  
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
 
   <updateHandler class="solr.DirectUpdateHandler2">
     <commitWithin>

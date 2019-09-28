@@ -149,7 +149,7 @@ public class TestRandomDVFaceting extends SolrTestCaseJ4 {
   @Test
   public void testRandomFaceting() throws Exception {
     Random rand = random();
-    int iter = atLeast(100);
+    int iter = atLeast(TEST_NIGHTLY ? 100 : 10);
     init();
     addMoreDocs(0);
     

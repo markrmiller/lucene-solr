@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 
 import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 
 @Slow
 @Nightly
@@ -37,6 +38,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 3000) // give a little buffer
 // commented out on: 24-Dec-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 12-Jun-2018
 public class HdfsSyncSliceTest extends SyncSliceTest {
   private static MiniDFSCluster dfsCluster;

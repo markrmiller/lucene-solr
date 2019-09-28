@@ -32,6 +32,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkMaintenanceUtils;
 import org.apache.solr.util.SolrCLI;
@@ -41,6 +42,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SolrCLIZkUtilsTest extends SolrCloudTestCase {
 
   @BeforeClass

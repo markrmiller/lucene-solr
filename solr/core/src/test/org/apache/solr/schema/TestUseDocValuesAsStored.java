@@ -103,6 +103,7 @@ public class TestUseDocValuesAsStored extends AbstractBadConfigTestBase {
     // <schemaFactory class="ManagedIndexSchemaFactory" ... />
     System.setProperty("enable.update.log", "false");
     System.setProperty("managed.schema.mutable", "true");
+    
     initCore("solrconfig-managed-schema.xml", "schema-non-stored-docvalues.xml", tmpSolrHome.getPath());
 
     assertQ("sanity check", req("q", "*:*"), "//*[@numFound='0']");
@@ -162,6 +163,7 @@ public class TestUseDocValuesAsStored extends AbstractBadConfigTestBase {
   }
   
   @Test
+  @Nightly // something can happen here that is very slow ...
   public void testDuplicateMultiValued() throws Exception {
     doTest("strTF", dvStringFieldName(3,true,false), "str", "X", "X", "Y");
     doTest("strTT", dvStringFieldName(3,true,true), "str", "X", "X", "Y");
@@ -175,6 +177,7 @@ public class TestUseDocValuesAsStored extends AbstractBadConfigTestBase {
   }
 
   @Test
+  @Nightly
   public void testRandomSingleAndMultiValued() throws Exception {
     for (int c = 0 ; c < 10 * RANDOM_MULTIPLIER ; ++c) {
       clearIndex();

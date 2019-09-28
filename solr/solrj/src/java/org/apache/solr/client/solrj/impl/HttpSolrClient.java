@@ -310,7 +310,8 @@ public class HttpSolrClient extends BaseHttpSolrClient {
       mrr.future = pool.submit(() -> executeMethod(method, request.getUserPrincipal(), processor, isV2ApiRequest(request)));
  
     } finally {
-      pool.shutdown();
+      ExecutorUtil.shutdownAndAwaitTermination(pool);
+      
       MDC.remove("HttpSolrClient.url");
     }
     assert method != null;

@@ -65,6 +65,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.carrotsearch.randomizedtesting.annotations.Nightly;
+
 /**
  * Simulates HTTP partitions between a leader and replica but the replica does
  * not lose its ZooKeeper connection.
@@ -73,6 +75,7 @@ import org.slf4j.LoggerFactory;
 @Slow
 @SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
 // commented out on: 24-Dec-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2018-06-18
+@Nightly // too slow for non Nightly
 public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -157,7 +160,7 @@ public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
     try {
       // Inject pausing in recovery op, hence the replica won't be able to finish recovery
 
-      TestInjection.prepRecoveryOpPauseForever = "true:100";
+      if (TEST_NIGHTLY) TestInjection.prepRecoveryOpPauseForever = "true:100";
       
       createCollection(testCollectionName, "conf1", 1, 2, 1);
       cloudClient.setDefaultCollection(testCollectionName);

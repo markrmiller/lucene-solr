@@ -16,6 +16,9 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.params;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
@@ -25,6 +28,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -51,6 +55,7 @@ import static org.hamcrest.CoreMatchers.not;
 /**
  * Tests using fromIndex that points to a collection in SolrCloud mode.
  */
+@LuceneTestCase.Slow
 public class DistribJoinFromCollectionTest extends SolrCloudTestCase{
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

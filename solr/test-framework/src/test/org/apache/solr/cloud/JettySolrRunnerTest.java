@@ -22,6 +22,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -29,6 +30,7 @@ import org.junit.Test;
 
 import static org.hamcrest.core.IsNot.not;
 
+@LuceneTestCase.Slow
 public class JettySolrRunnerTest extends SolrTestCaseJ4 {
 
   @Test

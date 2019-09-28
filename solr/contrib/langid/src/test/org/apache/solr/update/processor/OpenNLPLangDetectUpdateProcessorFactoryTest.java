@@ -17,11 +17,13 @@
 
 package org.apache.solr.update.processor;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.request.SolrQueryRequest;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class OpenNLPLangDetectUpdateProcessorFactoryTest extends LanguageIdentifierUpdateProcessorFactoryTestCase {
   private static final String TEST_MODEL = "opennlp-langdetect.eng-swe-spa-rus-deu.bin";
   

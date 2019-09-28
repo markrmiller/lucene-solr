@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
@@ -49,6 +50,7 @@ import org.apache.solr.util.ReadOnlyCoresLocator;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slowest
 public class TestLazyCores extends SolrTestCaseJ4 {
 
   private File solrHomeDirectory;
@@ -58,6 +60,7 @@ public class TestLazyCores extends SolrTestCaseJ4 {
     // Need to use a disk-based directory because there are tests that close a core after adding documents
     // then expect to be able to re-open that core and execute a search
     useFactory("solr.StandardDirectoryFactory");
+    System.setProperty("solr.commitOnClose", "true"); // can make things quite slow
   }
 
   private static CoreDescriptor makeCoreDescriptor(CoreContainer cc, String coreName, String isTransient, String loadOnStartup) {

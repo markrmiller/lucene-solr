@@ -59,8 +59,8 @@ public class UpdateStream extends TupleStream implements Expressible {
   private int batchNumber;
   private long totalDocsIndex;
   private PushBackStream tupleSource;
-  private transient SolrClientCache cache;
-  private transient CloudSolrClient cloudSolrClient;
+  private volatile transient SolrClientCache cache;
+  private volatile transient CloudSolrClient cloudSolrClient;
   private List<SolrInputDocument> documentBatch = new ArrayList();
   private String coreName;
 
@@ -131,8 +131,12 @@ public class UpdateStream extends TupleStream implements Expressible {
   
   @Override
   public void close() throws IOException {
-    if(cache == null && cloudSolrClient != null) {
-      cloudSolrClient.close();
+    if (cache == null) {
+      try {
+        cloudSolrClient.close();
+      } catch (NullPointerException e) {
+        // okay
+      }
     }
     tupleSource.close();
   }

@@ -22,6 +22,7 @@ import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.SolrCore;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -35,11 +36,17 @@ public class ResolveAnalyzerByNameTest extends SolrTestCaseJ4 {
 
   @BeforeClass
   public static void beforeTests() throws Exception {
-    initCore("solrconfig-basic.xml", "schema-analyzer-by-name.xml");
+
+  }
+  
+  @After
+  public void afterTest() {
+    deleteCore();
   }
 
   @Test
-  public void testSchemaLoadingSimpleAnalyzer() {
+  public void testSchemaLoadingSimpleAnalyzer() throws Exception {
+    initCore("solrconfig-basic.xml", "schema-analyzer-by-name.xml");
     SolrCore core = h.getCore();
     IndexSchema schema = core.getLatestSchema();
     assertTrue( schema.getFieldTypes().containsKey("text_ws") );
@@ -53,7 +60,8 @@ public class ResolveAnalyzerByNameTest extends SolrTestCaseJ4 {
   }
 
   @Test
-  public void testSchemaLoadingComplexAnalyzer() {
+  public void testSchemaLoadingComplexAnalyzer() throws Exception {
+    initCore("solrconfig-basic.xml", "schema-analyzer-by-name.xml");
     SolrCore core = h.getCore();
     IndexSchema schema = core.getLatestSchema();
     assertTrue( schema.getFieldTypes().containsKey("text") );
@@ -75,7 +83,8 @@ public class ResolveAnalyzerByNameTest extends SolrTestCaseJ4 {
   }
 
   @Test
-  public void testSchemaLoadingAnalyzerWithCharFilters() {
+  public void testSchemaLoadingAnalyzerWithCharFilters() throws Exception {
+    initCore("solrconfig-basic.xml", "schema-analyzer-by-name.xml");
     SolrCore core = h.getCore();
     IndexSchema schema = core.getLatestSchema();
     assertTrue( schema.getFieldTypes().containsKey("charfilthtmlmap") );

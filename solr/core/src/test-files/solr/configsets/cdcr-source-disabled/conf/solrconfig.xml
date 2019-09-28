@@ -36,6 +36,10 @@
                     class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
   <schemaFactory class="ClassicIndexSchemaFactory"/>
 
+  <indexConfig>
+    <lockType>${solr.tests.lockType:single}</lockType>
+  </indexConfig>
+  
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
 
   <updateHandler class="solr.DirectUpdateHandler2">

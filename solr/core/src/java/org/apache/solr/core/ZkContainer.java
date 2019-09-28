@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -38,20 +39,20 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.SmartClose;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.util.DefaultSolrThreadFactory;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ZkContainer {
+public class ZkContainer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   protected ZkController zkController;
   private SolrZkServer zkServer;
 
-  private ExecutorService coreZkRegister = ExecutorUtil.newMDCAwareCachedThreadPool(
-      new DefaultSolrThreadFactory("coreZkRegister") );
+  private final ExecutorService coreZkRegister = ExecutorUtil.newMDCAwareCachedThreadPool(15000, new DefaultSolrThreadFactory("coreZkRegister") );
   
   // see ZkController.zkRunOnly
   private boolean zkRunOnly = Boolean.getBoolean("zkRunOnly"); // expert
@@ -231,23 +232,13 @@ public class ZkContainer {
   public ZkController getZkController() {
     return zkController;
   }
-
+  
+  @Override
   public void close() {
-    
-    try {
-      if (zkController != null) {
-        zkController.close();
-      }
-    } finally {
-      try {
-        if (zkServer != null) {
-          zkServer.stop();
-        }
-      } finally {
-        ExecutorUtil.shutdownAndAwaitTermination(coreZkRegister);
-      }
+    try (SmartClose closer = new SmartClose(this)) {
+      coreZkRegister.shutdown();
+      closer.add("ZkContainer", coreZkRegister, zkController, zkServer);
     }
-    
   }
 
   public ExecutorService getCoreZkRegisterExecutorService() {

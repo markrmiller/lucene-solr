@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.Locale;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.schema.IndexSchema;
@@ -36,6 +37,7 @@ import org.junit.Before;
  * Tests for the field mutating update processors
  * that parse Dates, Longs, Doubles, and Booleans.
  */
+@LuceneTestCase.Slow
 public class AddSchemaFieldsUpdateProcessorFactoryTest extends UpdateProcessorTestBase {
   private static final String SOLRCONFIG_XML = "solrconfig-add-schema-fields-update-processor-chains.xml";
   private static final String SCHEMA_XML     = "schema-add-schema-fields-update-processor.xml";

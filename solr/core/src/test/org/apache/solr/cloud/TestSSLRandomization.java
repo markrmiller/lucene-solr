@@ -16,9 +16,13 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import static org.apache.solr.SolrTestCaseJ4.buildUrl;
+
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.util.SSLTestConfig;
 import org.apache.solr.util.RandomizeSSL;
@@ -37,6 +41,8 @@ import org.slf4j.LoggerFactory;
  * @see TestMiniSolrCloudClusterSSL
  */
 @RandomizeSSL(ssl=0.5,reason="frequent SSL usage to make test worth while")
+@LuceneTestCase.Slow
+@LuceneTestCase.Nightly // ive disabled ssl non nightly
 public class TestSSLRandomization extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

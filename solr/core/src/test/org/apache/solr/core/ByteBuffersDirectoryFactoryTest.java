@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockFactory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -27,6 +28,7 @@ import org.apache.solr.core.DirectoryFactory.DirContext;
 /**
  * Test-case for ByteBuffersDirectoryFactory
  */
+@LuceneTestCase.Slow
 public class ByteBuffersDirectoryFactoryTest extends SolrTestCaseJ4 {
 
   public void testOpenReturnsTheSameForSamePath() throws IOException {

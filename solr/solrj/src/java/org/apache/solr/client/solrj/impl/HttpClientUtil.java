@@ -82,7 +82,7 @@ public class HttpClientUtil {
   public static final int DEFAULT_MAXCONNECTIONS = 100000;
   
   private static final int VALIDATE_AFTER_INACTIVITY_DEFAULT = 3000;
-  private static final int EVICT_IDLE_CONNECTIONS_DEFAULT = 50000;
+  public static final int EVICT_IDLE_CONNECTIONS_DEFAULT = 50000;
   private static final String VALIDATE_AFTER_INACTIVITY = "validateAfterInactivity";
   private static final String EVICT_IDLE_CONNECTIONS = "evictIdleConnections";
 
@@ -137,7 +137,7 @@ public class HttpClientUtil {
 
   private static volatile SolrHttpClientBuilder httpClientBuilder;
 
-  private static SolrHttpClientContextBuilder httpClientRequestContextBuilder = new SolrHttpClientContextBuilder();
+  private static volatile SolrHttpClientContextBuilder httpClientRequestContextBuilder = new SolrHttpClientContextBuilder();
 
   private static volatile SchemaRegistryProvider schemaRegistryProvider;
   private static volatile String cookiePolicy;

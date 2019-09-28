@@ -17,9 +17,7 @@
 package org.apache.solr.handler.sql;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
@@ -42,18 +40,17 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import com.google.common.collect.ImmutableMap;
 
 class SolrSchema extends AbstractSchema {
-  final Properties properties;
+  CloudSolrClient cloudSolrClient;
+  Properties properties;
 
-  SolrSchema(Properties properties) {
+  SolrSchema(Properties info, CloudSolrClient cloudSolrClient) {
     super();
-    this.properties = properties;
+    this.cloudSolrClient = cloudSolrClient;
+    this.properties = info;
   }
 
   @Override
   protected Map<String, Table> getTableMap() {
-    String zk = this.properties.getProperty("zk");
-    try(CloudSolrClient cloudSolrClient = new CloudSolrClient.Builder(Collections.singletonList(zk), Optional.empty()).withSocketTimeout(30000).withConnectionTimeout(15000).build()) {
-      cloudSolrClient.connect();
       ZkStateReader zkStateReader = cloudSolrClient.getZkStateReader();
       ClusterState clusterState = zkStateReader.getClusterState();
 
@@ -73,15 +70,12 @@ class SolrSchema extends AbstractSchema {
       }
 
       return builder.build();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+ 
   }
 
   private Map<String, LukeResponse.FieldInfo> getFieldInfo(String collection) {
-    String zk = this.properties.getProperty("zk");
-    try(CloudSolrClient cloudSolrClient = new CloudSolrClient.Builder(Collections.singletonList(zk), Optional.empty()).withSocketTimeout(30000).withConnectionTimeout(15000).build()) {
-      cloudSolrClient.connect();
+
+    try {
       LukeRequest lukeRequest = new LukeRequest();
       lukeRequest.setNumTerms(0);
       LukeResponse lukeResponse = lukeRequest.process(cloudSolrClient, collection);

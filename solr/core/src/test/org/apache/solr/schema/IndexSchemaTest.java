@@ -104,7 +104,7 @@ public class IndexSchemaTest extends SolrTestCaseJ4 {
     final boolean usingPoints = Boolean.getBoolean(NUMERIC_POINTS_SYSPROP);
     // Test TrieDate fields. The following asserts are expecting a field type defined as:
     String expectedDefinition = "<fieldtype name=\"tdatedv\" class=\""+dateClass+"\" " +
-        "precisionStep=\"6\" docValues=\"true\" multiValued=\"true\"/>";
+        "precisionStep=\"8\" docValues=\"true\" multiValued=\"true\"/>";
     FieldType tdatedv = schema.getFieldType("foo_tdtdvs");
     assertTrue("Expecting a field type defined as " + expectedDefinition, 
                (usingPoints ? DatePointField.class : TrieDateField.class).isInstance(tdatedv));
@@ -114,7 +114,7 @@ public class IndexSchemaTest extends SolrTestCaseJ4 {
                tdatedv.isMultiValued());
     if ( ! usingPoints ) {
       assertEquals("Expecting a field type defined as " + expectedDefinition,
-                   6, ((TrieDateField)tdatedv).getPrecisionStep());
+                   8, ((TrieDateField)tdatedv).getPrecisionStep());
     }
   }
 

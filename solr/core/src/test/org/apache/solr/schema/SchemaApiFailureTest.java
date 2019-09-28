@@ -17,19 +17,18 @@
 
 package org.apache.solr.schema;
 
-import java.util.concurrent.TimeUnit;
-
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest;
 import org.apache.solr.client.solrj.response.schema.SchemaResponse;
 import org.apache.solr.cloud.SolrCloudTestCase;
-import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.util.Utils;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SchemaApiFailureTest extends SolrCloudTestCase {
 
   private static final String COLLECTION = "schema-api-failure";
@@ -40,8 +39,7 @@ public class SchemaApiFailureTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(COLLECTION, 2, 1) // _default configset
         .setMaxShardsPerNode(2)
         .process(cluster.getSolrClient());
-    cluster.getSolrClient().waitForState(COLLECTION, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-        (n, c) -> DocCollection.isFullyActive(n, c, 2, 1));
+    cluster.waitForActiveCollection(COLLECTION, 2, 2);
   }
 
   @Test

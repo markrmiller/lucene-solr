@@ -20,7 +20,7 @@
  import groovy.time.TimeCategory
  import org.apache.lucene.gradle.TestResultObj
 
-test {
+project.ext.testConf = {
   group = 'Tests'
   description = "Runs project tests."
   
@@ -31,8 +31,9 @@ test {
   useJUnit()
   
   filter {
-    includeTestsMatching "*.Test*"
-    includeTestsMatching "*.*Test"
+    includeTestsMatching "Test*"
+    includeTestsMatching "*Test"
+    excludeTestsMatching "*\$*"
     // so we can run with --tests wildcards from higher lvl dirs
     setFailOnNoMatchingTests(false)
   }
@@ -46,8 +47,8 @@ test {
   }
 
   afterSuite { desc, result ->
-    if (desc.parent) return // Only summarize results for whole modules
-      if (result.testCount == 0 && result.successfulTestCount == 0 && result.failedTestCount == 0 && result.skippedTestCount == 0) {
+    if (desc != null && desc.parent != null && desc.parent) return // Only summarize results for whole modules
+      if (result != null && result.testCount == 0 && result.successfulTestCount == 0 && result.failedTestCount == 0 && result.skippedTestCount == 0) {
         return
       }
     
@@ -58,14 +59,14 @@ test {
           "${result.failedTestCount} failures, " +
           "${result.skippedTestCount} skipped" +
           ") " +
-          "in ${TimeCategory.minus(new Date(result.endTime), new Date(result.startTime))}" +
-          "\n" +
-          "Report file: ${project.tasks.test.reports.html.entryPoint}"
+          "in ${TimeCategory.minus(new Date(result.endTime), new Date(result.startTime))}"
+          // +
+          //"\n" + "Report file://${testTask.reports.html.entryPoint.getAbsolutePath() + ' ' }"
 
-    TestResultObj testResult = new TestResultObj("${project.name}:${project.tasks.test.name}", summary, result.resultType == TestResult.ResultType.SUCCESS)
+    TestResultObj testResult = new TestResultObj("${project.name}:${testTask.name}", summary, result.resultType == TestResult.ResultType.SUCCESS)
 
     // Add reports in `testsResults`, keep failed suites at the end
-    if (result.resultType == TestResult.ResultType.SUCCESS) {
+    if (result != null && result.resultType == TestResult.ResultType.SUCCESS) {
       rootProject.testsResults.add(0, testResult)
     } else {
       rootProject.testsResults += testResult
@@ -73,7 +74,7 @@ test {
   }
   
   minHeapSize = "128m"
-  maxHeapSize = "512m"
+  maxHeapSize = "768m"
   // Enable assertions
   jvmArgs += "-ea"
   // Enable assertions in system classes
@@ -94,32 +95,29 @@ test {
     commonDir = rootProject.project(":solr").projectDir
   }
   
-  workingDir = project.mfile(project.projectDir, 'build/tests')
-  
-  def tmpDir = project.mfile(workingDir, 'temp')
+  def tmpDir  = project.mfile(project.buildDir, 'tests/temp')
   
   doFirst {
-    def success = workingDir.mkdirs()
     tmpDir.mkdirs()
   }
   
   systemProperty 'common.dir', "${commonDir}"
-  systemProperty 'build.dir', project.buildDir
+  systemProperty 'build.dir', project.buildDir.getAbsolutePath()
   systemProperty 'tests.multiplier', '1'
-  systemProperty 'tests.codec', 'random'
-  systemProperty 'tests.postingsformat', 'random'
-  systemProperty 'tests.docvaluesformat', 'random'
-  systemProperty 'tests.locale', 'random'
-  systemProperty 'tests.timezone', 'random'
-  systemProperty 'tests.directory', 'random'
-  systemProperty 'tests.linedocsfile', 'europarl.lines.txt.gz'
+ // systemProperty 'tests.codec', 'random'
+  //systemProperty 'tests.postingsformat', 'random'
+  //systemProperty 'tests.docvaluesformat', 'random'
+ // systemProperty 'tests.locale', 'random'
+  //systemProperty 'tests.timezone', 'random'
+ // systemProperty 'tests.directory', 'random'
+  //systemProperty 'tests.linedocsfile', 'europarl.lines.txt.gz'
   systemProperty 'tests.nightly', 'false'
   systemProperty 'tests.weekly', 'false'
   systemProperty 'tests.monster', 'false'
-  systemProperty 'tests.slow', 'true'
-  systemProperty 'tests.cleanthreads.sysprop', 'perMethod'
+  //systemProperty 'tests.slow', 'true'
+  //systemProperty 'tests.cleanthreads.sysprop', 'perMethod'
   systemProperty 'tests.verbose', 'false'
-  systemProperty 'tests.filterstacks', 'true'
+ // systemProperty 'tests.filterstacks', 'true'
   systemProperty 'tests.asserts', 'true'
   systemProperty 'tempDir', tmpDir
   systemProperty 'java.io.tmpdir', tmpDir
@@ -129,13 +127,18 @@ test {
   systemProperty 'jdk.map.althashing.threshold', '0'
   systemProperty 'tests.src.home', System.getenv('user.dir')
   systemProperty 'solr.directoryFactory', 'org.apache.solr.core.MockDirectoryFactory'
+  systemProperty '/', File.separator
+  
+  systemProperty "lucene.cms.override_core_count", "2"
+  systemProperty "lucene.cms.override_spins", "false"
   
   systemProperty 'tests.seed', project.ext.pickRandomSeed()
 
   // replaces default random source to the nonblocking variant 
   systemProperty 'java.security.egd', 'file:/dev/./urandom'
-  systemProperty 'java.security.manager', 'org.apache.lucene.util.TestSecurityManager'
-  systemProperty 'java.security.policy', "${mfile(rootProjectDir, project.ext.testsPolicy)}"
+ // systemProperty 'test.solr.allowed.securerandom', 'NativePRNG'
+  //systemProperty 'java.security.manager', 'org.apache.lucene.util.TestSecurityManager'
+  //systemProperty 'java.security.policy', "${mfile(rootProjectDir, project.ext.testsPolicy)}"
   
   if (project.ext.properties.containsKey('tests_jvms')) {
     def testsJvms = project.ext.properties.tests_jvms
@@ -148,6 +151,8 @@ test {
   if (testsFailFast)    {
     failFast = true
   }
+  
+  scanForTestClasses = false
 
 }
 

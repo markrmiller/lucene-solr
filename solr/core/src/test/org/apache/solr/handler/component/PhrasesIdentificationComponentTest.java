@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.handler.component.PhrasesIdentificationComponent.Phrase;
 import org.apache.solr.common.SolrException;
@@ -36,19 +37,27 @@ import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Before;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.BaseMatcher;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class PhrasesIdentificationComponentTest extends SolrTestCaseJ4 {
 
   private static final String HANDLER = "/phrases";
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforePhrasesIdentificationComponentTest() throws Exception {
     initCore("solrconfig-phrases-identification.xml","schema-phrases-identification.xml");
+  }
+  
+  @AfterClass
+  public static void afterPhrasesIdentificationComponentTest() throws Exception {
+    deleteCore();
   }
   
   @Before

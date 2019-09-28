@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -29,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Slow
+@LuceneTestCase.Slowest
 public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
   
   private static final Integer RUN_LENGTH = Integer.parseInt(System.getProperty("solr.tests.cloud.cm.runlength", "-1"));
@@ -38,9 +39,9 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
   public static void beforeSuperClass() {
     schemaString = "schema15.xml";      // we need a string id
     System.setProperty("solr.autoCommit.maxTime", "15000");
-    System.clearProperty("solr.httpclient.retries");
-    System.clearProperty("solr.retries.on.forward");
-    System.clearProperty("solr.retries.to.followers"); 
+    System.setProperty("solr.zkclienttimeout", "45000");
+    System.setProperty("distribUpdateSoTimeout", "10000");
+    System.setProperty("socketTimeout", "20000");
     setErrorHook();
   }
   
@@ -71,14 +72,14 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
     super();
     sliceCount = Integer.parseInt(System.getProperty("solr.tests.cloud.cm.slicecount", "-1"));
     if (sliceCount == -1) {
-      sliceCount = random().nextInt(TEST_NIGHTLY ? 5 : 3) + 1;
+      sliceCount = random().nextInt(TEST_NIGHTLY ? 5 : 1) + 1;
     }
 
     int numShards = Integer.parseInt(System.getProperty("solr.tests.cloud.cm.shardcount", "-1"));
     if (numShards == -1) {
       // we make sure that there's at least one shard with more than one replica
       // so that the ChaosMonkey has something to kill
-      numShards = sliceCount + random().nextInt(TEST_NIGHTLY ? 12 : 2) + 1;
+      numShards = sliceCount + random().nextInt(TEST_NIGHTLY ? 12 : 1) + 1;
     }
     fixShardCount(numShards);
   }
@@ -95,7 +96,7 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
     tryDelete();
     
     List<StoppableIndexingThread> threads = new ArrayList<>();
-    int threadCount = 2;
+    int threadCount = TEST_NIGHTLY ? 3 : 1;
     int batchSize = 1;
     if (random().nextBoolean()) {
       batchSize = random().nextInt(98) + 2;
@@ -107,6 +108,10 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
       maxUpdates = 1000 + random().nextInt(1000);
     } else {
       maxUpdates = 15000;
+    }
+    
+    if (!TEST_NIGHTLY) {
+      maxUpdates = 50;
     }
     
     for (int i = 0; i < threadCount; i++) {
@@ -126,7 +131,7 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
           runTimes = new int[] {5000, 6000, 10000, 15000, 25000, 30000,
               30000, 45000, 90000, 120000};
         } else {
-          runTimes = new int[] {5000, 7000, 15000};
+          runTimes = new int[] {5000, 7000 };
         }
         runLength = runTimes[random().nextInt(runTimes.length - 1)];
       }
@@ -151,14 +156,12 @@ public class ChaosMonkeySafeLeaderTest extends AbstractFullDistribZkTestBase {
     
     // try and wait for any replications and what not to finish...
 
-    Thread.sleep(2000);
-
     waitForThingsToLevelOut(180000);
     
     // even if things were leveled out, a jetty may have just been stopped or something
     // we wait again and wait to level out again to make sure the system is not still in flux
     
-    Thread.sleep(3000);
+    Thread.sleep(1000);
 
     waitForThingsToLevelOut(180000);
 

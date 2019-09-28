@@ -16,6 +16,7 @@
  */
 package org.apache.solr.search;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
@@ -34,6 +35,7 @@ import java.util.Arrays;
  *
  * @see org.apache.solr.handler.component.QueryComponent
  */
+@LuceneTestCase.Slow
 public class MergeStrategyTest extends BaseDistributedSearchTestCase {
 
   public MergeStrategyTest() {

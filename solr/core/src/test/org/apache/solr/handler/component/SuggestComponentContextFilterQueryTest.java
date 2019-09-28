@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.component;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.spelling.suggest.SuggesterParams;
 import org.junit.BeforeClass;
@@ -24,6 +25,8 @@ import org.junit.Test;
 
 import static org.hamcrest.core.Is.is;
 
+@LuceneTestCase.Slow
+@LuceneTestCase.Slowest
 public class SuggestComponentContextFilterQueryTest extends SolrTestCaseJ4 {
 
   static String rh = "/suggest";

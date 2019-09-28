@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.response.SolrResponseBase;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
@@ -30,6 +31,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.Utils;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class OverseerTaskQueueTest extends DistributedQueueTest {
 
 

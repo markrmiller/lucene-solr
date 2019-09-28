@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 
 import java.io.IOException;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -30,12 +31,15 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Slow
 public class SplitShardTest extends SolrCloudTestCase {
 
   private final String COLLECTION_NAME = "splitshardtest-collection";
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    System.setProperty("managed.schema.mutable", "true");
+    
     configureCluster(1)
         .addConfig("conf", configset("cloud-minimal"))
         .configure();

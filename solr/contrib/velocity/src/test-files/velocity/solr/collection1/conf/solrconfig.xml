@@ -24,6 +24,10 @@
 
   <schemaFactory class="ClassicIndexSchemaFactory"/>
 
+  <indexConfig>
+    <lockType>${solr.lock.type:single}</lockType>
+  </indexConfig>
+
   <requestHandler name="search" class="solr.SearchHandler" default="true">
      <lst name="defaults">
        <str name="echoParams">explicit</str>
