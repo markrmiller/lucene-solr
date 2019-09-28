@@ -124,7 +124,7 @@ public class CollectionsAPIDistDeleteZkTest extends SolrCloudTestCase {
     assertEquals(0, CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
         .setCreateNodeSet("")
         .process(cluster.getSolrClient()).getStatus());
-    waitForState("", collectionName, SolrCloudTestCase.activeClusterShape(2, 0));
+    cluster.waitForActiveCollection(collectionName, 2, 0);
     String dataDir = createTempDir().toFile().getAbsolutePath();
     // create a core that simulates something left over from a partially-deleted collection
     assertTrue(CollectionAdminRequest
@@ -132,17 +132,19 @@ public class CollectionsAPIDistDeleteZkTest extends SolrCloudTestCase {
         .setDataDir(dataDir)
         .process(cluster.getSolrClient()).isSuccess());
     
-    waitForState("", collectionName, SolrCloudTestCase.activeClusterShape(2, 1));
+    cluster.waitForActiveCollection(collectionName, 2, 1);
 
     CollectionAdminRequest.deleteCollection(collectionName)
         .process(cluster.getSolrClient());
 
+    cluster.waitForRemovedCollection(collectionName);
+    
     assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
 
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
         .process(cluster.getSolrClient());
 
-    waitForState("", collectionName, SolrCloudTestCase.activeClusterShape(2, 2));
+    cluster.waitForActiveCollection(collectionName, 2, 2);
     
     assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
   }
@@ -156,11 +158,13 @@ public class CollectionsAPIDistDeleteZkTest extends SolrCloudTestCase {
 
     // delete via API - should remove collections node
     CollectionAdminRequest.deleteCollection(collectionName).process(cluster.getSolrClient());
+    cluster.waitForRemovedCollection(collectionName);
     assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
-    
+
     // now creating that collection should work
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
         .process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(collectionName, 2, 2);
     assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains(collectionName));
   }
 
@@ -204,8 +208,7 @@ public class CollectionsAPIDistDeleteZkTest extends SolrCloudTestCase {
     // create another collection should still work
     CollectionAdminRequest.createCollection("acollectionafterbaddelete", "conf", 1, 2)
         .process(cluster.getSolrClient());
-    waitForState("Collection creation after a bad delete failed", "acollectionafterbaddelete",
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
+    cluster.waitForActiveCollection("acollectionafterbaddelete", 1, 2);
   }
 
 }

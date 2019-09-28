@@ -139,6 +139,8 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
     CloudSolrClient solrClient = cluster.getSolrClient();
     create.process(solrClient);
 
+    cluster.waitForActiveCollection(getCollectionName(), NUM_SHARDS, NUM_SHARDS * (replFactor + numTlogReplicas + numPullReplicas));
+    
     indexDocs(getCollectionName(), false);
 
     if (doSplitShardOperation) {
@@ -177,6 +179,8 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
 
     CloudSolrClient solrClient = cluster.getSolrClient();
     create.process(solrClient);
+    
+    cluster.waitForActiveCollection(getCollectionName(), NUM_SHARDS, NUM_SHARDS * (replFactor + numTlogReplicas + numPullReplicas));
 
     indexDocs(getCollectionName(), false);
 

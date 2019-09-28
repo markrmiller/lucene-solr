@@ -132,6 +132,9 @@ public class SolrTestCase extends LuceneTestCase {
     interuptThreadWithNameContains = null;
     
     
+    
+    
+    System.setProperty(SolrTestCaseJ4.USE_NUMERIC_POINTS_SYSPROP, "true");
     System.setProperty("solr.tests.IntegerFieldType", "solr.IntPointField");
     System.setProperty("solr.tests.FloatFieldType", "solr.FloatPointField");
     System.setProperty("solr.tests.LongFieldType", "solr.LongPointField");

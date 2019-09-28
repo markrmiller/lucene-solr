@@ -91,7 +91,6 @@ public class DistributedSpellCheckComponentTest extends SolrCloudBridgeTestCase 
 
   @Test
   public void spellcheckComponentDistribTest() throws Exception {
-    del("*:*");
     index(id, "1", "lowerfilt", "toyota");
     index(id, "2", "lowerfilt", "chevrolet");
     index(id, "3", "lowerfilt", "suzuki");

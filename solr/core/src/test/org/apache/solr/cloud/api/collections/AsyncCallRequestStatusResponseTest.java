@@ -57,8 +57,7 @@ public class AsyncCallRequestStatusResponseTest extends SolrCloudTestCase {
     String asyncId =
         createCollection.processAsync(cluster.getSolrClient());
 
-    waitForState("Expected collection 'asynccall' to have "+numShards+" shards and "+
-        numShards*numReplicas+" replica", "asynccall", clusterShape(numShards, numShards*numReplicas));
+    cluster.waitForActiveCollection("asynccall", numShards, numShards * numReplicas);
 
     RequestStatusState state = AbstractFullDistribZkTestBase.getRequestStateAfterCompletion(asyncId, 30, cluster.getSolrClient());
     assertEquals("Unexpected request status: " + state, "completed", state.getKey());
