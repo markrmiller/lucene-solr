@@ -64,8 +64,7 @@ public class ConnectionReuseTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(COLLECTION, "config", 1, 1)
         .processAndWait(cluster.getSolrClient(), DEFAULT_TIMEOUT);
 
-    cluster.getSolrClient().waitForState(COLLECTION, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 1));
+    cluster.waitForActiveCollection(COLLECTION, 1, 1);
   }
 
   private SolrClient buildClient(CloseableHttpClient httpClient, URL url) {

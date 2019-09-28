@@ -281,6 +281,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         .setNode(cluster.getJettySolrRunner(1).getNodeName())
         .setCoreName("halfcollection_shard1_replica_n1")
         .process(cluster.getSolrClient()).isSuccess());
+    
+    cluster.waitForActiveCollection("halfcollectionblocker", 1, 1);
+    cluster.waitForActiveCollection("halfcollectionblocker2", 1, 1);
 
     String nn1 = cluster.getJettySolrRunner(0).getNodeName();
     String nn2 = cluster.getJettySolrRunner(1).getNodeName();
@@ -309,7 +312,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   public void testCoresAreDistributedAcrossNodes() throws Exception {
     CollectionAdminRequest.createCollection("nodes_used_collection", "conf", 2, 2)
         .process(cluster.getSolrClient());
-
+    cluster.waitForActiveCollection("nodes_used_collection", 2, 4);
     Set<String> liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
 
     List<String> createNodeList = new ArrayList<>(liveNodes);
@@ -334,13 +337,13 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     // create another collection should still work
     CollectionAdminRequest.createCollection("acollectionafterbaddelete", "conf", 1, 2)
         .process(cluster.getSolrClient());
-    waitForState("Collection creation after a bad delete failed", "acollectionafterbaddelete",
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
+    cluster.waitForActiveCollection("acollectionafterbaddelete", 1, 2);
   }
 
   @Test
   public void testSpecificConfigsets() throws Exception {
     CollectionAdminRequest.createCollection("withconfigset2", "conf2", 1, 1).process(cluster.getSolrClient());
+    cluster.waitForActiveCollection("withconfigset2", 1, 1);
     byte[] data = zkClient().getData(ZkStateReader.COLLECTIONS_ZKNODE + "/" + "withconfigset2", null, null, true);
     assertNotNull(data);
     ZkNodeProps props = ZkNodeProps.load(data);
@@ -370,20 +373,10 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection("nodeset_collection", "conf", 2, 1)
         .setCreateNodeSet(baseUrls.get(0) + "," + baseUrls.get(1))
         .process(cluster.getSolrClient());
+    
+    cluster.waitForActiveCollection("nodeset_collection", 2, 0);
 
-    DocCollection collectionState = getCollectionState("nodeset_collection");
-    for (Replica replica : collectionState.getReplicas()) {
-      String replicaUrl = replica.getCoreUrl();
-      boolean matchingJetty = false;
-      for (String jettyUrl : baseUrls) {
-        if (replicaUrl.startsWith(jettyUrl)) {
-          matchingJetty = true;
-        }
-      }
-      if (matchingJetty == false) {
-        fail("Expected replica to be on " + baseUrls + " but was on " + replicaUrl);
-      }
-    }
+    // this won't create replicas, it uses create node set
   }
 
   @Test
