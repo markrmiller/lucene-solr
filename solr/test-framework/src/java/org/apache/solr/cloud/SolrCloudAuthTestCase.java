@@ -145,8 +145,8 @@ public class SolrCloudAuthTestCase extends SolrCloudTestCase {
     Map<String, Long> counts = countSecurityMetrics(cluster, prefix, AUDIT_METRICS_KEYS);
     boolean success = isMetricsEqualOrLarger(AUDIT_METRICS_TO_COMPARE, expectedCounts, counts);
     if (!success) {
-      log.info("First metrics count assert failed, pausing 2s before re-attempt");
-      Thread.sleep(2000);
+      log.info("First metrics count assert failed, pausing before re-attempt");
+      Thread.sleep(300);
       counts = countSecurityMetrics(cluster, prefix, AUDIT_METRICS_KEYS);
       success = isMetricsEqualOrLarger(AUDIT_METRICS_TO_COMPARE, expectedCounts, counts);
     }

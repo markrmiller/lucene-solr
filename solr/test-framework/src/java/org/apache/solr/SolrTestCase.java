@@ -90,7 +90,7 @@ public class SolrTestCase extends LuceneTestCase {
       "com.carrotsearch.randomizedtesting.",
   });
   
-  private static final int SOLR_TEST_TIMEOUT = Integer.getInteger("solr.test.timeout", 20000);
+  private static final int SOLR_TEST_TIMEOUT = Integer.getInteger("solr.test.timeout", 25);
   
   private static long testStartTime;
   

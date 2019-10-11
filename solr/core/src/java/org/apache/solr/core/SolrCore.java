@@ -1160,6 +1160,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       final Slice slice = collection.getSlice(coreDescriptor.getCloudDescriptor().getShardId());
       if (slice.getState() == Slice.State.CONSTRUCTION) {
         // set update log to buffer before publishing the core
+        assert getUpdateHandler().getUpdateLog() != null;
         getUpdateHandler().getUpdateLog().bufferUpdates();
       }
     }

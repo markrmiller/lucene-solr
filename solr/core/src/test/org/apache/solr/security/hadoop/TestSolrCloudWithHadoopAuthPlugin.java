@@ -120,6 +120,8 @@ public class TestSolrCloudWithHadoopAuthPlugin extends SolrCloudAuthTestCase {
     CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName, "conf1",
         NUM_SHARDS, REPLICATION_FACTOR);
     create.process(solrClient);
+    
+    cluster.waitForActiveCollection(collectionName, NUM_SHARDS, NUM_SHARDS * REPLICATION_FACTOR);
     // The metrics counter for wrong credentials here really just means  
     assertAuthMetricsMinimums(6, 3, 0, 3, 0, 0);
 

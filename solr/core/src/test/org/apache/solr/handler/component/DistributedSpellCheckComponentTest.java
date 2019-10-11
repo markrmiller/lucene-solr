@@ -19,20 +19,12 @@ package org.apache.solr.handler.component;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import junit.framework.Assert;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.SuppressTempFileChecks;
-import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SpellingParams;
-import org.apache.solr.common.util.NamedList;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -43,7 +35,6 @@ import org.junit.Test;
  *
  * @see org.apache.solr.handler.component.SpellCheckComponent
  */
-@SuppressTempFileChecks(bugUrl = "https://issues.apache.org/jira/browse/SOLR-1877 Spellcheck IndexReader leak bug?")
 @LuceneTestCase.Slow
 public class DistributedSpellCheckComponentTest extends SolrCloudBridgeTestCase {
   
@@ -57,6 +48,8 @@ public class DistributedSpellCheckComponentTest extends SolrCloudBridgeTestCase 
 
   @BeforeClass
   public static void beforeClass() throws Exception {
+    schemaString = "schema.xml";
+    solrconfigString = "solrconfig.xml";
     sliceCount = 3;
     replicationFactor = 1;
     numShards = 3;
