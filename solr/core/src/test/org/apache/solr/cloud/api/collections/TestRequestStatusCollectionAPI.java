@@ -57,7 +57,7 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
     } catch (SolrServerException | IOException e) {
       e.printStackTrace();
     }
-
+    
     // Check for the request to be completed.
 
     NamedList r = null;
@@ -80,6 +80,8 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
     assertEquals("found [1000] in completed tasks", message); 
     assertEquals("expecting "+numShards+" shard responses at "+createResponse,
         numShards, numResponsesCompleted(createResponse));
+    
+    cluster.waitForActiveCollection("collection2", 2, 2);
     
     // Check for a random (hopefully non-existent request id
     params = new ModifiableSolrParams();
@@ -151,6 +153,8 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
 
     assertEquals("found [1002] in failed tasks", message);
 
+    cluster.waitForActiveCollection("collection2", 4, 4);
+    
     params = new ModifiableSolrParams();
     params.set(CollectionParams.ACTION, CollectionParams.CollectionAction.CREATE.toString());
     params.set("name", "collection3");
