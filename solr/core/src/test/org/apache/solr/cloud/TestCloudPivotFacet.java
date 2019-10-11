@@ -76,7 +76,8 @@ import static org.apache.solr.common.params.FacetParams.FACET_SORT;
  *
  */
 @SuppressSSL // Too Slow
-public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
+@LuceneTestCase.Slow
+public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -94,7 +95,7 @@ public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
 
   public TestCloudPivotFacet() {
     // we need DVs on point fields to compute stats & facets
-    if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
+    if (Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP)) System.setProperty(SolrTestCaseJ4.NUMERIC_DOCVALUES_SYSPROP,"true");
   }
   
   /** 
@@ -106,16 +107,16 @@ public class TestCloudPivotFacet extends AbstractFullDistribZkTestBase {
 
   @BeforeClass
   public static void initUseFieldRandomizedFactor() {
+    schemaString = "schema.xml";
+    
     useFieldRandomizedFactor = TestUtil.nextInt(random(), 2, 30);
     log.info("init'ing useFieldRandomizedFactor = {}", useFieldRandomizedFactor);
   }
 
   @Test
   //commented 2-Aug-2018 @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 28-June-2018
-  public void test() throws Exception {
+  public void testDistPivotFacet() throws Exception {
 
-    waitForThingsToLevelOut(30000); // TODO: why would we have to wait?
-    // 
     handle.clear();
     handle.put("QTime", SKIPVAL);
     handle.put("timestamp", SKIPVAL);

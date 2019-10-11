@@ -274,8 +274,7 @@ public class TestPullReplica extends SolrCloudTestCase {
         break;
       } else {
         // reload
-        CollectionAdminResponse response = CollectionAdminRequest.reloadCollection(collectionName)
-        .process(cluster.getSolrClient());
+        CollectionAdminResponse response = reloadCollection(collectionName);
         assertEquals(0, response.getStatus());
         reloaded = true;
       }

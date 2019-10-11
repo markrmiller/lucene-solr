@@ -29,6 +29,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.common.util.SmartClose;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,13 +88,14 @@ public class SolrClientCache implements Serializable {
   }
 
   public synchronized void close() {
-    for(Map.Entry<String, SolrClient> entry : solrClients.entrySet()) {
-      try {
-        entry.getValue().close();
-      } catch (IOException e) {
-        log.error("Error closing SolrClient for " + entry.getKey(), e);
-      }
+    List<Object> closes = new ArrayList<>();
+    for (Map.Entry<String,SolrClient> entry : solrClients.entrySet()) {
+      closes.add(entry.getValue());
     }
     solrClients.clear();
+
+    try (SmartClose closer = new SmartClose(this)) {
+      closer.add("solrClients", closes);
+    }
   }
 }

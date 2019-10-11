@@ -57,14 +57,13 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     testAddFieldAndDocument(collection);
   }
 
-  private void testReloadAndAddSimple(String collection) throws IOException, SolrServerException {
+  private void testReloadAndAddSimple(String collection) throws Exception {
     CloudSolrClient cloudClient = cluster.getSolrClient();
 
     String fieldName = "myNewField";
     addStringField(fieldName, collection, cloudClient);
 
-    CollectionAdminRequest.Reload reloadRequest = CollectionAdminRequest.reloadCollection(collection);
-    CollectionAdminResponse response = reloadRequest.process(cloudClient);
+    CollectionAdminResponse response = reloadCollection(collection);
     assertEquals(0, response.getStatus());
     assertTrue(response.isSuccess());
 

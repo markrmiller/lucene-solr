@@ -49,6 +49,8 @@ import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.codahale.metrics.Timer;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SmartClose;
+import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.MetricsConfig;
 import org.apache.solr.core.PluginInfo;
@@ -1064,45 +1066,52 @@ public class SolrMetricManager {
    * @return names of closed reporters
    */
   public Set<String> closeReporters(String registry, String tag) {
+    long start = System.currentTimeMillis();
+    Set<String> removed = new HashSet<>();
+    List<SolrMetricReporter> closeReporters = new ArrayList<>();
     // make sure we use a name with prefix
     registry = enforcePrefix(registry);
     try {
-      if (!reportersLock.tryLock(10, TimeUnit.SECONDS)) {
-        log.warn("Could not obtain lock to modify reporters registry: " + registry);
-        return Collections.emptySet();
+      while (true) {
+        try {
+          if (reportersLock.tryLock(10, TimeUnit.SECONDS)) {
+            break;
+          }
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+
       }
-    } catch (InterruptedException e) {
-      log.warn("Interrupted while trying to obtain lock to modify reporters registry: " + registry);
-      return Collections.emptySet();
-    }
-    log.info("Closing metric reporters for registry=" + registry + ", tag=" + tag);
-    try {
-      Map<String, SolrMetricReporter> perRegistry = reporters.get(registry);
+
+      log.info("Closing metric reporters for registry=" + registry + ", tag=" + tag);
+	  // nocommit
+      Map<String,SolrMetricReporter> perRegistry = reporters.get(registry);
       if (perRegistry != null) {
         Set<String> names = new HashSet<>(perRegistry.keySet());
-        Set<String> removed = new HashSet<>();
+
         names.forEach(name -> {
           if (tag != null && !tag.isEmpty() && !name.endsWith("@" + tag)) {
             return;
           }
           SolrMetricReporter reporter = perRegistry.remove(name);
-          try {
-            reporter.close();
-          } catch (IOException ioe) {
-            log.warn("Exception closing reporter " + reporter, ioe);
-          }
+
+          closeReporters.add(reporter);
           removed.add(name);
         });
         if (removed.size() == names.size()) {
           reporters.remove(registry);
         }
-        return removed;
-      } else {
-        return Collections.emptySet();
       }
+
     } finally {
       reportersLock.unlock();
     }
+    System.out.println("lock time:" + (System.currentTimeMillis() - start));
+    try (SmartClose closer = new SmartClose(this)) {
+      closer.add("MetricReporters", closeReporters);
+    }
+    System.out.println("close time:" + (System.currentTimeMillis() - start));
+    return removed;
   }
 
   /**

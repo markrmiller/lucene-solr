@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import com.codahale.metrics.Counter;
@@ -30,6 +31,8 @@ import com.codahale.metrics.MetricFilter;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
 import com.codahale.metrics.Timer;
+
+import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.metrics.FilteringSolrMetricReporter;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.slf4j.Logger;
@@ -67,7 +70,7 @@ public class SolrSlf4jReporter extends FilteringSolrMetricReporter {
     final Map<String, String> mdcContext;
 
     Slf4jReporterWrapper(String logger, Map<String, String> mdcContext, Slf4jReporter delegate, TimeUnit rateUnit, TimeUnit durationUnit) {
-      super(null, logger, null, rateUnit, durationUnit);
+      super(null, logger, null, rateUnit, durationUnit, (new ScheduledThreadPoolExecutor(0, new SolrjNamedThreadFactory("Slf4jReporterWrapper"))));
       this.delegate = delegate;
       this.mdcContext = mdcContext;
     }
