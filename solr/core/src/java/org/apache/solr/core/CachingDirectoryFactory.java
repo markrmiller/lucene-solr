@@ -28,6 +28,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
@@ -37,6 +38,8 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.TimeOut;
+import org.apache.solr.common.util.TimeSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,6 +161,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
   public void close() throws IOException {
     synchronized (this) {
       log.debug("Closing {} - {} directories currently being tracked", this.getClass().getSimpleName(), byDirectoryCache.size());
+      TimeOut timeout = new TimeOut(15, TimeUnit.SECONDS,  TimeSource.NANO_TIME);
       this.closed = true;
       Collection<CacheValue> values = byDirectoryCache.values();
       for (CacheValue val : values) {
@@ -170,7 +174,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           while (val.refCnt != 0) {
             wait(300);
 
-            if (cnt++ >= 120) {
+            if (timeout.hasTimedOut()) {
               String msg = "Timeout waiting for all directory ref counts to be released - gave up waiting on " + val;
               log.error(msg);
               // debug
@@ -373,7 +377,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           CacheValue newCacheValue = new CacheValue(fullPath, directory);
           byDirectoryCache.put(directory, newCacheValue);
           byPathCache.put(fullPath, newCacheValue);
-          log.debug("return new directory for {}", fullPath);
+          log.info("return new directory for {}", newCacheValue);
           success = true;
         } finally {
           if (!success) {
@@ -382,7 +386,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         }
       } else {
         cacheValue.refCnt++;
-        log.debug("Reusing cached directory: {}", cacheValue);
+        log.info("Reusing cached directory: {}", cacheValue);
       }
 
       return directory;
@@ -452,7 +456,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         throw new IllegalArgumentException("Unknown directory: " + directory
             + " " + byDirectoryCache);
       }
-      log.debug("Releasing directory: " + cacheValue.path + " " + (cacheValue.refCnt - 1) + " " + cacheValue.doneWithDir);
+      log.info("Releasing directory: " + cacheValue.path + " " + (cacheValue.refCnt - 1) + " " + cacheValue.doneWithDir);
 
       cacheValue.refCnt--;
 

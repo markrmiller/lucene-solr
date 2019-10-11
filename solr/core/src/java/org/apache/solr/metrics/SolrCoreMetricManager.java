@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 
 import com.codahale.metrics.MetricRegistry;
 import org.apache.solr.cloud.CloudDescriptor;
+import org.apache.solr.common.util.SmartClose;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
@@ -146,11 +147,16 @@ public class SolrCoreMetricManager implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    metricManager.closeReporters(getRegistryName(), tag);
-    if (getLeaderRegistryName() != null) {
-      metricManager.closeReporters(getLeaderRegistryName(), tag);
+    try (SmartClose closer = new SmartClose(this)) {
+
+      closer.add("CloseReporters", () -> {metricManager.closeReporters(getRegistryName(), tag); return "reporters";}, () -> {
+        if (getLeaderRegistryName() != null) metricManager.closeReporters(getLeaderRegistryName(), tag);
+        return "leaderReporters";
+      }, () -> {
+        metricManager.unregisterGauges(getRegistryName(), tag);
+        return "gauges";
+      });
     }
-    metricManager.unregisterGauges(getRegistryName(), tag);
   }
 
   public SolrCore getCore() {

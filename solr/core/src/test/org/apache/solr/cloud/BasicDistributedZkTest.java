@@ -167,7 +167,7 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
   
   @BeforeClass
   public static void beforeBDZKTClass() {
-    System.out.println("beofre BasicZK");
+    enableMetricsForNonNightly();
     TestInjection.newSearcherHook(newSearcherHook);
   }
 
@@ -273,22 +273,22 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
     query(false, new String[] {"q","*:*", "sort",i1+" desc", "fl","*,score"});
     query(false, new String[] {"q","*:*", "sort","n_tl1 asc", "fl","*,score"}); 
     query(false, new String[] {"q","*:*", "sort","n_tl1 desc"});
-    //handle.put("maxScore", SKIPVAL);
+    handle.put("maxScore", SKIPVAL);
     query(false, new String[] {"q","{!func}"+i1});// does not expect maxScore. So if it comes ,ignore it. JavaBinCodec.writeSolrDocumentList()
     //is agnostic of request params.
-    //handle.remove("maxScore");
+    handle.remove("maxScore");
     query(false, new String[] {"q","{!func}"+i1, "fl","*,score"});  // even scores should match exactly here
 
-//    handle.put("highlighting", UNORDERED);
-//    handle.put("response", UNORDERED);
+    handle.put("highlighting", UNORDERED);
+    handle.put("response", UNORDERED);
 
-  //  handle.put("maxScore", SKIPVAL);
+    handle.put("maxScore", SKIPVAL);
     query(false, new String[] {"q","quick"});
     query(false, new String[] {"q","all","fl","id","start","0"});
     query(false, new String[] {"q","all","fl","foofoofoo","start","0"});  // no fields in returned docs
     query(false, new String[] {"q","all","fl","id","start","100"});
 
-   // handle.put("score", SKIPVAL);
+    handle.put("score", SKIPVAL);
     query(false, new String[] {"q","quick","fl","*,score"});
     query(false, new String[] {"q","all","fl","*,score","start","1"});
     query(false, new String[] {"q","all","fl","*,score","start","100"});
@@ -411,11 +411,6 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
     // on shards with matches.
     // query("q","matchesnothing","fl","*,score", "debugQuery", "true");
 
-    // would be better if these where all separate tests - but much, much
-    // slower
-    if (TEST_NIGHTLY) doOptimisticLockingAndUpdating();
-    testANewCollectionInOneInstanceWithManualShardAssignement();
-    if (TEST_NIGHTLY) testNumberOfCommitsWithCommitAfterAdd();
   }
 
   private void testSortableTextFaceting() throws Exception {
@@ -577,7 +572,7 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
     final ModifiableSolrParams updateParams = new ModifiableSolrParams();
     updateParams.add(UpdateParams.UPDATE_CHAIN, chain);
     
-    final int numLoops = atLeast(50);
+    final int numLoops = atLeast(TEST_NIGHTLY ? 50 : 15);
     
     for (int i = 1; i < numLoops; i++) {
       // add doc to random client
@@ -651,7 +646,8 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
     
   }
 
-  private void testNumberOfCommitsWithCommitAfterAdd()
+  @Test
+  public void testNumberOfCommitsWithCommitAfterAdd()
       throws SolrServerException, IOException {
     log.info("### STARTING testNumberOfCommitsWithCommitAfterAdd");
     long startCommits = getNumCommits((HttpSolrClient) getClient(0));
@@ -687,6 +683,10 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
       QueryRequest req = new QueryRequest(params);
       NamedList<Object> resp = client.request(req);
       NamedList metrics = (NamedList) resp.get("metrics");
+      if (metrics.size() == 0) {
+        return 0L;
+      }
+
       NamedList uhandlerCat = (NamedList) metrics.getVal(0);
       Map<String,Object> commits = (Map<String,Object>) uhandlerCat.get("UPDATE.updateHandler.commits");
       return (Long) commits.get("count");

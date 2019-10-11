@@ -50,8 +50,10 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.ZkClientClusterStateProvider;
+import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.client.solrj.request.CoreStatus;
+import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.ClusterProperties;
 import org.apache.solr.common.cloud.CollectionStatePredicate;
@@ -66,6 +68,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.RetryUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.zookeeper.CreateMode;
 import org.junit.AfterClass;
@@ -497,6 +500,37 @@ public class SolrCloudTestCase extends SSLSolrTestCase {
     try (HttpSolrClient client = getHttpSolrClient(jetty.getBaseUrl().toString(), cluster.getSolrClient().getHttpClient())) {
       return CoreAdminRequest.getCoreStatus(replica.getCoreName(), client);
     }
+  }
+  
+  public CollectionAdminResponse reloadCollection(String collection) throws SolrServerException, IOException, InterruptedException {
+    List<Replica> replicas = cluster.getSolrClient().getZkStateReader().getClusterState().getCollection(collection)
+        .getReplicas();
+    
+    Map<Replica,Long> startTimes = new HashMap<>();
+    
+    for (Replica replica : replicas) {
+      long coreStartTime = getCoreStatus(replica).getCoreStartTime().getTime();
+      startTimes.put(replica, coreStartTime);
+    }
+    
+    CollectionAdminResponse resp = CollectionAdminRequest.reloadCollection(collection).process(cluster.getSolrClient());
+
+    for (Replica replica : replicas) {
+      long coreStartTime = startTimes.get(replica);
+
+      RetryUtil.retryUntil("Timed out waiting for core to reload", 10, 1000, TimeUnit.MILLISECONDS, () -> {
+        long restartTime = 0;
+        try {
+          restartTime = getCoreStatus(replica).getCoreStartTime().getTime();
+        } catch (Exception e) {
+          log.warn("Exception getting core start time: {}", e.getMessage());
+          return false;
+        }
+        return restartTime > coreStartTime;
+      });
+    }
+    
+    return resp;
   }
 
   protected NamedList waitForResponse(Predicate<NamedList> predicate, SolrRequest request, int intervalInMillis, int numRetries, String messageOnFail) {

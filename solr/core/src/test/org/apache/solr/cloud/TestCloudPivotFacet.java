@@ -82,7 +82,7 @@ import static org.apache.solr.common.params.FacetParams.FACET_SORT;
  *
  */
 @SuppressSSL // Too Slow
-@LuceneTestCase.Slowest
+@LuceneTestCase.Slow
 public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -113,6 +113,8 @@ public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
 
   @BeforeClass
   public static void initUseFieldRandomizedFactor() {
+    schemaString = "schema.xml";
+    
     useFieldRandomizedFactor = TestUtil.nextInt(random(), 2, 30);
     log.info("init'ing useFieldRandomizedFactor = {}", useFieldRandomizedFactor);
   }
@@ -121,11 +123,9 @@ public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
   //commented 2-Aug-2018 @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 28-June-2018
   public void testDistPivotFacet() throws Exception {
 
-
-    // 
-//    handle.clear();
-//    handle.put("QTime", SKIPVAL);
-//    handle.put("timestamp", SKIPVAL);
+    handle.clear();
+    handle.put("QTime", SKIPVAL);
+    handle.put("timestamp", SKIPVAL);
     
     final Set<String> fieldNameSet = new HashSet<>();
     

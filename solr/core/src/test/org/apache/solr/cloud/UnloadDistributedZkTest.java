@@ -65,21 +65,13 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
   
   @BeforeClass
   public static void beforeUnloadDistributedZkTest() throws Exception {
-    System.out.println("Before Unload");
+    System.setProperty("managed.schema.mutable", "true");
  
   }
 
   protected String getSolrXml() {
     return "solr.xml";
   }
-
-//  @Test
-//  public void test() throws Exception {
-//    testCoreUnloadAndLeaders(); // long
-//    testUnloadLotsOfCores(); // long
-//
-//    testUnloadShardAndCollection();
-//  }
 
   public void checkCoreNamePresenceAndSliceCount(String collectionName, String coreName,
       boolean shouldBePresent, int expectedSliceCount) throws Exception {

@@ -398,6 +398,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
   @Override
   public synchronized void close(IndexWriterCloser closer) {
+    System.out.println("CLOSE CORE STATE");
     closed = true;
     cancelRecovery();
     closeIndexWriter(closer);

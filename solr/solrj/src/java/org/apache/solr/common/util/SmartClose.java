@@ -61,7 +61,7 @@ public class SmartClose implements Closeable {
   private final CloseTimeTracker tracker;
 
   public SmartClose(Object closeObject) {
-    tracker = new CloseTimeTracker(closeObject);
+    tracker = new CloseTimeTracker(closeObject, closeObject.getClass().getName());
     log.debug("Start tacking close of :" + closeObject.toString());
   }
 
@@ -69,42 +69,41 @@ public class SmartClose implements Closeable {
   @SuppressWarnings("unchecked")
   public void add(String label, Object... objects) {
     ArrayList<Object> objectList = new ArrayList<>();
-    for (Object object : objects) {
-      if (object instanceof Collection) {
-        objectList.addAll((Collection<? extends Object>) object);
-      } else {
-        objectList.add(object);
+
+    if (objects != null) {
+      for (Object object : objects) {
+        if (object == null) continue;
+        if (object instanceof Collection) {
+          objectList.addAll((Collection<? extends Object>) object);
+        } else {
+          objectList.add(object);
+        }
       }
     }
 
     WorkUnit workUnit = new WorkUnit(objectList, tracker, label);
     workUnits.add(workUnit);
   }
-
+  
   public void add(Object object) {
-    List<Object> objects = new ArrayList<>();
-
-    if (object instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object);
-    } else {
-      objects.add(object);
+    if (object == null) return;
+    if (object instanceof Collection<?>) {
+      throw new IllegalArgumentException("Use this method only with a single Object");
     }
-
-    WorkUnit workUnit = new WorkUnit(objects, tracker, " ");
-    workUnits.add(workUnit);
+    add(object.getClass().getName(), object);
   }
 
-  public void add(Callable callable) {
+  public void add(String label, Callable<?>... callables) {
     List<Object> objects = new ArrayList<>();
-    objects.add(callable);
+    objects.addAll(Arrays.asList(callables));
 
-    WorkUnit workUnit = new WorkUnit(objects, tracker, " ");
+    WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
   }
-
-  public void add(String label, Callable... Callables) {
+  
+  public void add(String label, Runnable... tasks) {
     List<Object> objects = new ArrayList<>();
-    objects.addAll(Arrays.asList(Callables));
+    objects.addAll(Arrays.asList(tasks));
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
@@ -114,12 +113,13 @@ public class SmartClose implements Closeable {
     List<Object> objects = new ArrayList<>();
     objects.add(Callable);
 
-    if (object instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object);
-    } else {
-      objects.add(object);
+    if (object != null) {
+      if (object instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object);
+      } else {
+        objects.add(object);
+      }
     }
-
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
   }
@@ -127,11 +127,12 @@ public class SmartClose implements Closeable {
   public void add(String label, Object object, Callable... Callables) {
     List<Object> objects = new ArrayList<>();
     objects.addAll(Arrays.asList(Callables));
-
-    if (object instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object);
-    } else {
-      objects.add(object);
+    if (object != null) {
+      if (object instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object);
+      } else {
+        objects.add(object);
+      }
     }
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
@@ -141,15 +142,20 @@ public class SmartClose implements Closeable {
   public void add(String label, Object object1, Object object2, Callable... Callables) {
     List<Object> objects = new ArrayList<>();
     objects.addAll(Arrays.asList(Callables));
-    if (object1 instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object1);
-    } else {
-      objects.add(object1);
+
+    if (object1 != null) {
+      if (object1 instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object1);
+      } else {
+        objects.add(object1);
+      }
     }
-    if (object2 instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object2);
-    } else {
-      objects.add(object2);
+    if (object2 != null) {
+      if (object2 instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object2);
+      } else {
+        objects.add(object2);
+      }
     }
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
@@ -159,20 +165,26 @@ public class SmartClose implements Closeable {
   public void add(String label, Object object1, Object object2, Object object3, Callable... Callables) {
     List<Object> objects = new ArrayList<>();
     objects.addAll(Arrays.asList(Callables));
-    if (object1 instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object1);
-    } else {
-      objects.add(object1);
+    if (object1 != null) {
+      if (object1 instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object1);
+      } else {
+        objects.add(object1);
+      }
     }
-    if (object2 instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object2);
-    } else {
-      objects.add(object2);
+    if (object2 != null) {
+      if (object2 instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object2);
+      } else {
+        objects.add(object2);
+      }
     }
-    if (object3 instanceof Collection) {
-      objects.addAll((Collection<? extends Object>) object3);
-    } else {
-      objects.add(object3);
+    if (object3 != null) {
+      if (object3 instanceof Collection) {
+        objects.addAll((Collection<? extends Object>) object3);
+      } else {
+        objects.add(object3);
+      }
     }
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
@@ -193,18 +205,16 @@ public class SmartClose implements Closeable {
       for (WorkUnit workUnit : workUnits) {
 
         final CloseTimeTracker workUnitTracker;
-        if (workUnit.objects.size() == 1) {
-          workUnitTracker = workUnit.tracker.startSubClose(workUnit.objects.get(0));
 
-        } else {
-          workUnitTracker = workUnit.tracker.startSubClose(workUnit.label);
-        }
+  
+        workUnitTracker = workUnit.tracker.startSubClose(workUnit.label);
 
         List<Object> objects = workUnit.objects;
 
         List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
 
         for (Object object : objects) {
+          System.out.println("run close for " + object);
           if (object == null) continue;
           log.debug("add close call for:" + object);
           closeCalls.add(() -> {
@@ -254,7 +264,7 @@ public class SmartClose implements Closeable {
                 return null;
               }
             } finally {
-              subTracker.doneClose(returnObject);
+              subTracker.doneClose(returnObject instanceof String ? (String)returnObject : (returnObject == null ? "": returnObject.getClass().getName()));
             }
             return null;
           });
@@ -276,5 +286,7 @@ public class SmartClose implements Closeable {
       }
     }
   }
+
+
 
 }

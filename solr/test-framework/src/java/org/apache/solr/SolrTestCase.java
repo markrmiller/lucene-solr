@@ -204,7 +204,7 @@ public class SolrTestCase extends LuceneTestCase {
       System.setProperty("solr.tests.maxBufferedDocs", "1000000");
       System.setProperty("solr.tests.ramBufferSizeMB", "20");
       System.setProperty("solr.tests.ramPerThreadHardLimitMB", "4");
-      System.setProperty("solr.disableJvmMetrics", "true");
+      //System.setProperty("solr.disableJvmMetrics", "true");
       System.setProperty("useCompoundFile", "false");
       
       
@@ -280,11 +280,11 @@ public class SolrTestCase extends LuceneTestCase {
         Long tooLongTime = 0L;
         try {
           synchronized (CloseTimeTracker.CLOSE_TIMES) {
-            Map<Integer,CloseTimeTracker> closeTimes = CloseTimeTracker.CLOSE_TIMES;
+            Map<String,CloseTimeTracker> closeTimes = CloseTimeTracker.CLOSE_TIMES;
             for (CloseTimeTracker closeTime : closeTimes.values()) {
-              if (closeTime.getClazz() == SolrCore.class) {
-                continue;
-              }
+//              if (closeTime.getClazz() == SolrCore.class) {
+//                continue;
+//              }
               if (closeTime.getElapsedMS() > 8000) {
                 tooLongTime = closeTime.getElapsedMS();
                 clazz = closeTime.getClazz();

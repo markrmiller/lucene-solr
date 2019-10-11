@@ -21,7 +21,6 @@ eclipse {
     // for the 'grouping' modules, only show the root dir files to keep 
     // ide fast and showing the right files first
     if (!file('src').exists()) {
-      println('No Java!')
       resourceFilter {
         appliesTo = 'FOLDERS'
         type = 'EXCLUDE_ALL'
@@ -30,8 +29,6 @@ eclipse {
           arguments = '1.0-name-matches-false-false-*'
         }
       }
-    } else {
-      println 'found plugin'
     }
     
     // ignore common folders we don't want the ide busy looking at

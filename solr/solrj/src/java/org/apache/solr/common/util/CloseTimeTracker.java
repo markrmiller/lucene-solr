@@ -19,11 +19,8 @@ package org.apache.solr.common.util;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -34,14 +31,12 @@ public class CloseTimeTracker {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  public static final Map<Integer,CloseTimeTracker> CLOSE_TIMES = new ConcurrentHashMap<>();
+  public static final Map<String,CloseTimeTracker> CLOSE_TIMES = new ConcurrentHashMap<>();
   
   private final long startTime;
 
   private volatile long doneTime;
 
-//  private final Map<String,Long> startTimes = new ConcurrentHashMap<>();
-//  private final Map<String,Long> endTimes = new ConcurrentHashMap<>();
   private volatile Object trackedObject;
   
   private final List<CloseTimeTracker> children = Collections.synchronizedList(new ArrayList<>());
@@ -49,28 +44,23 @@ public class CloseTimeTracker {
   private final Class<? extends Object> clazz;
 
   private final StringBuilder label = new StringBuilder();
-
-  public CloseTimeTracker(Object object) {
-    log.info("Start tracking close for " + object.getClass().getName());
-    this.clazz = object.getClass();
-    
-    CLOSE_TIMES.put(object.hashCode(), this);
-    this.trackedObject = object;
-    this.startTime = System.nanoTime();
-  }
   
-  private CloseTimeTracker(Object object, String label) {
-    this.trackedObject = object;
-    this.clazz = object.getClass();
-    this.startTime = System.nanoTime();
-    this.label.append(label);
+  private final int depth;
+  
+  public CloseTimeTracker(Object object, String label) {
+    this(object, label, 1);
   }
 
-  private CloseTimeTracker(String label) {
-    this.clazz = null;
-    this.trackedObject = null;
+  private CloseTimeTracker(Object object, String label, int i) {
+    this.trackedObject = object;
+    this.clazz = object == null ? null : object.getClass();
     this.startTime = System.nanoTime();
     this.label.append(label);
+    this.depth = i;
+    
+    if (depth <= 1) {
+      CLOSE_TIMES.put((object != null ? object.hashCode() : 0) + "_" + label.hashCode(), this);
+    }
   }
 
   public void doneClose() {
@@ -78,11 +68,23 @@ public class CloseTimeTracker {
     //System.out.println("done close: " + trackedObject + " "  + label + " " + getElapsedNS());
   }
   
-  public void doneClose(Object theObject) {
-    if (theObject == null) return;
-    log.info(theObject instanceof String ? theObject.getClass().getName() : theObject.toString() +  " was closed");
+  public void doneClose(String label) {
+   // if (theObject == null) return;
+   // log.info(theObject instanceof String ? theObject.getClass().getName() : theObject.toString() +  " was closed");
     doneTime = System.nanoTime();
-    trackedObject = theObject;
+    
+    //this.label.append(label);
+    StringBuilder spacer = new StringBuilder();
+    for (int i =0; i < depth; i++) {
+      spacer.append(' ');
+    }
+    
+    String extra = "";
+    if (label.trim().length() != 0) {
+      extra = label + "->";
+    }
+    
+    this.label.insert(0, spacer.toString() + extra);
   }
 
   public long getElapsedNS() {
@@ -90,13 +92,13 @@ public class CloseTimeTracker {
   }
 
   public CloseTimeTracker startSubClose(String label) {
-    CloseTimeTracker subTracker = new CloseTimeTracker("  " + label);
+    CloseTimeTracker subTracker = new CloseTimeTracker(null, label, depth+1);
     children.add(subTracker);
     return subTracker;
   }
   
   public CloseTimeTracker startSubClose(Object object) {
-    CloseTimeTracker subTracker = new CloseTimeTracker(object, "  ");
+    CloseTimeTracker subTracker = new CloseTimeTracker(object, object.getClass().getName(), depth+1);
     children.add(subTracker);
     return subTracker;
   }
@@ -107,23 +109,27 @@ public class CloseTimeTracker {
 
   public String getCloseTimes() {
     StringBuilder sb = new StringBuilder();
-    if (trackedObject != null) {
-      if (trackedObject instanceof String) {
-        sb.append(label + trackedObject.toString() + " " + getElapsedMS() + "ms");
-      } else {
-        sb.append(label + trackedObject.getClass().getName() + " " + getElapsedMS() + "ms");
-      }
-    } else {
-      sb.append(":" + label + " " + getElapsedMS() + "ms");
-    }
-
+//    if (trackedObject != null) {
+//      if (trackedObject instanceof String) {
+//        sb.append(label + trackedObject.toString() + " " + getElapsedMS() + "ms");
+//      } else {
+//        sb.append(label + trackedObject.getClass().getName() + " " + getElapsedMS() + "ms");
+//      }
+//    } else {
+      sb.append(label + " " + getElapsedMS() + "ms");
+//    }
+     // sb.append("[\n");
     synchronized (children) {
-      //sb.append("children:");
+     // sb.append(" children(" + children.size() + ")");
       for (CloseTimeTracker entry : children) {
-        sb.append("\n  " + entry.getCloseTimes());
+        sb.append("\n");
+        for (int i = 0; i < depth; i++) {
+          sb.append(' ');
+        }
+        sb.append(entry.getCloseTimes());
       }
     }
-
+    //sb.append("]\n");
     return sb.toString();
 
     // synchronized (startTimes) {
@@ -138,15 +144,16 @@ public class CloseTimeTracker {
   }
   
   public String toString() {
-    if (trackedObject != null) {
+    if (label != null) {
+      return (children.size() > 0 ? ":" : "") + label + " " + getElapsedMS() + "ms";
+    } else if (trackedObject != null) {
       if (trackedObject instanceof String) {
-        return trackedObject.toString() + ": " + getElapsedMS() + "ms";
+        return trackedObject.toString() + "-> " + getElapsedMS() + "ms";
       } else {
-        return trackedObject.getClass().getSimpleName() + ": " + getElapsedMS() + "ms";
+        return trackedObject.getClass().getSimpleName() + "--> " + getElapsedMS() + "ms";
       }
-    } else {
-      return ":" + label + " " + getElapsedMS() + "ms";
     }
+    return "*InternalError*";
   }
 
   private long getElapsedNS(long startTime, long doneTime) {
