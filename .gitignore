@@ -3,6 +3,7 @@ eclipse-build
 /maven-build
 /classes
 build
+build-eclipse
 /idea-build
 dist
 lib
@@ -23,7 +24,6 @@ lucene/**/*.iml
 .caches
 .out
 /prj.el
-bin
 /bin.*
 pom.xml
 /nbproject

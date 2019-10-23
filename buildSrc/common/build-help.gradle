@@ -24,7 +24,7 @@ task buildDependenciesHelp {
   group = 'Help (Build Documentation)'
   description = "How dependencies are managed and what you need to know to change them."
   doLast {
-    println file(mfile(project(":buildSrc").projectDir, 'common/help-text/buildDependenciesHelp.txt')).text
+    println file(mfile(project.rootProject.projectDir, 'buildSrc/common/help-text/buildDependenciesHelp.txt')).text
   }
 }
 
