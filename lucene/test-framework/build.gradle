@@ -19,12 +19,11 @@ apply plugin: 'java-library'
 apply plugin: 'maven-publish'
 apply plugin: org.apache.lucene.gradle.dist.PartOfDist
 
-archivesBaseName = 'lucene-test-framework'
-
 dependencies {
   
   implementation project(':lucene:lucene-core')
   implementation project(':lucene:lucene-codecs')
+  implementation project(':lucene:lucene-analyzers:lucene-analyzers-common')
   
   api ("junit:junit")
   api ('org.hamcrest:hamcrest-core')

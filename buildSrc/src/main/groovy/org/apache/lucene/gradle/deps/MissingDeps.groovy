@@ -79,7 +79,7 @@ class MissingDeps extends DefaultTask {
     // make sure ant task logging shows up by default
     ant.lifecycleLogLevel = "INFO"
     
-    def topLvlProject = project.getTopLvlProject(project)
+    def topLvlProject = project.getTopLvlProject()
     
     File dotFile = project.mfile(inputDirectory, 'jdepsDir/' + topLvlProject.name +  "/" + "${project.name}-${project.version}/${project.name}-${project.version}.jar.dot")
     

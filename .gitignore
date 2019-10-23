@@ -34,3 +34,4 @@ __pycache__
 .DS_Store
 .gradle
 derby.log
+user.properties

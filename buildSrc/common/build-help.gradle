@@ -20,7 +20,7 @@ task buildTestsHelp {
   description = "How to run Lucene and Solr tests and the options that are available to you."
 
   doLast {
-    println file("${project(':buildSrc').projectDir}/common/help-text/testHelp.txt").text
+    println file("${rootDir}/buildSrc/common/help-text/testHelp.txt").text
   }
 }
 
@@ -28,7 +28,7 @@ task buildDependenciesHelp {
   group = 'Help (Build Documentation)'
   description = "How dependencies are managed and what you need to know to change them."
   doLast {
-    println file(mfile(project.rootProject.projectDir, 'buildSrc/common/help-text/buildDependenciesHelp.txt')).text
+    println file("${rootDir}/buildSrc/common/help-text/buildDependenciesHelp.txt").text
   }
 }
 

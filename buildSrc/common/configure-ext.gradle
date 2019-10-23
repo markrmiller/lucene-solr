@@ -37,15 +37,21 @@ allprojects {
   ext.filePath = { path -> file(path).getAbsolutePath() }
   // sugar multi part File
   ext.mfile = { file1, file2 -> new File(file(file1), file2.toString()) }
-  
-  ext.getTopLvlProject = { proj ->
-    def topLvlProject
-    if (proj.group ==~ /.*?\.lucene(?:\.\w+)?/) {
-      topLvlProject = project.project(":lucene")
-    } else if (proj.group ==~ /.*?\.solr(?:\.\w+)?/) {
-      topLvlProject = project.project(":solr")
+
+  ext.getTopLvlProject = { Project proj ->
+    Project projectIt
+    if (proj == null) {
+      projectIt = project
+    } else {
+      projectIt = proj
     }
-    return topLvlProject
+    if (projectIt.getParent() == null) {
+      return projectI
+    }
+    while(projectIt.getParent() != projectIt.rootProject) {
+      projectIt = projectIt.getParent()
+    }
+    return projectIt
   }
 
   // keep the random seed constant for each subproject.

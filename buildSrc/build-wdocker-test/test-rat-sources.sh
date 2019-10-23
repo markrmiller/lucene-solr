@@ -21,9 +21,15 @@ command -v docker >/dev/null 2>&1 || { echo "docker must be installed to run thi
 
 OPTIND=1  # Reset in case getopts has been used previously in the shell.
 
-while getopts ":" opt; do
+results="undefined"
+
+
+while getopts ":r:" opt; do
     case "$opt" in
-    *)  
+    r)
+      results="${OPTARG}"
+      ;;
+    *)
       echo -e "\n-----> Invalid arg: $OPTARG  If it is a valid option, does it take an argument?"
       usage
       exit 1
@@ -43,16 +49,26 @@ exec() {
   docker exec --user ${UID} $2 -t ${CONTAINER_NAME} bash -c "$1"
 }
 
+writeResult() {
+  echo "$1" > ${results}
+}
+
 set -x
 
 exec_args=""
-gradle_args="--console=plain -x verifyLocks"
+gradle_args="--console=plain"
 
 # NOTE: we don't clean right now, as it would wipe out buildSrc/build on us for the host, but buildTest dependsOn clean
 
+
+echo "\n\nTestChecks#testRatSources"
+
+
+echo "${HOME}"
+
 # first check that rat passes
 cmd="cd /home/lucene/project;./gradlew ${gradle_args} ratSources"
-exec "${cmd}" "${exec_args}" || { exit 1; }
+exec "${cmd}" "${exec_args}" || { writeResult "The ratSources task did not pass when it should have"; exit 1; }
 
 # create an xml file with no license in lucene
 cmd="touch /home/lucene/project/lucene/core/src/java/org/no_license_test_file.xml"
@@ -61,11 +77,12 @@ exec "${cmd}" "${exec_args}" || { exit 1; }
 # test that rat fails on our test file
 cmd="cd /home/lucene/project;./gradlew ${gradle_args} ratSources"
 if exec "${cmd}" "${exec_args}"; then
-  echo "rat should fail!"
+  echo "The ratSources task passed when it should not have!"
+  writeResult "The ratSources task passed when it should not have!";
   exit 1 # rat should fail!
 fi
 
-# clean test file
+# clean test file - also done by the java test parent in case of failure
 cmd="rm /home/lucene/project/lucene/core/src/java/org/no_license_test_file.xml"
 exec "${cmd}" "${exec_args}" || { exit 1; }
 

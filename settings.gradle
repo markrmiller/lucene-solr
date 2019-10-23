@@ -7,9 +7,6 @@
  * in the user guide at https://docs.gradle.org/4.10.2/userguide/multi_project_builds.html
  */
 
-println rootProject.name
-println rootProject.projectDir
-
 include 'buildSrc'
 include 'dev-tools'
 
