@@ -29,7 +29,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -61,6 +63,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @see TestCloudPivotFacet
  */
+@LuceneTestCase.Slow
 public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -92,7 +95,7 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
                (STR_FIELD_SUFFIXES.length < MAX_FIELD_NUM) && (INT_FIELD_SUFFIXES.length < MAX_FIELD_NUM));
     
     // we need DVs on point fields to compute stats & facets
-    if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
+    if (Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP)) System.setProperty(SolrTestCaseJ4.NUMERIC_DOCVALUES_SYSPROP,"true");
     
     // multi replicas should not matter...
     final int repFactor = usually() ? 1 : 2;
@@ -197,7 +200,7 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
   /** Sanity check that malformed requests produce errors */
   public void testMalformedGivesError() throws Exception {
 
-    ignoreException(".*'join' domain change.*");
+    SolrTestCaseJ4.ignoreException(".*'join' domain change.*");
     
     for (String join : Arrays.asList("bogus",
                                      "{ }",
@@ -385,6 +388,8 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
       });
   }
 
+  @Nightly // can be very slow
+  @Slow
   public void testRandom() throws Exception {
 
     // we put a safety valve in place on the maximum number of buckets that we are willing to verify
@@ -821,7 +826,7 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
         from = field(suffixes, random().nextInt(MAX_FIELD_NUM));
         to = field(suffixes, random().nextInt(MAX_FIELD_NUM));
         // HACK: joined numeric point fields need docValues.. for now just skip _is fields if we are dealing with points.
-        if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP) && (from.endsWith("_is") || to.endsWith("_is")))
+        if (Boolean.getBoolean(SolrTestCaseJ4.NUMERIC_POINTS_SYSPROP) && (from.endsWith("_is") || to.endsWith("_is")))
         {
             continue;
         }

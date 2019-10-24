@@ -37,4 +37,15 @@ public class AlreadyClosedException extends IllegalStateException {
     super(msg, th);
   }
 
+  public static class CoreIsClosedException extends AlreadyClosedException {
+    
+    public CoreIsClosedException() {
+      super();
+    }
+    
+    public CoreIsClosedException(String s) {
+      super(s);
+    }
+  }
+  
 }

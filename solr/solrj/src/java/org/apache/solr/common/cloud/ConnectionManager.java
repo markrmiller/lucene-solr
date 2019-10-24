@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
@@ -134,12 +136,15 @@ public class ConnectionManager implements Watcher {
       likelyExpiredState = LikelyExpiredState.EXPIRED;
 
       log.warn("Our previous ZooKeeper session was expired. Attempting to reconnect to recover relationship with ZooKeeper...");
-
+      if (isClosed()) {
+        return;
+      }
       if (beforeReconnect != null) {
         try {
           beforeReconnect.command();
         } catch (Exception e) {
           log.warn("Exception running beforeReconnect command", e);
+          throw new SW.Exp(e);
         }
       }
 
@@ -154,14 +159,16 @@ public class ConnectionManager implements Watcher {
                 public void update(SolrZooKeeper keeper) {
                   try {
                     waitForConnected(Long.MAX_VALUE);
-
                     try {
                       client.updateKeeper(keeper);
-                    } catch (InterruptedException e) {
-                      closeKeeper(keeper);
-                      Thread.currentThread().interrupt();
-                      // we must have been asked to stop
-                      throw new RuntimeException(e);
+                    } catch (Exception e) {
+                      Exp exp = new SW.Exp(e);
+                      try {
+                        closeKeeper(keeper);
+                      } catch (Exception e1) {
+                        exp.addSuppressed(e1);
+                      } 
+                      throw exp;
                     }
 
                     if (onReconnect != null) {
@@ -181,8 +188,13 @@ public class ConnectionManager implements Watcher {
           break;
 
         } catch (Exception e) {
-          SolrException.log(log, "", e);
-          log.info("Could not connect due to error, sleeping for 1s and trying again");
+          if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+          }
+          
+          String msg = "Could not connect due to error, sleeping for 1s and trying again";
+          SolrException.log(log, msg, e);
+          log.info(msg);
           waitSleep(1000);
         }
 
@@ -197,11 +209,11 @@ public class ConnectionManager implements Watcher {
     }
   }
 
-  public synchronized boolean isConnectedAndNotClosed() {
+  public boolean isConnectedAndNotClosed() {
     return !isClosed() && connected;
   }
 
-  public synchronized boolean isConnected() {
+  public boolean isConnected() {
     return connected;
   }
 

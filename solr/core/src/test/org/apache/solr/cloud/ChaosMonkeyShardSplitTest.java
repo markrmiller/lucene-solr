@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase.CloudJettyRunner;
 import org.apache.solr.cloud.api.collections.ShardSplitTest;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.ClusterState;
@@ -68,7 +69,6 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
 
   @Test
   public void test() throws Exception {
-    waitForThingsToLevelOut(15);
 
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     final DocRouter router = clusterState.getCollection(AbstractDistribZkTestBase.DEFAULT_COLLECTION).getRouter();
@@ -107,16 +107,16 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
       };
       indexThread.start();
 
+      // nocommit
       // kill the leader
-      CloudJettyRunner leaderJetty = shardToLeaderJetty.get("shard1");
+      CloudJettyRunner leaderJetty = null;// shardToLeaderJetty.get("shard1");
       leaderJetty.jetty.stop();
 
       Thread.sleep(2000);
 
-      waitForThingsToLevelOut(90);
 
       Thread.sleep(1000);
-      checkShardConsistency(false, true);
+      //checkShardConsistency(false, true);
 
       CloudJettyRunner deadJetty = leaderJetty;
 
@@ -125,10 +125,10 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
       // SolrQuery("*:*")).getResults().getNumFound();
 
       // Wait until new leader is elected
-      while (deadJetty == leaderJetty) {
-        updateMappingsFromZk(this.jettys, this.clients);
-        leaderJetty = shardToLeaderJetty.get("shard1");
-      }
+//      while (deadJetty == leaderJetty) {
+//        updateMappingsFromZk(this.jettys, this.clients);
+//        leaderJetty = shardToLeaderJetty.get("shard1");
+//      }
 
       // bring back dead node
       deadJetty.jetty.start(); // he is not the leader anymore
@@ -137,15 +137,15 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
 
       // Kill the overseer
       // TODO: Actually kill the Overseer instance
-      killer = new OverseerRestarter(zkServer.getZkAddress());
-      killerThread = new Thread(killer);
-      killerThread.start();
-      killCounter.incrementAndGet();
+//      killer = new OverseerRestarter(cluster.getZkServer()));
+//      killerThread = new Thread(killer);
+//      killerThread.start();
+//      killCounter.incrementAndGet();
 
       splitShard(AbstractDistribZkTestBase.DEFAULT_COLLECTION, SHARD1, null, null, false);
 
       log.info("Layout after split: \n");
-      printLayout();
+     // printLayout();
 
       // distributed commit on all shards
     } finally {
@@ -166,7 +166,7 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
     // todo - can't call waitForThingsToLevelOut because it looks for
     // jettys of all shards
     // and the new sub-shards don't have any.
-    waitForRecoveriesToFinish(true);
+   // waitForRecoveriesToFinish(true);
     // waitForThingsToLevelOut(15);
   }
 
@@ -235,7 +235,6 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
         return;
       }
     }
-    printLayout();
     fail("timeout waiting to see recovered node");
   }
 
@@ -263,8 +262,7 @@ public class ChaosMonkeyShardSplitTest extends ShardSplitTest {
     Overseer overseer = new Overseer((HttpShardHandler) new HttpShardHandlerFactory().getShardHandler(), updateShardHandler, "/admin/cores",
         reader, null, new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "solr").build());
     overseer.close();
-    ElectionContext ec = new OverseerElectionContext(zkClient, overseer,
-        address.replaceAll("/", "_"));
+    ElectionContext ec = new OverseerElectionContext(address.replaceAll("/", "_"), zkClient, overseer);
     overseerElector.setup(ec);
     overseerElector.joinElection(ec, false);
     reader.close();

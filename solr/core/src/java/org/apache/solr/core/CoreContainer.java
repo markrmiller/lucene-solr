@@ -931,7 +931,6 @@ public class CoreContainer {
     try {
       if (isZooKeeperAware()) {
         cancelCoreRecoveries();
-        zkSys.zkController.preClose();
       }
 
       ExecutorUtil.shutdownAndAwaitTermination(coreContainerWorkExecutor);

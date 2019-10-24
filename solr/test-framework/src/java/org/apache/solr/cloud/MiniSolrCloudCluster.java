@@ -68,9 +68,9 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
-import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.KeeperException;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -106,7 +106,7 @@ public class MiniSolrCloudCluster {
       "    <str name=\"host\">127.0.0.1</str>\n" +
       "    <int name=\"hostPort\">${hostPort:8983}</int>\n" +
       "    <str name=\"hostContext\">${hostContext:solr}</str>\n" +
-      "    <int name=\"zkClientTimeout\">${solr.zkclienttimeout:30000}</int>\n" +
+      "    <int name=\"zkClientTimeout\">${solr.zkclienttimeout:45000}</int>\n" +
       "    <bool name=\"genericCoreNodeNames\">${genericCoreNodeNames:true}</bool>\n" +
       "    <int name=\"leaderVoteWait\">${leaderVoteWait:10000}</int>\n" +
       "    <int name=\"distribUpdateConnTimeout\">${distribUpdateConnTimeout:45000}</int>\n" +
@@ -325,16 +325,28 @@ public class MiniSolrCloudCluster {
   private void waitForAllNodes(int numServers, int timeoutSeconds) throws IOException, InterruptedException, TimeoutException {
     log.info("waitForAllNodes: numServers={}", numServers);
     
+    List<JettySolrRunner> runners = getJettySolrRunners();
+    
     int numRunning = 0;
     TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
     
+    ZkStateReader reader = getSolrClient().getZkStateReader();
+    int numReady = 0;
+    for (JettySolrRunner jetty : runners) {
+      reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> n != null && jetty != null && jetty.getNodeName() != null && n.contains(jetty.getNodeName()));
+      numReady++;
+      if (numServers == numReady) {
+        break;
+      }
+    }
+
     while (true) {
       if (timeout.hasTimedOut()) {
         throw new IllegalStateException("giving up waiting for all jetty instances to be running. numServers=" + numServers
             + " numRunning=" + numRunning);
       }
       numRunning = 0;
-      for (JettySolrRunner jetty : getJettySolrRunners()) {
+      for (JettySolrRunner jetty : runners) {
         if (jetty.isRunning()) {
           numRunning++;
         }
@@ -342,22 +354,23 @@ public class MiniSolrCloudCluster {
       if (numServers == numRunning) {
         break;
       }
-      Thread.sleep(100);
+      Thread.sleep(250);
     }
     
-    ZkStateReader reader = getSolrClient().getZkStateReader();
-    for (JettySolrRunner jetty : getJettySolrRunners()) {
-      reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> n.contains(jetty.getNodeName()));
-    }
+    log.info("Done waitForAllNodes: numServers={}", numServers);
   }
 
   public void waitForNode(JettySolrRunner jetty, int timeoutSeconds)
       throws IOException, InterruptedException, TimeoutException {
+    if (jetty.getNodeName() == null) {
+      log.info("Cannot wait for Jetty with null node name");
+      return;
+    }
     log.info("waitForNode: {}", jetty.getNodeName());
 
     ZkStateReader reader = getSolrClient().getZkStateReader();
 
-    reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> n.contains(jetty.getNodeName()));
+    reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> n != null && jetty != null && jetty.getNodeName() != null && n.contains(jetty.getNodeName()));
 
   }
 
@@ -531,45 +544,43 @@ public class MiniSolrCloudCluster {
 
   /** Delete all collections (and aliases) */
   public void deleteAllCollections() throws Exception {
-    try (ZkStateReader reader = new ZkStateReader(solrClient.getZkStateReader().getZkClient())) {
-      final CountDownLatch latch = new CountDownLatch(1);
-      reader.registerCloudCollectionsListener(new CloudCollectionsListener() {
-        
-        @Override
-        public void onChange(Set<String> oldCollections, Set<String> newCollections) {
-          if (newCollections != null && newCollections.size() == 0) {
-            latch.countDown();
-          }
+    ZkStateReader reader = solrClient.getZkStateReader();
+    final CountDownLatch latch = new CountDownLatch(1);
+    reader.registerCloudCollectionsListener(new CloudCollectionsListener() {
+
+      @Override
+      public void onChange(Set<String> oldCollections, Set<String> newCollections) {
+        if (newCollections != null && newCollections.size() == 0) {
+          latch.countDown();
         }
-      });
-      
-      reader.createClusterStateWatchersAndUpdate(); // up to date aliases & collections
-      reader.aliasesManager.applyModificationAndExportToZk(aliases -> Aliases.EMPTY);
-      for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
-        CollectionAdminRequest.deleteCollection(collection).process(solrClient);
       }
-      
-      boolean success = latch.await(60, TimeUnit.SECONDS);
-      if (!success) {
-        throw new IllegalStateException("Still waiting to see all collections removed from clusterstate.");
-      }
-      
-      for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
-        reader.waitForState(collection, 15, TimeUnit.SECONDS, (collectionState) -> collectionState == null ? true : false);
-      }
-     
-    } 
-    
+    });
+
+    reader.aliasesManager.applyModificationAndExportToZk(aliases -> Aliases.EMPTY);
+    for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
+      CollectionAdminRequest.deleteCollection(collection).process(solrClient);
+    }
+
+    boolean success = latch.await(60, TimeUnit.SECONDS);
+    if (!success) {
+      throw new IllegalStateException("Still waiting to see all collections removed from clusterstate.");
+    }
+
+    for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
+      reader.waitForState(collection, 15, TimeUnit.SECONDS,
+          (collectionState) -> collectionState == null ? true : false);
+    }
+
     // may be deleted, but may not be gone yet - we only wait to not see it in ZK, not for core unloads
     TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
     while (true) {
-      
-      if( timeout.hasTimedOut() ) {
+
+      if (timeout.hasTimedOut()) {
         throw new TimeoutException("Timed out waiting for all collections to be fully removed.");
       }
-      
+
       boolean allContainersEmpty = true;
-      for(JettySolrRunner jetty : jettys) {
+      for (JettySolrRunner jetty : jettys) {
         CoreContainer cc = jetty.getCoreContainer();
         if (cc != null && cc.getCores().size() != 0) {
           allContainersEmpty = false;
@@ -601,7 +612,7 @@ public class MiniSolrCloudCluster {
    */
   public void shutdown() throws Exception {
     try {
-    
+       // no commiit - do it ourselves
       IOUtils.closeQuietly(solrClient);
       List<Callable<JettySolrRunner>> shutdowns = new ArrayList<>(jettys.size());
       for (final JettySolrRunner jetty : jettys) {
@@ -640,7 +651,7 @@ public class MiniSolrCloudCluster {
   
   protected CloudSolrClient buildSolrClient() {
     return new Builder(Collections.singletonList(getZkServer().getZkAddress()), Optional.empty())
-        .withSocketTimeout(90000).withConnectionTimeout(15000).build(); // we choose 90 because we run in some harsh envs
+        .withSocketTimeout(Integer.getInteger("socketTimeout", 30000)).withConnectionTimeout(15000).build(); // we choose 90 because we run in some harsh envs
   }
 
   private static String getHostContextSuitableForServletContext(String ctx) {
@@ -765,6 +776,16 @@ public class MiniSolrCloudCluster {
 
   public void waitForActiveCollection(String collection, int shards, int totalReplicas) {
     waitForActiveCollection(collection,  30, TimeUnit.SECONDS, shards, totalReplicas);
+  }
+  
+  public void waitForRemovedCollection(String collection) {
+    try {
+      getSolrClient().waitForState(collection, 30, TimeUnit.SECONDS, (n, c) -> {
+        return c == null;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      throw new RuntimeException("Timeout waiting for removed collection: " + collection);
+    }
   }
   
   public static CollectionStatePredicate expectedShardsAndActiveReplicas(int expectedShards, int expectedReplicas) {

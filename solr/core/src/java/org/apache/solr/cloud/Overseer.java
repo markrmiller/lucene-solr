@@ -60,6 +60,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
@@ -222,16 +223,8 @@ public class Overseer implements SolrCloseable {
           try {
             // We do not need to filter any nodes here cause all processed nodes are removed once we flush clusterstate
             queue = new LinkedList<>(stateUpdateQueue.peekElements(1000, 3000L, (x) -> true));
-          } catch (KeeperException.SessionExpiredException e) {
-            log.warn("Solr cannot talk to ZK, exiting Overseer main queue loop", e);
-            return;
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
-          } catch (AlreadyClosedException e) {
-
           } catch (Exception e) {
-            log.error("Exception in Overseer main queue loop", e);
+            throw new SW.Exp(e);
           }
           try {
             Set<String> processedNodes = new HashSet<>();
@@ -260,23 +253,12 @@ public class Overseer implements SolrCloseable {
             // clean work queue
             stateUpdateQueue.remove(processedNodes);
             processedNodes.clear();
-          } catch (KeeperException.SessionExpiredException e) {
-            log.warn("Solr cannot talk to ZK, exiting Overseer main queue loop", e);
-            return;
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
-          } catch (AlreadyClosedException e) {
-  
           } catch (Exception e) {
-            log.error("Exception in Overseer main queue loop", e);
-            refreshClusterState = true; // it might have been a bad version error
+            throw new SW.Exp(e);
           }
         }
       } finally {
         log.info("Overseer Loop exiting : {}", LeaderElector.getNodeName(myId));
-        //do this in a separate thread because any wait is interrupted in this main thread
-        new Thread(this::checkIfIamStillLeader, "OverseerExitThread").start();
       }
     }
 
@@ -436,9 +418,9 @@ public class Overseer implements SolrCloseable {
       return Collections.singletonList(ZkStateWriter.NO_OP);
     }
 
+    // nocommit kill this
     private LeaderStatus amILeader() {
       Timer.Context timerContext = stats.time("am_i_leader");
-      boolean success = true;
       String propsId = null;
       try {
         ZkNodeProps props = ZkNodeProps.load(zkClient.getData(
@@ -447,33 +429,12 @@ public class Overseer implements SolrCloseable {
         if (myId.equals(propsId)) {
           return LeaderStatus.YES;
         }
-      } catch (KeeperException e) {
-        success = false;
-        if (e.code() == KeeperException.Code.CONNECTIONLOSS) {
-          log.error("", e);
-          return LeaderStatus.DONT_KNOW;
-        } else if (e.code() != KeeperException.Code.SESSIONEXPIRED) {
-          log.warn("", e);
-        } else {
-          log.debug("", e);
-        }
-      } catch (InterruptedException e) {
-        success = false;
-        Thread.currentThread().interrupt();
-      } catch (AlreadyClosedException e) {
-        success = false;
       } catch (Exception e) {
-        success = false;
-        log.warn("Unexpected exception", e);
+        throw new SW.Exp(e); 
       } finally {
         timerContext.stop();
-        if (success)  {
-          stats.success("am_i_leader");
-        } else  {
-          stats.error("am_i_leader");
-        }
       }
-      log.info("According to ZK I (id={}) am no longer a leader. propsId={}", myId, propsId);
+      
       return LeaderStatus.NO;
     }
 
@@ -743,7 +704,7 @@ public class Overseer implements SolrCloseable {
     return triggerThread;
   }
   
-  public synchronized void close() {
+  public void close() {
     if (this.id != null) {
       log.info("Overseer (id=" + id + ") closing");
     }
@@ -759,7 +720,7 @@ public class Overseer implements SolrCloseable {
   }
 
   private void doClose() {
-    
+    // nocommit fast close
     if (updaterThread != null) {
       IOUtils.closeQuietly(updaterThread);
       updaterThread.interrupt();

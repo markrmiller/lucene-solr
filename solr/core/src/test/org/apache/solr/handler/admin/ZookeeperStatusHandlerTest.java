@@ -101,7 +101,6 @@ public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
 
   @Test
   public void testEnsembleStatusMock() {
-    assumeWorkingMockito();
     ZookeeperStatusHandler zkStatusHandler = mock(ZookeeperStatusHandler.class);
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "ruok")).thenReturn(Arrays.asList("imok"));
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "mntr")).thenReturn(

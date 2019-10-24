@@ -25,8 +25,8 @@ import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.util.TimeOut;
 import org.junit.Test;
 
 import java.io.IOException;

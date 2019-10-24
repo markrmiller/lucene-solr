@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
@@ -60,7 +61,7 @@ public class DeleteNodeTest extends SolrCloudTestCase {
     Set<String> liveNodes = state.getLiveNodes();
     ArrayList<String> l = new ArrayList<>(liveNodes);
     Collections.shuffle(l, random());
-    CollectionAdminRequest.Create create = pickRandom(
+    CollectionAdminRequest.Create create = SolrTestCaseJ4.pickRandom(
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 2, 0, 0),
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 1, 1, 0),
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 0, 1, 1),

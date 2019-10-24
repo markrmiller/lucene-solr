@@ -38,6 +38,7 @@ import org.junit.Test;
 
 public class MetricTriggerTest extends SolrCloudTestCase {
 
+  private static final String DEFAULT_TEST_COLLECTION_NAME = "Collection1";
   private AutoScaling.TriggerEventProcessor noFirstRunProcessor = event -> {
     fail("Did not expect the listener to fire on first run!");
     return true;

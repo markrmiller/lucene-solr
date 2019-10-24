@@ -30,7 +30,6 @@ import org.gradle.api.Project
 import org.apache.commons.io.FilenameUtils
 import org.gradle.api.publish.maven.plugins.MavenPublishPlugin
 import org.apache.lucene.gradle.DepInsightReportTask
-import org.apache.lucene.gradle.testFast.FastTest
 
 plugins {
   id "com.palantir.consistent-versions" version "1.12.4"

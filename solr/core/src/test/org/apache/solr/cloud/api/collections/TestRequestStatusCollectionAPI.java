@@ -20,18 +20,19 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
-import org.apache.solr.cloud.BasicDistributedZkTest;
+import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.junit.Test;
 
-public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
+@LuceneTestCase.Slow
+public class TestRequestStatusCollectionAPI extends SolrCloudBridgeTestCase {
 
   public static final int MAX_WAIT_TIMEOUT_SECONDS = 90;
 
@@ -40,7 +41,7 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
   }
 
   @Test
-  public void test() throws Exception {
+  public void testRequestCollectionStatus() throws Exception {
     ModifiableSolrParams params = new ModifiableSolrParams();
 
     params.set(CollectionParams.ACTION, CollectionParams.CollectionAction.CREATE.toString());
@@ -220,12 +221,7 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
     QueryRequest request = new QueryRequest(params);
     request.setPath("/admin/collections");
 
-    String baseUrl = ((HttpSolrClient) shardToJetty.get(SHARD1).get(0).client.getSolrClient()).getBaseURL();
-    baseUrl = baseUrl.substring(0, baseUrl.length() - "collection1".length());
-
-    try (HttpSolrClient baseServer = getHttpSolrClient(baseUrl, 15000)) {
-      return baseServer.request(request);
-    }
+    return cloudClient.request(request);
 
   }
 }

@@ -87,14 +87,15 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CommonParams.EchoParamStyle;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.common.util.SmartClose;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.DirectoryFactory.DirContext;
 import org.apache.solr.core.snapshots.SolrSnapshotManager;
@@ -534,13 +535,15 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   }
 
   private SolrSnapshotMetaDataManager initSnapshotMetaDataManager() {
+    Directory snapshotDir = null;
     try {
       String dirName = getDataDir() + SolrSnapshotMetaDataManager.SNAPSHOT_METADATA_DIR + "/";
-      Directory snapshotDir = directoryFactory.get(dirName, DirContext.DEFAULT,
+          snapshotDir = directoryFactory.get(dirName, DirContext.DEFAULT,
           getSolrConfig().indexConfig.lockType);
       return new SolrSnapshotMetaDataManager(this, snapshotDir);
     } catch (Throwable e) {
       try {
+        // nocommit have to get this wwriter and writer close
         directoryFactory.doneWithDirectory(snapshotDir);
         directoryFactory.release(snapshotDir);
       } catch (Exception e1) {
@@ -549,11 +552,10 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       if (e instanceof Error) {
         throw (Error) e;
       }
-      // nocommit
       throw new IllegalStateException(e);
     }
   }
-
+  
   /**
    * This method deletes the snapshot with the specified name. If the directory
    * storing the snapshot is not the same as the *current* core index directory,
@@ -704,20 +706,18 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 
         solrCoreState.increfSolrCoreState();
         
-        try {
+        
         core = new SolrCore(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
             coreConfig.getIndexSchema(), coreConfig.getProperties(),
             cd, updateHandler, solrDelPolicy, currentCore, true);
-        } catch (SolrException e) {
-          if (e.getCause() instanceof AlreadyClosedException) {
-            decRefOnFail = true;
-          }
-          throw e;
-       }
+
+        // nocommit - have to fix core and corestate close / tracking
+        success = true;
+        
         // we open a new IndexWriter to pick up the latest config
         core.getUpdateHandler().getSolrCoreState().newIndexWriter(core, false);
         core.getSearcher(true, false, null, true);
-        success = true;
+
         return core;
    
       
@@ -1540,6 +1540,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 
   // this core current usage count
   private final AtomicInteger refCount = new AtomicInteger(1);
+  private volatile boolean isClosed = false;
 
   /**
    * expert: increments the core reference count
@@ -1575,6 +1576,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    */
   @Override
   public void close() {
+	  Error error = null;
     int count = refCount.decrementAndGet();
     if (count > 0) return; // close is called often, and only actually closes if nothing is using it.
     if (count < 0) {
@@ -1585,7 +1587,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     log.info("{} CLOSING SolrCore {}", logid, this);
 
     
-    if (this.isClosed) return;
+    if (this.isClosed()) return;
     this.isClosed = true;
     System.out.println("showdown " + count);
     try {
@@ -1598,7 +1600,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       }
     }
     
-    try (SmartClose closer = new SmartClose(this)) {
+    try (SW closer = new SW(this)) {
       List<Callable<?>> closeHookCalls = new ArrayList<>();
 
       if (closeHooks != null) {

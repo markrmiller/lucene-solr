@@ -54,6 +54,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.AutoScalingParams;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Pair;
@@ -76,6 +77,7 @@ import static org.apache.solr.common.util.Utils.fromJSON;
 
 public class ZkStateReader implements SolrCloseable {
   public static final int STATE_UPDATE_DELAY = Integer.getInteger("solr.OverseerStateUpdateDelay", 2000);  // delay between cloud state updates
+  // nocommit
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static final String BASE_URL_PROP = "base_url";
@@ -901,7 +903,7 @@ public class ZkStateReader implements SolrCloseable {
   public void close() {
 	    this.closed = true;
 
-	    try (SmartClose closer = new SmartClose(this)) {
+	    try (SW closer = new SW(this)) {
 	      notifications.shutdown();
 	      collectionPropsNotifications.shutdown();
 
@@ -2117,11 +2119,8 @@ public class ZkStateReader implements SolrCloseable {
         try {
           boolean updated = update();
           assert updated;
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new ZooKeeperException(ErrorCode.SERVER_ERROR, e.toString(), e);
-        } catch (KeeperException e) {
-          throw new ZooKeeperException(ErrorCode.SERVER_ERROR, e.toString(), e);
+        } catch (Exception e) {
+          throw new SW.Exp(e);
         }
       }
 

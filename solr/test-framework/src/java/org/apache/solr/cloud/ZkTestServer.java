@@ -16,38 +16,6 @@
  */
 package org.apache.solr.cloud;
 
-import com.google.common.util.concurrent.AtomicLongMap;
-
-import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.util.IOUtils;
-import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.common.util.Utils;
-import org.apache.solr.util.TimeOut;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.Op;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.data.Stat;
-import org.apache.zookeeper.jmx.ManagedUtil;
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.NIOServerCnxnFactory;
-import org.apache.zookeeper.server.ServerCnxn;
-import org.apache.zookeeper.server.ServerCnxnFactory;
-import org.apache.zookeeper.server.ServerConfig;
-import org.apache.zookeeper.server.SessionTracker.Session;
-import org.apache.zookeeper.server.ZKDatabase;
-import org.apache.zookeeper.server.ZooKeeperServer;
-import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
-import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.management.JMException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -70,6 +38,41 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.management.JMException;
+
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.TimeOut;
+import org.apache.solr.common.util.TimeSource;
+import org.apache.solr.common.util.Utils;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Op;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.jmx.ManagedUtil;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.NIOServerCnxnFactory;
+import org.apache.zookeeper.server.ServerCnxn;
+import org.apache.zookeeper.server.ServerCnxnFactory;
+import org.apache.zookeeper.server.ServerConfig;
+import org.apache.zookeeper.server.SessionTracker.Session;
+import org.apache.zookeeper.server.ZKDatabase;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
+import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.util.concurrent.AtomicLongMap;
 
 public class ZkTestServer {
 
@@ -106,6 +109,8 @@ public class ZkTestServer {
   protected volatile SolrZkClient chRootClient;
 
   private volatile ZKDatabase zkDb;
+  
+  public final AtomicBoolean startupWait = new AtomicBoolean(false);
 
   static public enum LimitViolationAction {
     IGNORE,
@@ -318,6 +323,7 @@ public class ZkTestServer {
      * @param config ServerConfig to use.
      * @throws IOException If there is a low-level I/O error.
      */
+    @SuppressWarnings("resource")
     public void runFromConfig(ServerConfig config) throws IOException {
       ObjectReleaseTracker.track(this);
       log.info("Starting server");
@@ -340,6 +346,10 @@ public class ZkTestServer {
         cnxnFactory.configure(config.getClientPortAddress(),
             config.getMaxClientCnxns());
         cnxnFactory.startup(zooKeeperServer);
+        startupWait.set(true);
+        synchronized (startupWait) {
+          startupWait.notifyAll();
+        }
         cnxnFactory.join();
 
         if (violationReportAction != LimitViolationAction.IGNORE) {
@@ -352,8 +362,7 @@ public class ZkTestServer {
           }
         }
       } catch (InterruptedException e) {
-        // warn, but generally this is ok
-        log.warn("Server interrupted", e);
+        throw new SW.Exp("Exception shutting down ZKTestServer", e);
       }
     }
 
@@ -361,36 +370,30 @@ public class ZkTestServer {
      * Shutdown the serving instance
      * @throws IOException If there is a low-level I/O error.
      */
+    @SuppressWarnings("resource")
     protected void shutdown() throws IOException {
-
-      // shutting down the cnxnFactory will close the zooKeeperServer
-      // zooKeeperServer.shutdown();
-
-      ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
       try {
+        ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
+
         if (cnxnFactory != null) {
-          while (true) {
-            cnxnFactory.shutdown();
-            try {
-              cnxnFactory.join();
-              break;
-            } catch (InterruptedException e) {
-              // Thread.currentThread().interrupt();
-              // don't keep interrupted status
-            }
-          }
+          cnxnFactory.shutdown();
         }
+
         if (zkDb != null) {
-          zkDb.close();
+          zkDb.clear();
         }
 
-        if (cnxnFactory != null && cnxnFactory.getLocalPort() != 0) {
-          waitForServerDown(getZkHost(), 30000);
+        try {
+          cnxnFactory.join();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
+      } catch (Exception e) {
+        throw new SW.Exp("Exception shutting down ZKTestServer", e);
       } finally {
-
         ObjectReleaseTracker.release(this);
       }
+
     }
 
     public int getLocalPort() {
@@ -571,31 +574,16 @@ public class ZkTestServer {
       };
 
       ObjectReleaseTracker.track(zooThread);
+
       zooThread.start();
 
-      int cnt = 0;
-      int port = -1;
-      try {
-        port = getPort();
-      } catch (IllegalStateException e) {
-
-      }
-      while (port < 1) {
-        Thread.sleep(100);
-        try {
-          port = getPort();
-        } catch (IllegalStateException e) {
-
-        }
-        if (cnt == 500) {
-          throw new RuntimeException("Could not get the port for ZooKeeper server");
-        }
-        cnt++;
-      }
-      log.info("start zk server on port:" + port);
-
-      waitForServerUp(getZkHost(), 30000);
-
+       synchronized (startupWait) {
+         while (!startupWait.get()) {
+           startupWait.wait(10000);
+         }
+       }
+      
+      
       init(solrFormat);
     } catch (Exception e) {
       log.error("Error trying to run ZK Test Server", e);
@@ -605,36 +593,38 @@ public class ZkTestServer {
 
   public void shutdown() throws IOException, InterruptedException {
     log.info("Shutting down ZkTestServer.");
+    Thread thread = new Thread() {
+      @Override
+      public void run() {
+        IOUtils.closeQuietly(rootClient);
+        IOUtils.closeQuietly(chRootClient);
+      }
+    };
     try {
-      IOUtils.closeQuietly(rootClient);
-      IOUtils.closeQuietly(chRootClient);
-    } finally {
 
+      thread.start();
       // TODO: this can log an exception while trying to unregister a JMX MBean
       try {
         zkServer.shutdown();
       } catch (Exception e) {
-        log.error("Exception shutting down ZooKeeper Test Server",e);
-      }
-
-      if (zkDb != null) {
-        zkDb.close();
+        log.error("Exception shutting down ZooKeeper Test Server", e);
       }
 
       while (true) {
         try {
-          zooThread.join();
+          //zooThread.join();
           ObjectReleaseTracker.release(zooThread);
           zooThread = null;
           break;
-        } catch (InterruptedException e) {
-          // don't keep interrupted status
         } catch (NullPointerException e) {
           // okay
           break;
         }
       }
+    } finally {
+      thread.join();
     }
+
     ObjectReleaseTracker.release(this);
   }
 
@@ -655,7 +645,7 @@ public class ZkTestServer {
       try {
         Thread.sleep(250);
       } catch (InterruptedException e) {
-        // ignore
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -676,7 +666,7 @@ public class ZkTestServer {
         throw new RuntimeException("Time out waiting for ZooKeeper to startup!");
       }
       try {
-        Thread.sleep(250);
+        Thread.sleep(500);
       } catch (InterruptedException e) {
         // ignore
       }

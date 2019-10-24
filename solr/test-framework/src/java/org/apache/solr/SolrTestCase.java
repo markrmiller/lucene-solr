@@ -41,11 +41,12 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.SuppressFileSystems;
 import org.apache.lucene.util.LuceneTestCase.SuppressSysoutChecks;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.SmartClose;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.update.DirectUpdateHandler2;
@@ -54,7 +55,6 @@ import org.apache.solr.util.RandomizeSSL;
 import org.apache.solr.util.RevertDefaultThreadHandlerRule;
 import org.apache.solr.util.StartupLoggingUtils;
 import org.apache.solr.util.TestInjection;
-import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -121,6 +121,10 @@ public class SolrTestCase extends LuceneTestCase {
    */
   @BeforeClass
   public static void beforeSolrTestCase() throws Exception {
+    
+    // this is the main thread running through the tests - give it max consideration
+    Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+    
     // ant test -Dargs="-Dtests.force.assumption.failure.beforeclass=true"
     final String PROP = "tests.force.assumption.failure.beforeclass";
     assumeFalse(PROP + " == true",

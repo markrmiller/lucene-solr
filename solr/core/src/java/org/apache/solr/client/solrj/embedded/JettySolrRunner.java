@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,13 +47,12 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.lucene.util.Constants;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
+import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.SolrjNamedThreadFactory;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.servlet.SolrDispatchFilter;
-import org.apache.solr.util.TimeOut;
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
@@ -93,16 +91,15 @@ public class JettySolrRunner {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final int THREAD_POOL_MAX_THREADS = 10000;
-  // NOTE: needs to be larger than SolrHttpClient.threadPoolSweeperMaxIdleTime
-  private static final int THREAD_POOL_MAX_IDLE_TIME_MS = 260000;
+  // NOTE: needs to be larger than HttpClientUtil.SolrHttpClient.EVICT_IDLE_CONNECTIONS
+  private static final int THREAD_POOL_MAX_IDLE_TIME_MS = HttpClientUtil.EVICT_IDLE_CONNECTIONS_DEFAULT + 10000;
 
   Server server;
 
-  volatile FilterHolder dispatchFilter;
-  volatile FilterHolder debugFilter;
+  private volatile FilterHolder dispatchFilter;
+  private volatile FilterHolder debugFilter;
 
-  private boolean waitOnSolr = false;
-  private int jettyPort = -1;
+  private volatile int jettyPort = -1;
 
   private final JettyConfig config;
   private final String solrHome;
@@ -110,19 +107,19 @@ public class JettySolrRunner {
 
   private volatile boolean startedBefore = false;
 
-  private LinkedList<FilterHolder> extraFilters;
+  private volatile LinkedList<FilterHolder> extraFilters;
 
   private static final String excludePatterns = "/css/.+,/js/.+,/img/.+,/tpl/.+";
 
-  private int proxyPort = -1;
+  private volatile int proxyPort = -1;
 
   private final boolean enableProxy;
 
-  private SocketProxy proxy;
+  private final SocketProxy proxy;
 
-  private String protocol;
+  private volatile String protocol;
 
-  private String host;
+  private volatile String host;
 
   private volatile boolean started = false;
 
@@ -254,6 +251,8 @@ public class JettySolrRunner {
         throw new RuntimeException(e);
       }
       setProxyPort(proxy.getListenPort());
+    } else {
+      proxy = null;
     }
 
     this.init(this.config.port);
@@ -262,146 +261,136 @@ public class JettySolrRunner {
   private void init(int port) {
 
     QueuedThreadPool qtp = new QueuedThreadPool();
-    qtp.setMaxThreads(THREAD_POOL_MAX_THREADS);
-    qtp.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
-    qtp.setReservedThreads(0);
+    qtp.setMaxThreads(Integer.getInteger("solr.maxContainerThreads", THREAD_POOL_MAX_THREADS));
+    qtp.setLowThreadsThreshold(Integer.getInteger("solr.lowContainerThreadsThreshold", -1)); // we don't use this or connections will get cut
+    qtp.setMinThreads(Integer.getInteger("solr.minContainerThreads", 1));
+    qtp.setIdleTimeout(Integer.getInteger("solr.containerThreadsIdle", THREAD_POOL_MAX_IDLE_TIME_MS));
+    qtp.setReservedThreads(-1); // -1 auto sizes, important to keep
     server = new Server(qtp);
     server.manage(qtp);
     server.setStopAtShutdown(config.stopAtShutdown);
 
-    if (System.getProperty("jetty.testMode") != null) {
-      // if this property is true, then jetty will be configured to use SSL
-      // leveraging the same system properties as java to specify
-      // the keystore/truststore if they are set unless specific config
-      // is passed via the constructor.
-      //
-      // This means we will use the same truststore, keystore (and keys) for
-      // the server as well as any client actions taken by this JVM in
-      // talking to that server, but for the purposes of testing that should
-      // be good enough
-      final SslContextFactory sslcontext = SSLConfig.createContextFactory(config.sslConfig);
+    // if this property is true, then jetty will be configured to use SSL
+    // leveraging the same system properties as java to specify
+    // the keystore/truststore if they are set unless specific config
+    // is passed via the constructor.
+    //
+    // This means we will use the same truststore, keystore (and keys) for
+    // the server as well as any client actions taken by this JVM in
+    // talking to that server, but for the purposes of testing that should
+    // be good enough
+    final SslContextFactory sslcontext = SSLConfig.createContextFactory(config.sslConfig);
 
-      HttpConfiguration configuration = new HttpConfiguration();
-      ServerConnector connector;
-      if (sslcontext != null) {
-        configuration.setSecureScheme("https");
-        configuration.addCustomizer(new SecureRequestCustomizer());
-        HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(configuration);
+    HttpConfiguration configuration = new HttpConfiguration();
+    ServerConnector connector;
+    if (sslcontext != null) {
+      configuration.setSecureScheme("https");
+      configuration.addCustomizer(new SecureRequestCustomizer());
+      HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(configuration);
 
-        if (config.onlyHttp1 || !Constants.JRE_IS_MINIMUM_JAVA9) {
-          connector = new ServerConnector(server, new SslConnectionFactory(sslcontext,
-              http1ConnectionFactory.getProtocol()),
-              http1ConnectionFactory);
-        } else {
-          sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
-
-          connector = new ServerConnector(server);
-          SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
-          connector.addConnectionFactory(sslConnectionFactory);
-          connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
-
-          HTTP2ServerConnectionFactory http2ConnectionFactory = new HTTP2ServerConnectionFactory(configuration);
-
-          ALPNServerConnectionFactory alpn = new ALPNServerConnectionFactory(
-              http2ConnectionFactory.getProtocol(),
-              http1ConnectionFactory.getProtocol());
-          alpn.setDefaultProtocol(http1ConnectionFactory.getProtocol());
-          connector.addConnectionFactory(alpn);
-          connector.addConnectionFactory(http1ConnectionFactory);
-          connector.addConnectionFactory(http2ConnectionFactory);
-        }
+      if (config.onlyHttp1 || !Constants.JRE_IS_MINIMUM_JAVA9) {
+        connector = new ServerConnector(server, new SslConnectionFactory(sslcontext,
+            http1ConnectionFactory.getProtocol()),
+            http1ConnectionFactory);
       } else {
-        if (config.onlyHttp1) {
-          connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
-        } else {
-          connector = new ServerConnector(server, new HttpConnectionFactory(configuration),
-              new HTTP2CServerConnectionFactory(configuration));
-        }
-      }
+        sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
 
-      connector.setReuseAddress(true);
-      connector.setSoLingerTime(-1);
-      connector.setPort(port);
-      connector.setHost("127.0.0.1");
-      connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
-      connector.setStopTimeout(0);
-      server.setConnectors(new Connector[] {connector});
-      server.setSessionIdManager(new DefaultSessionIdManager(server, new Random()));
+        connector = new ServerConnector(server);
+        SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
+        connector.addConnectionFactory(sslConnectionFactory);
+        connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
+
+        HTTP2ServerConnectionFactory http2ConnectionFactory = new HTTP2ServerConnectionFactory(configuration);
+
+        ALPNServerConnectionFactory alpn = new ALPNServerConnectionFactory(
+            http2ConnectionFactory.getProtocol(),
+            http1ConnectionFactory.getProtocol());
+        alpn.setDefaultProtocol(http1ConnectionFactory.getProtocol());
+        connector.addConnectionFactory(alpn);
+        connector.addConnectionFactory(http1ConnectionFactory);
+        connector.addConnectionFactory(http2ConnectionFactory);
+      }
     } else {
-      HttpConfiguration configuration = new HttpConfiguration();
-      ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
-      connector.setPort(port);
-      connector.setSoLingerTime(-1);
-      connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
-      server.setConnectors(new Connector[] {connector});
+      if (config.onlyHttp1) {
+        connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
+      } else {
+        connector = new ServerConnector(server, new HttpConnectionFactory(configuration),
+            new HTTP2CServerConnectionFactory(configuration));
+      }
     }
+
+    connector.setReuseAddress(true);
+    connector.setSoLingerTime(-1);
+    connector.setPort(port);
+    connector.setHost("127.0.0.1");
+    connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
+    connector.setStopTimeout(10000);
+    server.setConnectors(new Connector[] {connector});
+    server.setSessionIdManager(new DefaultSessionIdManager(server, new Random()));
 
     HandlerWrapper chain;
     {
-    // Initialize the servlets
-    final ServletContextHandler root = new ServletContextHandler(server, config.context, ServletContextHandler.SESSIONS);
+      // Initialize the servlets
+      final ServletContextHandler root = new ServletContextHandler(server, config.context,
+          ServletContextHandler.SESSIONS);
 
-    server.addLifeCycleListener(new LifeCycle.Listener() {
+      server.addLifeCycleListener(new LifeCycle.Listener() {
 
-      @Override
-      public void lifeCycleStopping(LifeCycle arg0) {
-      }
-
-      @Override
-      public void lifeCycleStopped(LifeCycle arg0) {}
-
-      @Override
-      public void lifeCycleStarting(LifeCycle arg0) {
-
-      }
-
-      @Override
-      public void lifeCycleStarted(LifeCycle arg0) {
-
-        jettyPort = getFirstConnectorPort();
-        int port = jettyPort;
-        if (proxyPort != -1) port = proxyPort;
-        nodeProperties.setProperty("hostPort", Integer.toString(port));
-        nodeProperties.setProperty("hostContext", config.context);
-
-        root.getServletContext().setAttribute(SolrDispatchFilter.PROPERTIES_ATTRIBUTE, nodeProperties);
-        root.getServletContext().setAttribute(SolrDispatchFilter.SOLRHOME_ATTRIBUTE, solrHome);
-
-        log.info("Jetty properties: {}", nodeProperties);
-
-        debugFilter = root.addFilter(DebugFilter.class, "*", EnumSet.of(DispatcherType.REQUEST) );
-        extraFilters = new LinkedList<>();
-        for (Map.Entry<Class<? extends Filter>, String> entry : config.extraFilters.entrySet()) {
-          extraFilters.add(root.addFilter(entry.getKey(), entry.getValue(), EnumSet.of(DispatcherType.REQUEST)));
+        @Override
+        public void lifeCycleStopping(LifeCycle arg0) {
         }
 
-        for (Map.Entry<ServletHolder, String> entry : config.extraServlets.entrySet()) {
-          root.addServlet(entry.getKey(), entry.getValue());
+        @Override
+        public void lifeCycleStopped(LifeCycle arg0) {
         }
-        dispatchFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
-        dispatchFilter.setHeldClass(SolrDispatchFilter.class);
-        dispatchFilter.setInitParameter("excludePatterns", excludePatterns);
-        root.addFilter(dispatchFilter, "*", EnumSet.of(DispatcherType.REQUEST));
 
-        synchronized (JettySolrRunner.this) {
-          waitOnSolr = true;
-          JettySolrRunner.this.notify();
+        @Override
+        public void lifeCycleStarting(LifeCycle arg0) {
+
         }
-      }
 
-      @Override
-      public void lifeCycleFailure(LifeCycle arg0, Throwable arg1) {
-        System.clearProperty("hostPort");
-      }
-    });
-    // for some reason, there must be a servlet for this to get applied
-    root.addServlet(Servlet404.class, "/*");
-    chain = root;
+        @Override
+        public void lifeCycleStarted(LifeCycle arg0) {
+
+          jettyPort = getFirstConnectorPort();
+          int port = jettyPort;
+          if (proxyPort != -1) port = proxyPort;
+          nodeProperties.setProperty("hostPort", Integer.toString(port));
+          nodeProperties.setProperty("hostContext", config.context);
+
+          root.getServletContext().setAttribute(SolrDispatchFilter.PROPERTIES_ATTRIBUTE, nodeProperties);
+          root.getServletContext().setAttribute(SolrDispatchFilter.SOLRHOME_ATTRIBUTE, solrHome);
+
+          log.info("Jetty properties: {}", nodeProperties);
+
+          debugFilter = root.addFilter(DebugFilter.class, "*", EnumSet.of(DispatcherType.REQUEST));
+          extraFilters = new LinkedList<>();
+          for (Map.Entry<Class<? extends Filter>,String> entry : config.extraFilters.entrySet()) {
+            extraFilters.add(root.addFilter(entry.getKey(), entry.getValue(), EnumSet.of(DispatcherType.REQUEST)));
+          }
+
+          for (Map.Entry<ServletHolder,String> entry : config.extraServlets.entrySet()) {
+            root.addServlet(entry.getKey(), entry.getValue());
+          }
+          dispatchFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
+          dispatchFilter.setHeldClass(SolrDispatchFilter.class);
+          dispatchFilter.setInitParameter("excludePatterns", excludePatterns);
+          root.addFilter(dispatchFilter, "*", EnumSet.of(DispatcherType.REQUEST)); // nocommit maybe async
+        }
+
+        @Override
+        public void lifeCycleFailure(LifeCycle arg0, Throwable arg1) {
+          System.clearProperty("hostPort");
+        }
+      });
+      // for some reason, there must be a servlet for this to get applied
+      root.addServlet(Servlet404.class, "/*");
+      chain = root;
     }
 
     chain = injectJettyHandlers(chain);
 
-    if(config.enableV2) {
+    if (config.enableV2) {
       RewriteHandler rwh = new RewriteHandler();
       rwh.setHandler(chain);
       rwh.setRewriteRequestURI(true);
@@ -495,7 +484,6 @@ public class JettySolrRunner {
 
       // if started before, make a new server
       if (startedBefore) {
-        waitOnSolr = false;
         init(port);
       } else {
         startedBefore = true;
@@ -508,19 +496,6 @@ public class JettySolrRunner {
           server.start();
         }
       }
-      synchronized (JettySolrRunner.this) {
-        int cnt = 0;
-        while (!waitOnSolr || !dispatchFilter.isRunning() || getCoreContainer() == null) {
-          this.wait(100);
-          if (cnt++ == 15) {
-            throw new RuntimeException("Jetty/Solr unresponsive");
-          }
-        }
-      }
-
-      if (config.waitForLoadingCoresToFinishMs != null && config.waitForLoadingCoresToFinishMs > 0L) {
-        waitForLoadingCoresToFinish(config.waitForLoadingCoresToFinishMs);
-      }
 
       setProtocolAndHost();
 
@@ -532,6 +507,11 @@ public class JettySolrRunner {
         }
       }
 
+      
+
+      if (config.waitForLoadingCoresToFinishMs != null && config.waitForLoadingCoresToFinishMs > 0L) {
+        waitForLoadingCoresToFinish(config.waitForLoadingCoresToFinishMs);
+      }
     } finally {
       started  = true;
       if (prevContext != null)  {
@@ -614,27 +594,6 @@ public class JettySolrRunner {
     try {
       Filter filter = dispatchFilter.getFilter();
 
-      // we want to shutdown outside of jetty cutting us off
-      SolrDispatchFilter sdf = getSolrDispatchFilter();
-      ExecutorService customThreadPool = null;
-      if (sdf != null) {
-        customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("jettyShutDown"));
-
-        sdf.closeOnDestroy(false);
-//        customThreadPool.submit(() -> {
-//          try {
-//            sdf.close();
-//          } catch (Throwable t) {
-//            log.error("Error shutting down Solr", t);
-//          }
-//        });
-        try {
-          sdf.close();
-        } catch (Throwable t) {
-          log.error("Error shutting down Solr", t);
-        }
-      }
-
       QueuedThreadPool qtp = (QueuedThreadPool) server.getThreadPool();
       ReservedThreadExecutor rte = qtp.getBean(ReservedThreadExecutor.class);
 
@@ -649,41 +608,23 @@ public class JettySolrRunner {
         }
       }
 
-      // stop timeout is 0, so we will interrupt right away
-      while(!qtp.isStopped()) {
-        qtp.stop();
-        if (qtp.isStopped()) {
-          Thread.sleep(50);
-        }
-      }
-
       // we tried to kill everything, now we wait for executor to stop
-      qtp.setStopTimeout(Integer.MAX_VALUE);
+      qtp.setStopTimeout(15000);
       qtp.stop();
-      qtp.join();
 
       if (rte != null) {
         // we try and wait for the reserved thread executor, but it doesn't always seem to work
         // so we actually set 0 reserved threads at creation
-
         rte.stop();
-
-        TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-        timeout.waitFor("Timeout waiting for reserved executor to stop.", ()
-            -> rte.isStopped());
       }
 
-      if (customThreadPool != null) {
-        ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
-      }
+      try {
 
-      do {
-        try {
-          server.join();
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      } while (!server.isStopped());
+        qtp.join();
+        server.join();
+      } catch (InterruptedException e) {
+        // ignore
+      }
 
     } finally {
       if (enableProxy) {

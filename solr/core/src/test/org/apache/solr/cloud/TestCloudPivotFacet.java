@@ -16,6 +16,10 @@
  */
 package org.apache.solr.cloud;
 
+import static org.apache.solr.SolrTestCaseJ4.skewed;
+import static org.apache.solr.SolrTestCaseJ4.randomDate;
+import static org.apache.solr.SolrTestCaseJ4.randomSkewedDate;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
@@ -26,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.FieldStatsInfo;
@@ -627,13 +633,13 @@ public class TestCloudPivotFacet extends SolrCloudBridgeTestCase {
     for (String prefix : new String[] { "pivot_x_s", "pivot_y_s", "pivot_z_s"}) {
       if (useField()) {
         doc.addField(prefix+"1", skewed(TestUtil.randomSimpleString(random(), 1, 1),
-                                        randomXmlUsableUnicodeString()));
+            SolrTestCaseJ4.randomXmlUsableUnicodeString()));
       }
       if (useField()) {
         int numMulti = atLeast(1);
         while (0 < numMulti--) {
           doc.addField(prefix, skewed(TestUtil.randomSimpleString(random(), 1, 1),
-                                      randomXmlUsableUnicodeString()));
+              SolrTestCaseJ4.randomXmlUsableUnicodeString()));
         }
       }
     }

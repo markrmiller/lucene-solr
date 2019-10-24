@@ -986,7 +986,6 @@ public abstract class SolrClient implements Serializable, Closeable {
     return new SolrPing().process(this, null);
   }
 
-
   /**
    * Performs a query to the Solr server
    *

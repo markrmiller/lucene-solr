@@ -193,13 +193,19 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
   @Override
   public PermissionNameProvider.Name getPermissionName(AuthorizationContext ctx) {
+    if (log.isDebugEnabled()) {
+      log.debug("getPermissionName(AuthorizationContext ctx={}) - start", ctx);
+    }
+
     String action = ctx.getParams().get("action");
     if (action == null) return PermissionNameProvider.Name.COLL_READ_PERM;
     CollectionParams.CollectionAction collectionAction = CollectionParams.CollectionAction.get(action);
     if (collectionAction == null) return null;
-    return collectionAction.isWrite ?
-        PermissionNameProvider.Name.COLL_EDIT_PERM :
-        PermissionNameProvider.Name.COLL_READ_PERM;
+    PermissionNameProvider.Name returnName = collectionAction.isWrite ? PermissionNameProvider.Name.COLL_EDIT_PERM : PermissionNameProvider.Name.COLL_READ_PERM;
+    if (log.isDebugEnabled()) {
+      log.debug("getPermissionName(AuthorizationContext) - end");
+    }
+    return returnName;
   }
 
   @Override
@@ -218,14 +224,26 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
   }
 
   protected void copyFromClusterProp(Map<String, Object> props, String prop) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("copyFromClusterProp(Map<String,Object> props={}, String prop={}) - start", props, prop);
+    }
+
     if (props.get(prop) != null) return;//if it's already specified , return
     Object defVal = new ClusterProperties(coreContainer.getZkController().getZkStateReader().getZkClient())
         .getClusterProperty(ImmutableList.of(CollectionAdminParams.DEFAULTS, CollectionAdminParams.COLLECTION, prop), null);
     if (defVal != null) props.put(prop, String.valueOf(defVal));
+
+    if (log.isDebugEnabled()) {
+      log.debug("copyFromClusterProp(Map<String,Object>, String) - end");
+    }
   }
 
   @Override
   public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+    if (log.isDebugEnabled()) {
+      log.debug("handleRequestBody(SolrQueryRequest req={}, SolrQueryResponse rsp={}) - start", req, rsp);
+    }
+
     // Make sure the cores is enabled
     CoreContainer cores = getCoreContainer();
     if (cores == null) {
@@ -255,15 +273,26 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       throw new SolrException(ErrorCode.BAD_REQUEST, "action is a required param");
     }
     rsp.setHttpCaching(false);
+
+    if (log.isDebugEnabled()) {
+      log.debug("handleRequestBody(SolrQueryRequest, SolrQueryResponse) - end");
+    }
   }
 
   void invokeAction(SolrQueryRequest req, SolrQueryResponse rsp, CoreContainer cores, CollectionAction action, CollectionOperation operation) throws Exception {
+    if (log.isDebugEnabled()) {
+      log.debug("invokeAction(SolrQueryRequest req={}, SolrQueryResponse rsp={}, CoreContainer cores={}, CollectionAction action={}, CollectionOperation operation={}) - start", req, rsp, cores, action, operation);
+    }
+
     if (!coreContainer.isZooKeeperAware()) {
       throw new SolrException(BAD_REQUEST,
           "Invalid request. collections can be accessed only in SolrCloud mode");
     }
     Map<String, Object> props = operation.execute(req, rsp, this);
     if (props == null) {
+      if (log.isDebugEnabled()) {
+        log.debug("invokeAction(SolrQueryRequest, SolrQueryResponse, CoreContainer, CollectionAction, CollectionOperation) - end");
+      }
       return;
     }
 
@@ -295,6 +324,9 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       coreContainer.getZkController().getOverseer().offerStateUpdate(Utils.toJSON(props));
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("invokeAction(SolrQueryRequest, SolrQueryResponse, CoreContainer, CollectionAction, CollectionOperation) - end");
+    }
   }
 
 
@@ -311,10 +343,22 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
   public static long DEFAULT_COLLECTION_OP_TIMEOUT = 180 * 1000;
 
   public SolrResponse sendToOCPQueue(ZkNodeProps m) throws KeeperException, InterruptedException {
-    return sendToOCPQueue(m, DEFAULT_COLLECTION_OP_TIMEOUT);
+    if (log.isDebugEnabled()) {
+      log.debug("sendToOCPQueue(ZkNodeProps m={}) - start", m);
+    }
+
+    SolrResponse returnSolrResponse = sendToOCPQueue(m, DEFAULT_COLLECTION_OP_TIMEOUT);
+    if (log.isDebugEnabled()) {
+      log.debug("sendToOCPQueue(ZkNodeProps) - end");
+    }
+    return returnSolrResponse;
   }
 
   public SolrResponse sendToOCPQueue(ZkNodeProps m, long timeout) throws KeeperException, InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("sendToOCPQueue(ZkNodeProps m={}, long timeout={}) - start", m, timeout);
+    }
+
     String operation = m.getStr(QUEUE_OPERATION);
     if (operation == null) {
       throw new SolrException(ErrorCode.BAD_REQUEST, "missing key " + QUEUE_OPERATION);
@@ -360,7 +404,11 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       }
       r.add(CoreAdminParams.REQUESTID, (String) m.get(ASYNC));
 
-      return new OverseerSolrResponse(r);
+      SolrResponse returnSolrResponse = new OverseerSolrResponse(r);
+      if (log.isDebugEnabled()) {
+        log.debug("sendToOCPQueue(ZkNodeProps, long) - end");
+      }
+      return returnSolrResponse;
     }
 
     long time = System.nanoTime();
@@ -368,7 +416,11 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         .getOverseerCollectionQueue()
         .offer(Utils.toJSON(m), timeout);
     if (event.getBytes() != null) {
-      return SolrResponse.deserialize(event.getBytes());
+      SolrResponse returnSolrResponse = SolrResponse.deserialize(event.getBytes());
+      if (log.isDebugEnabled()) {
+        log.debug("sendToOCPQueue(ZkNodeProps, long) - end");
+      }
+      return returnSolrResponse;
     } else {
       if (System.nanoTime() - time >= TimeUnit.NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS)) {
         throw new SolrException(ErrorCode.SERVER_ERROR, operation
@@ -387,8 +439,16 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
   }
 
   private boolean overseerCollectionQueueContains(String asyncId) throws KeeperException, InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("overseerCollectionQueueContains(String asyncId={}) - start", asyncId);
+    }
+
     OverseerTaskQueue collectionQueue = coreContainer.getZkController().getOverseerCollectionQueue();
-    return collectionQueue.containsTaskWithRequestId(ASYNC, asyncId);
+    boolean returnboolean = collectionQueue.containsTaskWithRequestId(ASYNC, asyncId);
+    if (log.isDebugEnabled()) {
+      log.debug("overseerCollectionQueueContains(String) - end");
+    }
+    return returnboolean;
   }
 
   /**
@@ -400,6 +460,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
    * @return the map supplied in the props parameter, modified to contain the prefixed params.
    */
   private static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+    if (log.isDebugEnabled()) {
+      log.debug("copyPropertiesWithPrefix(SolrParams params={}, Map<String,Object> props={}, String prefix={}) - start", params, props, prefix);
+    }
+
     Iterator<String> iter = params.getParameterNamesIterator();
     while (iter.hasNext()) {
       String param = iter.next();
@@ -411,13 +475,25 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         props.put(param, values[0]);
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("copyPropertiesWithPrefix(SolrParams, Map<String,Object>, String) - end");
+    }
     return props;
   }
 
   public static ModifiableSolrParams params(String... params) {
+    if (log.isDebugEnabled()) {
+      log.debug("params(String params={}) - start", Arrays.asList(params));
+    }
+
     ModifiableSolrParams msp = new ModifiableSolrParams();
     for (int i = 0; i < params.length; i += 2) {
       msp.add(params[i], params[i + 1]);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("params(String) - end");
     }
     return msp;
   }
@@ -435,6 +511,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
   }
 
   private static void createSysConfigSet(CoreContainer coreContainer) throws KeeperException, InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("createSysConfigSet(CoreContainer coreContainer={}) - start", coreContainer);
+    }
+
     SolrZkClient zk = coreContainer.getZkController().getZkStateReader().getZkClient();
     ZkCmdExecutor cmdExecutor = new ZkCmdExecutor(zk.getZkClientTimeout());
     cmdExecutor.ensureExists(ZkStateReader.CONFIGS_ZKNODE, zk);
@@ -450,17 +530,30 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       assert data != null && data.length > 0;
       cmdExecutor.ensureExists(path, data, CreateMode.PERSISTENT, zk);
     } catch (IOException e) {
+      log.error("createSysConfigSet(CoreContainer=" + coreContainer + ")", e);
+
       throw new SolrException(ErrorCode.SERVER_ERROR, e);
     }
 
 
+    if (log.isDebugEnabled()) {
+      log.debug("createSysConfigSet(CoreContainer) - end");
+    }
   }
 
   private static void addStatusToResponse(NamedList<Object> results, RequestStatusState state, String msg) {
+    if (log.isDebugEnabled()) {
+      log.debug("addStatusToResponse(NamedList<Object> results={}, RequestStatusState state={}, String msg={}) - start", results, state, msg);
+    }
+
     SimpleOrderedMap<String> status = new SimpleOrderedMap<>();
     status.add("state", state.getKey());
     status.add("msg", msg);
     results.add("status", status);
+
+    if (log.isDebugEnabled()) {
+      log.debug("addStatusToResponse(NamedList<Object>, RequestStatusState, String) - end");
+    }
   }
 
   public enum CollectionOperation implements CollectionOp {
@@ -896,6 +989,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       @SuppressWarnings("unchecked")
       @Override
       public Map<String, Object> execute(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler h) throws Exception {
+        if (log.isDebugEnabled()) {
+          log.debug("$CollectionOp.execute(SolrQueryRequest req={}, SolrQueryResponse rsp={}, CollectionsHandler h={}) - start", req, rsp, h);
+        }
+
         final CoreContainer coreContainer = h.coreContainer;
         final String requestId = req.getParams().get(REQUESTID);
         final ZkController zkController = coreContainer.getZkController();
@@ -922,6 +1019,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
             zkController.clearAsyncId(asyncId);
           }
           rsp.getValues().add("status", "successfully cleared stored collection api responses");
+
+          if (log.isDebugEnabled()) {
+            log.debug("$CollectionOp.execute(SolrQueryRequest, SolrQueryResponse, CollectionsHandler) - end");
+          }
           return null;
         } else {
           // Request to cleanup
@@ -935,6 +1036,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
             rsp.getValues().add("status", "[" + requestId + "] not found in stored responses");
             // Don't call zkController.clearAsyncId for this, since it could be a running/pending task
           }
+        }
+
+        if (log.isDebugEnabled()) {
+          log.debug("$CollectionOp.execute(SolrQueryRequest, SolrQueryResponse, CollectionsHandler) - end");
         }
         return null;
       }
@@ -1280,6 +1385,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
      * @return The sink map, or a new map if the sink map was null
      */
     private static Map<String, Object> convertPrefixToMap(SolrParams params, Map<String, Object> sink, String prefix) {
+      if (log.isDebugEnabled()) {
+        log.debug("convertPrefixToMap(SolrParams params={}, Map<String,Object> sink={}, String prefix={}) - start", params, sink, prefix);
+      }
+
       Map<String, Object> result = new LinkedHashMap<>();
       Iterator<String> iter = params.getParameterNamesIterator();
       while (iter.hasNext()) {
@@ -1292,6 +1401,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         sink = new LinkedHashMap<>();
       }
       sink.put(prefix, result);
+
+      if (log.isDebugEnabled()) {
+        log.debug("convertPrefixToMap(SolrParams, Map<String,Object>, String) - end");
+      }
       return sink;
     }
 
@@ -1313,6 +1426,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     }
 
     public static CollectionOperation get(CollectionAction action) {
+      if (log.isDebugEnabled()) {
+        log.debug("get(CollectionAction action={}) - start", action);
+      }
+
       for (CollectionOperation op : values()) {
         if (op.action == action) return op;
       }
@@ -1322,11 +1439,23 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     @Override
     public Map<String, Object> execute(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler h)
         throws Exception {
-      return fun.execute(req, rsp, h);
+      if (log.isDebugEnabled()) {
+        log.debug("execute(SolrQueryRequest req={}, SolrQueryResponse rsp={}, CollectionsHandler h={}) - start", req, rsp, h);
+      }
+
+      Map<String,Object> returnMap = fun.execute(req, rsp, h);
+      if (log.isDebugEnabled()) {
+        log.debug("execute(SolrQueryRequest, SolrQueryResponse, CollectionsHandler) - end");
+      }
+      return returnMap;
     }
   }
 
   private static void forceLeaderElection(SolrQueryRequest req, CollectionsHandler handler) {
+    if (log.isDebugEnabled()) {
+      log.debug("forceLeaderElection(SolrQueryRequest req={}, CollectionsHandler handler={}) - start", req, handler);
+    }
+
     ZkController zkController = handler.coreContainer.getZkController();
     ClusterState clusterState = zkController.getClusterState();
     String extCollectionName = req.getParams().required().get(COLLECTION_PROP);
@@ -1384,13 +1513,22 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
+      log.error("forceLeaderElection(SolrQueryRequest=" + req + ", CollectionsHandler=" + handler + ")", e);
+
       throw new SolrException(ErrorCode.SERVER_ERROR,
           "Error executing FORCELEADER operation for collection: " + collectionName + " shard: " + sliceId, e);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("forceLeaderElection(SolrQueryRequest, CollectionsHandler) - end");
     }
   }
 
   public static void waitForActiveCollection(String collectionName, CoreContainer cc, SolrResponse createCollResponse)
       throws KeeperException, InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("waitForActiveCollection(String collectionName={}, CoreContainer cc={}, SolrResponse createCollResponse={}) - start", collectionName, cc, createCollResponse);
+    }
 
     if (createCollResponse.getResponse().get("exception") != null) {
       // the main called failed, don't wait
@@ -1446,14 +1584,22 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         return false;
       });
     } catch (TimeoutException | InterruptedException e) {
+      log.error("waitForActiveCollection(String=" + collectionName + ", CoreContainer=" + cc + ", SolrResponse=" + createCollResponse + ")", e);
 
       String error = "Timeout waiting for active collection " + collectionName + " with timeout=" + seconds;
       throw new NotInClusterStateException(ErrorCode.SERVER_ERROR, error);
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("waitForActiveCollection(String, CoreContainer, SolrResponse) - end");
+    }
   }
 
   public static void verifyRuleParams(CoreContainer cc, Map<String, Object> m) {
+    if (log.isDebugEnabled()) {
+      log.debug("verifyRuleParams(CoreContainer cc={}, Map<String,Object> m={}) - start", cc, m);
+    }
+
     List l = (List) m.get(RULE);
     if (l != null) {
       for (Object o : l) {
@@ -1461,18 +1607,28 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         try {
           new Rule(map);
         } catch (Exception e) {
+          log.error("verifyRuleParams(CoreContainer=" + cc + ", Map<String,Object>=" + m + ")", e);
+
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Error in rule " + m, e);
         }
       }
     }
     if (cc != null && cc.isZooKeeperAware())
       ReplicaAssigner.verifySnitchConf(cc.getZkController().getSolrCloudManager(), (List) m.get(SNITCH));
+
+    if (log.isDebugEnabled()) {
+      log.debug("verifyRuleParams(CoreContainer, Map<String,Object>) - end");
+    }
   }
 
   /**
    * Converts a String of the form a:b,c:d to a Map
    */
   private static Map<String, Object> addMapObject(Map<String, Object> props, String key) {
+    if (log.isDebugEnabled()) {
+      log.debug("addMapObject(Map<String,Object> props={}, String key={}) - start", props, key);
+    }
+
     Object v = props.get(key);
     if (v == null) return props;
     List<String> val = new ArrayList<>();
@@ -1486,12 +1642,24 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       for (String rule : val) l.add(Rule.parseRule(rule));
       props.put(key, l);
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("addMapObject(Map<String,Object>, String) - end");
+    }
     return props;
   }
 
   private static void verifyShardsParam(String shardsParam) {
+    if (log.isDebugEnabled()) {
+      log.debug("verifyShardsParam(String shardsParam={}) - start", shardsParam);
+    }
+
     for (String shard : shardsParam.split(",")) {
       SolrIdentifierValidator.validateShardName(shard);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("verifyShardsParam(String) - end");
     }
   }
 
@@ -1502,7 +1670,15 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
   @Override
   public Collection<Api> getApis() {
-    return v2Handler.getApis();
+    if (log.isDebugEnabled()) {
+      log.debug("getApis() - start");
+    }
+
+    Collection<Api> returnCollection = v2Handler.getApis();
+    if (log.isDebugEnabled()) {
+      log.debug("getApis() - end");
+    }
+    return returnCollection;
   }
 
   @Override
@@ -1517,6 +1693,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
    * Copy all params to the given map or if the given map is null create a new one
    */
   static Map<String, Object> copy(SolrParams source, Map<String, Object> sink, Collection<String> paramNames) {
+    if (log.isDebugEnabled()) {
+      log.debug("copy(SolrParams source={}, Map<String,Object> sink={}, Collection<String> paramNames={}) - start", source, sink, paramNames);
+    }
+
     if (sink == null) sink = new LinkedHashMap<>();
     for (String param : paramNames) {
       String[] v = source.getParams(param);
@@ -1528,6 +1708,10 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         }
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("copy(SolrParams, Map<String,Object>, Collection<String>) - end");
+    }
     return sink;
   }
 
@@ -1535,7 +1719,15 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
    * Copy all params to the given map or if the given map is null create a new one
    */
   static Map<String, Object> copy(SolrParams source, Map<String, Object> sink, String... paramNames) {
-    return copy(source, sink, paramNames == null ? Collections.emptyList() : Arrays.asList(paramNames));
+    if (log.isDebugEnabled()) {
+      log.debug("copy(SolrParams source={}, Map<String,Object> sink={}, String paramNames={}) - start", source, sink, paramNames);
+    }
+
+    Map<String,Object> returnMap = copy(source, sink, paramNames == null ? Collections.emptyList() : Arrays.asList(paramNames));
+    if (log.isDebugEnabled()) {
+      log.debug("copy(SolrParams, Map<String,Object>, String) - end");
+    }
+    return returnMap;
   }
 
 }

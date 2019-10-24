@@ -48,8 +48,9 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.codahale.metrics.Timer;
+
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SmartClose;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.MetricsConfig;
@@ -1107,7 +1108,7 @@ public class SolrMetricManager {
       reportersLock.unlock();
     }
     System.out.println("lock time:" + (System.currentTimeMillis() - start));
-    try (SmartClose closer = new SmartClose(this)) {
+    try (SW closer = new SW(this)) {
       closer.add("MetricReporters", closeReporters);
     }
     System.out.println("close time:" + (System.currentTimeMillis() - start));

@@ -26,6 +26,7 @@ import java.security.PrivilegedAction;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.zookeeper.ClientCnxn;
 import org.apache.zookeeper.Watcher;
@@ -48,6 +49,10 @@ public class SolrZooKeeper extends ZooKeeper {
     return cnxn;
   }
   
+  public ClientCnxn getEventThread() {
+    return cnxn;
+  }
+  
   public SocketAddress getSocketAddress() {
     return testableLocalSocketAddress();
   }
@@ -56,11 +61,7 @@ public class SolrZooKeeper extends ZooKeeper {
     final Thread t = new Thread() {
       @Override
       public void run() {
-        try {
-          AccessController.doPrivileged((PrivilegedAction<Void>) this::closeZookeeperChannel);
-        } finally {
-          spawnedThreads.remove(this);
-        }
+        AccessController.doPrivileged((PrivilegedAction<Void>) this::closeZookeeperChannel);
       }
       
       @SuppressForbidden(reason = "Hack for Zookeper needs access to private methods.")
@@ -88,21 +89,69 @@ public class SolrZooKeeper extends ZooKeeper {
       }
     };
     spawnedThreads.add(t);
+   
     t.start();
   }
   
-  @Override
-  public synchronized void close() throws InterruptedException {
-    super.close();
+  public void close() throws InterruptedException {
+    
+    try (SW worker = new SW(this)) {
+      worker.add("SolrZooKeeper", () -> {
+        try {
+          SolrZooKeeper.super.close();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        }
+      }); // we don't wait for close because we wait below
+      worker.add("InterruptThreads", () -> {
+        for (Thread t : spawnedThreads) {
+          t.interrupt();
+        }
+      });
+      worker.add("InterruptThreads", () -> {
+        call(cnxn, "sendThread", "interrupt", null);
+        call(cnxn, "eventThread", "interrupt", null);
+        
+        call(cnxn, "sendThread", "join", 50l);
+        call(cnxn, "eventThread", "join", 50l);
+        
+        call(cnxn, "sendThread", "interrupt", null);
+        call(cnxn, "eventThread", "interrupt", null);
+        
+        call(cnxn, "sendThread", "join", 1000l);
+        call(cnxn, "eventThread", "join", 1000l);
+      });
+    }
   }
-  
-//  public static void assertCloses() {
-//    if (clients.size() > 0) {
-//      Iterator<Exception> stacktraces = clients.values().iterator();
-//      Exception cause = null;
-//      cause = stacktraces.next();
-//      throw new RuntimeException("Found a bad one!", cause);
-//    }
-//  }
-  
+
+
+  private void call(final ClientCnxn cnxn, String field, String meth, Object arg) {
+    try {
+      final Field sendThreadFld = cnxn.getClass().getDeclaredField(field);
+      sendThreadFld.setAccessible(true);
+      Object sendThread = sendThreadFld.get(cnxn);
+      if (sendThread != null) {
+        Method method;
+        if (arg != null) {
+          method = sendThread.getClass().getMethod(meth, long.class);
+        } else {
+          method = sendThread.getClass().getMethod(meth);
+        }
+        method.setAccessible(true);
+        try {
+          if (arg != null) {
+            method.invoke(sendThread, arg);
+          } else {
+            method.invoke(sendThread);
+          }
+        } catch (InvocationTargetException e) {
+          // is fine
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Closing Zookeeper send channel failed.", e);
+    }
+  }
 }
+  

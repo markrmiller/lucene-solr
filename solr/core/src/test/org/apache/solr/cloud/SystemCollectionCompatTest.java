@@ -41,10 +41,10 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.RetryUtil;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.logging.LogWatcher;
 import org.apache.solr.logging.LogWatcherConfig;
 import org.apache.solr.util.IdUtils;
-import org.apache.solr.util.TimeOut;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -79,7 +79,7 @@ public class SystemCollectionCompatTest extends SolrCloudTestCase {
     cluster.waitForActiveCollection(CollectionAdminParams.SYSTEM_COLL,  1, 2);
     ZkController zkController = cluster.getJettySolrRunner(0).getCoreContainer().getZkController();
     cloudManager = zkController.getSolrCloudManager();
-    solrClient = new CloudSolrClientBuilder(Collections.singletonList(zkController.getZkServerAddress()),
+    solrClient = new CloudSolrClient.Builder(Collections.singletonList(zkController.getZkServerAddress()),
         Optional.empty()).build();
     // send a dummy doc to the .system collection
     SolrInputDocument doc = new SolrInputDocument(

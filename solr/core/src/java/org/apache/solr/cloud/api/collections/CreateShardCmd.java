@@ -77,10 +77,8 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, NRT_REPLICAS + " + " + TLOG_REPLICAS + " must be greater than 0");
     }
 
-    //ZkStateReader zkStateReader = ocmh.zkStateReader;
     ocmh.overseer.offerStateUpdate(Utils.toJSON(message));
     // wait for a while until we see the shard
-    //ocmh.waitForNewShard(collectionName, sliceName);
     // wait for a while until we see the shard and update the local view of the cluster state
     clusterState = ocmh.waitForNewShard(collectionName, sliceName);
 

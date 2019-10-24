@@ -18,6 +18,7 @@ package org.apache.solr.common.cloud;
 
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
@@ -89,31 +90,35 @@ public class ZkCmdExecutor {
     return isClosed != null && isClosed.isClosed();
   }
 
-  public void ensureExists(String path, final SolrZkClient zkClient) throws KeeperException, InterruptedException {
+  public void ensureExists(String path, final SolrZkClient zkClient) {
     ensureExists(path, null, CreateMode.PERSISTENT, zkClient, 0);
   }
   
   
-  public void ensureExists(String path, final byte[] data, final SolrZkClient zkClient) throws KeeperException, InterruptedException {
+  public void ensureExists(String path, final byte[] data, final SolrZkClient zkClient)  {
     ensureExists(path, data, CreateMode.PERSISTENT, zkClient, 0);
   }
   
-  public void ensureExists(String path, final byte[] data, CreateMode createMode, final SolrZkClient zkClient) throws KeeperException, InterruptedException {
+  public void ensureExists(String path, final byte[] data, CreateMode createMode, final SolrZkClient zkClient) {
     ensureExists(path, data, createMode, zkClient, 0);
   }
-  
+
   public void ensureExists(final String path, final byte[] data,
-      CreateMode createMode, final SolrZkClient zkClient, int skipPathParts) throws KeeperException, InterruptedException {
-    
-    if (zkClient.exists(path, true)) {
-      return;
-    }
+      CreateMode createMode, final SolrZkClient zkClient, int skipPathParts) {
+
     try {
-      zkClient.makePath(path, data, createMode, null, true, true, skipPathParts);
-    } catch (NodeExistsException e) {
-      // it's okay if another beats us creating the node
+      if (zkClient.exists(path, true)) {
+        return;
+      }
+
+      try {
+        zkClient.makePath(path, data, createMode, null, true, true, skipPathParts);
+      } catch (NodeExistsException e) {
+        // it's okay if another beats us creating the node
+      }
+    } catch (Exception e1) {
+      throw new SW.Exp(e1);
     }
-    
   }
   
   /**

@@ -93,11 +93,14 @@ import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.common.util.StrUtils;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.URLUtil;
 import org.apache.solr.common.util.Utils;
@@ -355,8 +358,7 @@ public class ZkController implements Closeable {
 
               // start the overseer first as following code may need it's processing
               if (!zkRunOnly) {
-                ElectionContext context = new OverseerElectionContext(zkClient,
-                    overseer, getNodeName());
+                ElectionContext context = new OverseerElectionContext(getNodeName(), zkClient, overseer);
 
                 ElectionContext prevContext = overseerElector.getContext();
                 if (prevContext != null) {
@@ -427,17 +429,8 @@ public class ZkController implements Closeable {
                   log.warn("Error when notifying OnReconnect listener " + listener + " after session re-connected.", exc);
                 }
               }
-            } catch (InterruptedException e) {
-              // Restore the interrupted status
-              Thread.currentThread().interrupt();
-              throw new ZooKeeperException(
-                  SolrException.ErrorCode.SERVER_ERROR, "", e);
-            } catch (SessionExpiredException e) {
-              throw e;
             } catch (Exception e) {
-              SolrException.log(log, "", e);
-              throw new ZooKeeperException(
-                  SolrException.ErrorCode.SERVER_ERROR, "", e);
+              throw new SW.Exp(e);
             }
           }
 
@@ -457,7 +450,7 @@ public class ZkController implements Closeable {
 
       @Override
       public boolean isClosed() {
-        return cc.isShutDown();
+        return cc.isShutDown() || ZkController.this.isClosed();
       }});
 
 
@@ -585,82 +578,82 @@ public class ZkController implements Closeable {
     }
   }
 
-  public void preClose() {
-    this.isClosed = true;
-
-    try {
-      this.removeEphemeralLiveNode();
-    } catch (AlreadyClosedException | SessionExpiredException | KeeperException.ConnectionLossException e) {
-
-    } catch (Exception e) {
-      log.warn("Error removing live node. Continuing to close CoreContainer", e);
-    }
-
-    try {
-      if (getZkClient().getConnectionManager().isConnected()) {
-        log.info("Publish this node as DOWN...");
-        publishNodeAsDown(getNodeName());
-      }
-    } catch (Exception e) {
-      log.warn("Error publishing nodes as down. Continuing to close CoreContainer", e);
-    }
-
-    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("preCloseThreadPool"));
-
-    try {
-      synchronized (collectionToTerms) {
-        customThreadPool.submit(() -> collectionToTerms.values().parallelStream().forEach(ZkCollectionTerms::close));
-      }
-
-      customThreadPool.submit(() -> replicateFromLeaders.values().parallelStream().forEach(ReplicateFromLeader::stopReplication));
-    } finally {
-      ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
-    }
-  }
-
   /**
    * Closes the underlying ZooKeeper client.
    */
   public void close() {
-    if (!this.isClosed)
-      preClose();
+    this.isClosed = true;
 
-    ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
+    try (SW closer = new SW(this)) {
+      Callable<?> removeEphem = new Callable<>() {
 
-    customThreadPool.submit(() -> Collections.singleton(overseerElector.getContext()).parallelStream().forEach(IOUtils::closeQuietly));
+        @Override
+        public Object call() throws Exception {
+          try {
+            removeEphemeralLiveNode();
+          } catch (AlreadyClosedException | SessionExpiredException | KeeperException.ConnectionLossException e) {
 
-    customThreadPool.submit(() -> Collections.singleton(overseer).parallelStream().forEach(IOUtils::closeQuietly));
-
-    try {
-      customThreadPool.submit(() -> electionContexts.values().parallelStream().forEach(IOUtils::closeQuietly));
-
-    } finally {
-
-      sysPropsCacher.close();
-      customThreadPool.submit(() -> Collections.singleton(cloudSolrClient).parallelStream().forEach(IOUtils::closeQuietly));
-      customThreadPool.submit(() -> Collections.singleton(cloudManager).parallelStream().forEach(IOUtils::closeQuietly));
-
-      try {
-        try {
-          zkStateReader.close();
-        } catch (Exception e) {
-          log.error("Error closing zkStateReader", e);
+          } catch (Exception e) {
+            log.warn("Error removing live node. Continuing to close CoreContainer", e);
+          }
+          return "RemoveEphemNode";
         }
-      } finally {
-        try {
-          zkClient.close();
-        } catch (Exception e) {
-          log.error("Error closing zkClient", e);
-        } finally {
+        
+      };
+      
+      Callable<?> publishDown = new Callable<>() {
 
-          // just in case the OverseerElectionContext managed to start another Overseer
-          IOUtils.closeQuietly(overseer);
-
-          ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
+        @Override
+        public Object call() throws Exception {
+          try {
+            if (getZkClient().getConnectionManager().isConnected()) {
+              log.info("Publish this node as DOWN...");
+              publishNodeAsDown(getNodeName());
+            }
+          } catch (Exception e) {
+            log.warn("Error publishing nodes as down. Continuing to close CoreContainer", e);
+          }
+          return "PublishDownNode";
         }
-
+        
+      };
+     
+      List<ZkCollectionTerms> terms = new ArrayList<>(collectionToTerms.size());
+      synchronized (collectionToTerms) {
+        terms.addAll(collectionToTerms.values());
       }
+      
+      List<ReplicateFromLeader> repFromLeads = new ArrayList<>(replicateFromLeaders.size());
+      synchronized (replicateFromLeaders) {
+        repFromLeads.addAll(replicateFromLeaders.values());
+      }
+      closer.add("Cleanup&Terms&RepFromLeaders", removeEphem, publishDown, terms, repFromLeads);
+     // closer.add("", (() ->  collectionToTerms.values().parallelStream().forEach(ZkCollectionTerms::close)), () -> replicateFromLeaders.values().parallelStream().forEach(ReplicateFromLeader::stopReplication));
+  
+      //  customThreadPool.submit(() -> collectionToTerms.values().parallelStream().forEach(ZkCollectionTerms::close));
+     // }
+      
+//      customThreadPool
+//      .submit(() -> replicateFromLeaders.values().parallelStream().forEach(ReplicateFromLeader::stopReplication));
+      
+      closer.add("ZkController Internals", overseerElector.getContext(), overseer, electionContexts.values(), cloudSolrClient, sysPropsCacher, cloudManager, zkStateReader, zkClient);
+      //customThreadPool.submit( () -> Collections.singleton(overseerElector.getContext()).parallelStream().forEach(IOUtils::closeQuietly));
 
+     // customThreadPool.submit(() -> Collections.singleton(overseer).parallelStream().forEach(IOUtils::closeQuietly));
+
+  
+      //  customThreadPool.submit(() -> electionContexts.values().parallelStream().forEach(IOUtils::closeQuietly));
+
+
+      //  customThreadPool .submit(() -> Collections.singleton(cloudSolrClient).parallelStream().forEach(IOUtils::closeQuietly));
+     //   sysPropsCacher.close();
+       // customThreadPool.submit(() -> Collections.singleton(cloudManager).parallelStream().forEach(IOUtils::closeQuietly));
+
+    
+       //   customThreadPool.submit(() -> Arrays.asList(new Closeable[] {zkStateReader, zkClient, overseer}).stream().forEach(IOUtils::closeQuietly));
+
+
+      
     }
     assert ObjectReleaseTracker.release(this);
   }
@@ -921,8 +914,7 @@ public class ZkController implements Closeable {
         overseerElector = new LeaderElector(zkClient);
         this.overseer = new Overseer((HttpShardHandler) cc.getShardHandlerFactory().getShardHandler(), cc.getUpdateShardHandler(),
             CommonParams.CORES_HANDLER_PATH, zkStateReader, this, cloudConfig);
-        ElectionContext context = new OverseerElectionContext(zkClient,
-            overseer, getNodeName());
+        ElectionContext context = new OverseerElectionContext(getNodeName(), zkClient, overseer);
         overseerElector.setup(context);
         overseerElector.joinElection(context, false);
       }
@@ -934,20 +926,8 @@ public class ZkController implements Closeable {
 
       // Do this last to signal we're up.
       createEphemeralLiveNode();
-    } catch (IOException e) {
-      log.error("", e);
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Can't create ZooKeeperController", e);
-    } catch (InterruptedException e) {
-      // Restore the interrupted status
-      Thread.currentThread().interrupt();
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-          "", e);
-    } catch (KeeperException e) {
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-          "", e);
+    } catch (Exception e) {
+      throw new SW.Exp(e);
     }
 
   }
@@ -1108,8 +1088,7 @@ public class ZkController implements Closeable {
     return zkClient.isConnected();
   }
 
-  private void createEphemeralLiveNode() throws KeeperException,
-      InterruptedException {
+  private void createEphemeralLiveNode() {
     if (zkRunOnly) {
       return;
     }
@@ -1119,15 +1098,23 @@ public class ZkController implements Closeable {
     log.info("Register node as live in ZooKeeper:" + nodePath);
     List<Op> ops = new ArrayList<>(2);
     ops.add(Op.create(nodePath, null, zkClient.getZkACLProvider().getACLsToAdd(nodePath), CreateMode.EPHEMERAL));
-    // if there are nodeAdded triggers don't create nodeAdded markers
-    boolean createMarkerNode = zkStateReader.getAutoScalingConfig().hasTriggerForEvents(TriggerEventType.NODEADDED);
-    if (createMarkerNode && !zkClient.exists(nodeAddedPath, true)) {
-      // use EPHEMERAL so that it disappears if this node goes down
-      // and no other action is taken
-      byte[] json = Utils.toJSON(Collections.singletonMap("timestamp", TimeSource.NANO_TIME.getEpochTimeNs()));
-      ops.add(Op.create(nodeAddedPath, json, zkClient.getZkACLProvider().getACLsToAdd(nodeAddedPath), CreateMode.EPHEMERAL));
+    try {
+      // if there are nodeAdded triggers don't create nodeAdded markers
+      boolean createMarkerNode = zkStateReader.getAutoScalingConfig().hasTriggerForEvents(TriggerEventType.NODEADDED);
+
+      if (createMarkerNode && !zkClient.exists(nodeAddedPath, true)) {
+        // use EPHEMERAL so that it disappears if this node goes down
+        // and no other action is taken
+        byte[] json = Utils.toJSON(Collections.singletonMap("timestamp", TimeSource.NANO_TIME.getEpochTimeNs()));
+        ops.add(Op.create(nodeAddedPath, json, zkClient.getZkACLProvider().getACLsToAdd(nodeAddedPath),
+            CreateMode.EPHEMERAL));
+      }
+
+      zkClient.multi(ops, true);
+
+    } catch (Exception e) {
+      throw new SW.Exp(e);
     }
-    zkClient.multi(ops, true);
   }
 
   public void removeEphemeralLiveNode() throws KeeperException, InterruptedException {
@@ -1224,13 +1211,9 @@ public class ZkController implements Closeable {
           log.debug("Replica {} skipping election because it's type is {}", coreZkNodeName, Type.PULL);
           startReplicationFromLeader(coreName, false);
         }
-      } catch (InterruptedException e) {
-        // Restore the interrupted status
-        Thread.currentThread().interrupt();
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
-      } catch (KeeperException | IOException e) {
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
-      }
+      } catch (Exception e) {
+        throw new SW.Exp(e);
+      } 
 
       // in this case, we want to wait for the leader as long as the leader might
       // wait for a vote, at least - but also long enough that a large cluster has
@@ -1294,8 +1277,13 @@ public class ZkController implements Closeable {
         }
         core.getCoreDescriptor().getCloudDescriptor().setHasRegistered(true);
       } catch (Exception e) {
-        unregister(coreName, desc, false);
-        throw e;
+        Exp exp = new SW.Exp(e);
+        try {
+          unregister(coreName, desc, false);
+        } catch (Exception e1) {
+          exp.addSuppressed(e1);           
+        }
+        throw exp;
       }
 
       // make sure we have an update cluster state right away
@@ -1346,6 +1334,9 @@ public class ZkController implements Closeable {
 
   // timeoutms is the timeout for the first call to get the leader - there is then
   // a longer wait to make sure that leader matches our local state
+
+  // timeoutms is the timeout for the first call to get the leader - there is then
+  // a longer wait to make sure that leader matches our local state
   private String getLeader(final CloudDescriptor cloudDesc, int timeoutms) {
 
     String collection = cloudDesc.getCollectionName();
@@ -1358,34 +1349,7 @@ public class ZkController implements Closeable {
       leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms)
           .getCoreUrl();
 
-      // now wait until our currently cloud state contains the latest leader
-      String clusterStateLeaderUrl = zkStateReader.getLeaderUrl(collection,
-          shardId, timeoutms * 2); // since we found it in zk, we are willing to
-      // wait a while to find it in state
-      int tries = 0;
-      final long msInSec = 1000L;
-      int maxTries = (int) Math.floor(leaderConflictResolveWait / msInSec);
-      while (!leaderUrl.equals(clusterStateLeaderUrl)) {
-        if (cc.isShutDown()) throw new AlreadyClosedException();
-        if (tries > maxTries) {
-          throw new SolrException(ErrorCode.SERVER_ERROR,
-              "There is conflicting information about the leader of shard: "
-                  + cloudDesc.getShardId() + " our state says:"
-                  + clusterStateLeaderUrl + " but zookeeper says:" + leaderUrl);
-        }
-        tries++;
-        if (tries % 30 == 0) {
-          String warnMsg = String.format(Locale.ENGLISH, "Still seeing conflicting information about the leader "
-                  + "of shard %s for collection %s after %d seconds; our state says %s, but ZooKeeper says %s",
-              cloudDesc.getShardId(), collection, tries, clusterStateLeaderUrl, leaderUrl);
-          log.warn(warnMsg);
-        }
-        Thread.sleep(msInSec);
-        clusterStateLeaderUrl = zkStateReader.getLeaderUrl(collection, shardId,
-            timeoutms);
-        leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms)
-            .getCoreUrl();
-      }
+      zkStateReader.waitForState(collection, timeoutms * 2, TimeUnit.MILLISECONDS, (n, c) -> checkLeaderUrl(cloudDesc, leaderUrl, collection, shardId, leaderConflictResolveWait));
 
     } catch (AlreadyClosedException e) {
       throw e;
@@ -1395,6 +1359,21 @@ public class ZkController implements Closeable {
           "Error getting leader from zk for shard " + shardId, e);
     }
     return leaderUrl;
+  }
+  
+  private boolean checkLeaderUrl(CloudDescriptor cloudDesc, String leaderUrl, String collection, String shardId,
+      int timeoutms) {
+    // now wait until our currently cloud state contains the latest leader
+    String clusterStateLeaderUrl;
+    try {
+      clusterStateLeaderUrl = zkStateReader.getLeaderUrl(collection,
+          shardId, timeoutms * 2);
+
+      leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms).getCoreUrl();
+    } catch (Exception e) {
+      throw new SW.Exp(e);
+    }
+    return clusterStateLeaderUrl.equals(leaderUrl);
   }
 
   /**
@@ -1413,36 +1392,29 @@ public class ZkController implements Closeable {
    * @throws SessionExpiredException on zk session expiration.
    */
   public ZkCoreNodeProps getLeaderProps(final String collection,
-                                        final String slice, int timeoutms, boolean failImmediatelyOnExpiration) throws InterruptedException, SessionExpiredException {
-    int iterCount = timeoutms / 1000;
+      final String slice, int timeoutms, boolean failImmediatelyOnExpiration)
+      throws InterruptedException, SessionExpiredException {
+
+    TimeOut timeout = new TimeOut(timeoutms, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
     Exception exp = null;
-    while (iterCount-- > 0) {
+    while (!timeout.hasTimedOut()) {
       try {
+        getZkStateReader().waitForState(collection, 10, TimeUnit.SECONDS, (n,c) -> c != null && c.getLeader(slice) != null);
+        
         byte[] data = zkClient.getData(
             ZkStateReader.getShardLeadersPath(collection, slice), null, null,
             true);
         ZkCoreNodeProps leaderProps = new ZkCoreNodeProps(
             ZkNodeProps.load(data));
         return leaderProps;
-      } catch (InterruptedException e) {
-        throw e;
-      } catch (SessionExpiredException e) {
-        if (failImmediatelyOnExpiration) {
-          throw e;
-        }
-        exp = e;
-        Thread.sleep(1000);
+
       } catch (Exception e) {
-        exp = e;
-        Thread.sleep(1000);
-      }
-      if (cc.isShutDown()) {
-        throw new AlreadyClosedException();
-      }
+        throw new SW.Exp(e);
+      } 
     }
+
     throw new SolrException(ErrorCode.SERVICE_UNAVAILABLE, "Could not get leader props", exp);
   }
-
 
   private void joinElection(CoreDescriptor cd, boolean afterExpiration, boolean joinAtHead)
       throws InterruptedException, KeeperException, IOException {
@@ -1693,61 +1665,77 @@ public class ZkController implements Closeable {
     }
   }
 
-  private void waitForCoreNodeName(CoreDescriptor descriptor) {
-    int retryCount = 320;
-    log.debug("look for our core node name");
-    while (retryCount-- > 0) {
-      final DocCollection docCollection = zkStateReader.getClusterState()
-          .getCollectionOrNull(descriptor.getCloudDescriptor().getCollectionName());
-      if (docCollection != null && docCollection.getSlicesMap() != null) {
-        final Map<String, Slice> slicesMap = docCollection.getSlicesMap();
+  private void waitForCoreNodeName(CoreDescriptor cd) {
+    if (log.isDebugEnabled()) log.debug("look for our core node name");
+
+    AtomicReference<String> errorMessage = new AtomicReference<>();
+    try {
+      zkStateReader.waitForState(cd.getCollectionName(), 320, TimeUnit.SECONDS, (n, c) -> {
+        if (c == null)
+          return false;
+        final Map<String,Slice> slicesMap = c.getSlicesMap();
+        if (slicesMap == null) {
+          return false;
+        }
         for (Slice slice : slicesMap.values()) {
           for (Replica replica : slice.getReplicas()) {
-            // TODO: for really large clusters, we could 'index' on this
 
             String nodeName = replica.getStr(ZkStateReader.NODE_NAME_PROP);
             String core = replica.getStr(ZkStateReader.CORE_NAME_PROP);
 
             String msgNodeName = getNodeName();
-            String msgCore = descriptor.getName();
+            String msgCore = cd.getName();
 
             if (msgNodeName.equals(nodeName) && core.equals(msgCore)) {
-              descriptor.getCloudDescriptor()
+              cd.getCloudDescriptor()
                   .setCoreNodeName(replica.getName());
-              getCoreContainer().getCoresLocator().persist(getCoreContainer(), descriptor);
-              return;
+              getCoreContainer().getCoresLocator().persist(getCoreContainer(), cd);
+              return true;
             }
           }
         }
-      }
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+        return false;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      String error = errorMessage.get();
+      if (error == null)
+        error = "";
+      throw new NotInClusterStateException(ErrorCode.SERVER_ERROR, "Could not get shard id for core: " + cd.getName() + " " + error);
     }
   }
 
+  @SuppressWarnings("resource")
   private void waitForShardId(CoreDescriptor cd) {
-    log.debug("waiting to find shard id in clusterstate for " + cd.getName());
-    int retryCount = 320;
-    while (retryCount-- > 0) {
-      final String shardId = zkStateReader.getClusterState().getShardId(cd.getCollectionName(), getNodeName(), cd.getName());
-      if (shardId != null) {
-        cd.getCloudDescriptor().setShardId(shardId);
-        return;
-      }
+    if (log.isDebugEnabled()) log.debug("waiting to find shard id in clusterstate for " + cd.getName());
+    AtomicReference<String> returnId = new AtomicReference<>();
+    try {
       try {
-        Thread.sleep(1000);
+        zkStateReader.waitForState(cd.getCollectionName(), 15, TimeUnit.SECONDS, (n, c) -> {
+            if (c == null) return false;
+            String shardId = c.getShardId(getNodeName(), cd.getName());
+            if (shardId != null) {
+              returnId.set(shardId);
+              return true;
+            }
+            return false;
+        });
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
+        throw new SW.Exp(e);
       }
+    } catch (TimeoutException e1) {
+      throw new SolrException(ErrorCode.SERVER_ERROR,
+          "Could not get shard id for core: " + cd.getName());
+    }
+
+    final String shardId = returnId.get();
+    if (shardId != null) {
+      cd.getCloudDescriptor().setShardId(shardId);
+      return;
     }
 
     throw new SolrException(ErrorCode.SERVER_ERROR,
         "Could not get shard id for core: " + cd.getName());
   }
-
 
   public String getCoreNodeName(CoreDescriptor descriptor) {
     String coreNodeName = descriptor.getCloudDescriptor().getCoreNodeName();
@@ -1785,20 +1773,9 @@ public class ZkController implements Closeable {
               "Collection {} not visible yet, but flagging it so a watch is registered when it becomes visible" :
               "Registering watch for collection {}",
           collectionName);
-    } catch (KeeperException e) {
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
-    } catch (NotInClusterStateException e) {
-      // make the stack trace less verbose
-      throw e;
     } catch (Exception e) {
-      log.error("", e);
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "", e);
-    }
+      throw new SW.Exp(e);
+    } 
 
     doGetShardIdAndNodeNameProcess(cd);
 
@@ -2180,8 +2157,7 @@ public class ZkController implements Closeable {
             }
           }
         } else { // We're in the right place, now attempt to rejoin
-          overseerElector.retryElection(new OverseerElectionContext(zkClient,
-              overseer, getNodeName()), joinAtHead);
+          overseerElector.retryElection(new OverseerElectionContext(getNodeName(), zkClient, overseer), joinAtHead);
           return;
         }
       } else {
@@ -2215,7 +2191,7 @@ public class ZkController implements Closeable {
 
         ZkNodeProps zkProps = new ZkNodeProps(BASE_URL_PROP, baseUrl, CORE_NAME_PROP, coreName, NODE_NAME_PROP, getNodeName(), CORE_NODE_NAME_PROP, coreNodeName);
 
-        LeaderElector elect = ((ShardLeaderElectionContextBase) prevContext).getLeaderElector();
+        LeaderElector elect = ((ShardLeaderElectionContext) prevContext).getLeaderElector();
         ShardLeaderElectionContext context = new ShardLeaderElectionContext(elect, shardId, collectionName,
             coreNodeName, zkProps, this, getCoreContainer());
 
@@ -2557,25 +2533,37 @@ public class ZkController implements Closeable {
     }
 
     @Override
-    // synchronized due to SOLR-11535
+    // nocommit - wow this thing is scary.
     public synchronized boolean onStateChanged(DocCollection collectionState) {
+      if (cc.isShutDown()) { // don't accidently delete cores on shutdown due to unreliable state
+        return true;
+      }
+      
       if (getCoreContainer().getCoreDescriptor(coreName) == null) return true;
 
-      boolean replicaRemoved = getReplicaOrNull(collectionState, shard, coreNodeName) == null;
-      if (replicaRemoved) {
+      boolean removeReplica = shouldUnloadReplica(collectionState, shard, coreNodeName);
+      if (removeReplica) {
         try {
-          log.info("Replica {} removed from clusterstate, remove it.", coreName);
+          log.info("Replica {} removed from clusterstate, remove it.", coreName, collectionState);
           getCoreContainer().unload(coreName, true, true, true);
-        } catch (SolrException e) {
-          if (!e.getMessage().contains("Cannot unload non-existent core")) {
-            // no need to log if the core was already unloaded
-            log.warn("Failed to unregister core:{}", coreName, e);
-          }
         } catch (Exception e) {
-          log.warn("Failed to unregister core:{}", coreName, e);
+          throw new SW.Exp(e);
         }
       }
-      return replicaRemoved;
+      return removeReplica;
+    }
+    
+    private boolean shouldUnloadReplica(DocCollection docCollection, String shard, String coreNodeName) {
+//      if (docCollection == null) return false; // we have to be conservative or we get it wrong - only unload if collection and slice exist
+//
+//      Slice slice = docCollection.getSlice(shard);
+//      if (slice == null) return false;
+//
+//      Replica replica = slice.getReplica(coreNodeName);
+//      if (replica == null) return true;
+//      if (!getNodeName().equals(replica.getNodeName())) return true;
+
+      return false;
     }
 
     @Override

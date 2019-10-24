@@ -43,6 +43,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
@@ -145,17 +146,22 @@ public class DeleteReplicaCmd implements Cmd {
       }
     }
 
-    for (Map.Entry<Slice, Set<String>> entry : shardToReplicasMapping.entrySet()) {
-      Slice shardSlice = entry.getKey();
-      String shardId = shardSlice.getName();
-      Set<String> replicas = entry.getValue();
-      //callDeleteReplica on all replicas
-      for (String replica: replicas) {
-        log.debug("Deleting replica {}  for shard {} based on count {}", replica, shardId, count);
-        deleteCore(shardSlice, collectionName, replica, message, shard, results, onComplete, parallel);
+    try (SW worker = new SW(this)) {
+
+      for (Map.Entry<Slice,Set<String>> entry : shardToReplicasMapping.entrySet()) {
+        Slice shardSlice = entry.getKey();
+        String shardId = shardSlice.getName();
+        Set<String> replicas = entry.getValue();
+        // callDeleteReplica on all replicas
+        for (String replica : replicas) {
+          if (log.isDebugEnabled()) log.debug("Deleting replica {}  for shard {} based on count {}", replica, shardId, count);
+          worker.collect(() -> { deleteCore(shardSlice, collectionName, replica, message, shard, results, onComplete, parallel); return replica; });
+        }
+        results.add("shard_id", shardId);
+        results.add("replicas_deleted", replicas);
       }
-      results.add("shard_id", shardId);
-      results.add("replicas_deleted", replicas);
+
+      worker.addCollect("DeleteReplicas");
     }
 
   }

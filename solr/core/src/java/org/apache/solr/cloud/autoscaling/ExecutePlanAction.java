@@ -38,6 +38,7 @@ import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
@@ -165,20 +166,12 @@ public class ExecutePlanAction extends TriggerActionBase {
             return responses;
           });
           counter++;
-        } catch (IOException e) {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-              "Unexpected exception executing operation: " + operation.getParams(), e);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "ExecutePlanAction was interrupted", e);
         } catch (Exception e) {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-              "Unexpected exception executing operation: " + operation.getParams(), e);
+          throw new SW.Exp(e);
         }
       }
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Unexpected exception while processing event: " + event, e);
+      throw new SW.Exp(e);
     }
   }
 

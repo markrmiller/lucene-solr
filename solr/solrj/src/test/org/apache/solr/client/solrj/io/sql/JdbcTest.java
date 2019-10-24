@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj.io.sql;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -34,7 +35,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -42,6 +43,8 @@ import org.apache.solr.cloud.AbstractDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -51,8 +54,9 @@ import org.junit.Test;
  * SolrStream will get fully exercised through these tests.
  **/
 
-@Slow
+@LuceneTestCase.Slow
 @LuceneTestCase.SuppressCodecs({"Lucene3x", "Lucene40", "Lucene41", "Lucene42", "Lucene45"})
+@SolrTestCaseJ4.SuppressObjectReleaseTracker(reason = "Can't cleanly shutdown JDBCDriver ZkClients")
 public class JdbcTest extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";
@@ -98,6 +102,21 @@ public class JdbcTest extends SolrCloudTestCase {
         .commit(cluster.getSolrClient(), collection);
 
     zkHost = cluster.getZkServer().getZkAddress();
+  }
+  
+  @AfterClass
+  public static void cleanup() throws IOException, InterruptedException {
+    // we can't close the zk clients started by the calcite solr driver, so we get creative
+    Thread thread = new Thread() {
+      public void run() {
+        ObjectReleaseTracker.tryClose();
+      }
+    };
+    thread.start();
+
+    interruptThreadsOnTearDown("Callback", false);
+    interruptThreadsOnTearDown("Callback", true);
+    thread.join(10000);
   }
 
   @Test
@@ -495,7 +514,7 @@ public class JdbcTest extends SolrCloudTestCase {
 
   private void testJDBCMethods(String collection, String connectionString, Properties properties, String sql) throws Exception {
     try (Connection con = DriverManager.getConnection(connectionString, properties)) {
-      assertTrue(con.isValid(DEFAULT_CONNECTION_TIMEOUT));
+      assertTrue(con.isValid(SolrTestCaseJ4.DEFAULT_CONNECTION_TIMEOUT));
 
       assertEquals(zkHost, con.getCatalog());
       con.setCatalog(zkHost);

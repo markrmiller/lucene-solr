@@ -36,6 +36,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.lucene.util.LuceneTestCase.AwaitsFix;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -53,10 +54,10 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.util.TestInjection;
-import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.KeeperException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -147,7 +148,7 @@ public class TestPullReplica extends SolrCloudTestCase {
               2,    // numShards
               3,    // pullReplicas
               100); // maxShardsPerNode
-          url = url + pickRandom("", "&nrtReplicas=1", "&replicationFactor=1"); // These options should all mean the same
+          url = url + SolrTestCaseJ4.pickRandom("", "&nrtReplicas=1", "&replicationFactor=1"); // These options should all mean the same
           HttpGet createCollectionGet = new HttpGet(url);
           cluster.getSolrClient().getHttpClient().execute(createCollectionGet);
           break;
@@ -159,7 +160,7 @@ public class TestPullReplica extends SolrCloudTestCase {
               2,    // numShards
               3,    // pullReplicas
               100, // maxShardsPerNode
-              pickRandom("", ", nrtReplicas:1", ", replicationFactor:1")); // These options should all mean the same
+              SolrTestCaseJ4.pickRandom("", ", nrtReplicas:1", ", replicationFactor:1")); // These options should all mean the same
           HttpPost createCollectionPost = new HttpPost(url);
           createCollectionPost.setHeader("Content-type", "application/json");
           createCollectionPost.setEntity(new StringEntity(requestBody));
@@ -245,7 +246,7 @@ public class TestPullReplica extends SolrCloudTestCase {
         assertEquals(numDocs, leaderClient.query(new SolrQuery("*:*")).getResults().getNumFound());
       }
 
-      TimeOut t = new TimeOut(REPLICATION_TIMEOUT_SECS, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+      TimeOut t = new org.apache.solr.common.util.TimeOut(REPLICATION_TIMEOUT_SECS, TimeUnit.SECONDS, TimeSource.NANO_TIME);
       for (Replica r:s.getReplicas(EnumSet.of(Replica.Type.PULL))) {
         //TODO: assert replication < REPLICATION_TIMEOUT_SECS
         try (HttpSolrClient pullReplicaClient = getHttpSolrClient(r.getCoreUrl())) {
@@ -378,7 +379,7 @@ public class TestPullReplica extends SolrCloudTestCase {
       try (HttpSolrClient client = getHttpSolrClient(rAdd.getCoreUrl(), httpClient)) {
         SolrDocumentList allIdsResult = client.getById(ids);
         if (previousAllIdsResult != null) {
-          assertTrue(compareSolrDocumentList(previousAllIdsResult, allIdsResult));
+          assertTrue(SolrTestCaseJ4.compareSolrDocumentList(previousAllIdsResult, allIdsResult));
         } else {
           // set the first response here
           previousAllIdsResult = allIdsResult;
@@ -410,7 +411,7 @@ public class TestPullReplica extends SolrCloudTestCase {
     waitForNumDocsInAllReplicas(1, docCollection.getReplicas(EnumSet.of(Replica.Type.PULL)));
 
     // Delete leader replica from shard1
-    ignoreException("No registered leader was found"); //These are expected
+    SolrTestCaseJ4.ignoreException("No registered leader was found"); //These are expected
     JettySolrRunner leaderJetty = null;
     if (removeReplica) {
       CollectionAdminRequest.deleteReplica(
@@ -473,7 +474,7 @@ public class TestPullReplica extends SolrCloudTestCase {
       leaderJetty.start();
     }
     waitForState("Expected collection to be 1x2", collectionName, clusterShape(1, 2));
-    unIgnoreException("No registered leader was found"); // Should have a leader from now on
+    SolrTestCaseJ4.unIgnoreException("No registered leader was found"); // Should have a leader from now on
 
     // Validate that the new nrt replica is the leader now
     cluster.getSolrClient().getZkStateReader().forceUpdateCollection(collectionName);

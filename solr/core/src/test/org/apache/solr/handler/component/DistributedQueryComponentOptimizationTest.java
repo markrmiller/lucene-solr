@@ -16,6 +16,9 @@
  */
 package org.apache.solr.handler.component;
 
+import static org.apache.solr.SolrTestCaseJ4.assertFieldValues;
+import static org.apache.solr.SolrTestCaseJ4.sdoc;
+
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -46,6 +50,7 @@ import org.junit.Test;
  *
  * @see QueryComponent
  */
+@LuceneTestCase.Slow
 public class DistributedQueryComponentOptimizationTest extends SolrCloudTestCase {
 
   private static final String COLLECTION = "optimize";

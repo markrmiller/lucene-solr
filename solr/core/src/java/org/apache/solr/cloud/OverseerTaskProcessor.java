@@ -42,6 +42,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
@@ -416,6 +417,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     return  (String) m.get(ID);
   }
 
+  // nocommit - kill this
   protected LeaderStatus amILeader() {
     String statsName = "collection_am_i_leader";
     Timer.Context timerContext = stats.time(statsName);
@@ -428,19 +430,8 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
       if (myId.equals(propsId)) {
         return LeaderStatus.YES;
       }
-    } catch (KeeperException e) {
-      success = false;
-      if (e.code() == KeeperException.Code.CONNECTIONLOSS) {
-        log.error("", e);
-        return LeaderStatus.DONT_KNOW;
-      } else if (e.code() != KeeperException.Code.SESSIONEXPIRED) {
-        log.warn("", e);
-      } else {
-        log.debug("", e);
-      }
-    } catch (InterruptedException e) {
-      success = false;
-      Thread.currentThread().interrupt();
+    } catch (Exception e) {
+      throw new SW.Exp(e);
     } finally {
       timerContext.stop();
       if (success)  {

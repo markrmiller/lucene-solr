@@ -83,8 +83,7 @@ public abstract class TestBaseStatsCacheCloud extends SolrCloudTestCase {
     // create control core & client
     System.setProperty("solr.statsCache", getImplementationName());
     System.setProperty("solr.similarity", CustomSimilarityFactory.class.getName());
-    initCore("solrconfig-minimal.xml", "schema-tiny.xml");
-    control = new EmbeddedSolrServer(h.getCore());
+
     // create cluster
     configureCluster(numNodes) // 2 + random().nextInt(3)
         .addConfig("conf", configset(configset))

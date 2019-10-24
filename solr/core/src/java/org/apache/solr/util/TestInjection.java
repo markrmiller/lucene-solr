@@ -119,7 +119,7 @@ public class TestInjection {
 
   public volatile static String randomDelayInCoreCreation = null;
   
-  public volatile static int randomDelayMaxInCoreCreationInSec = 10;
+  public volatile static Integer randomDelayMaxInCoreCreationInSec = null;
 
   public volatile static String splitFailureBeforeReplicaCreation = null;
 
@@ -505,11 +505,12 @@ public class TestInjection {
     return true;
   }
 
-  static Set<Hook> newSearcherHooks = ConcurrentHashMap.newKeySet();
+  final static Set<Hook> newSearcherHooks = ConcurrentHashMap.newKeySet();
   
   public interface Hook {
     public void newSearcher(String collectionName);
-    public void waitForSearcher(String collection, int cnt, int timeoutms, boolean failOnTimeout) throws InterruptedException;
+    public void insertHook(String collection, int cnt);
+    public void waitForSearcher(int timeoutms, boolean failOnTimeout) throws InterruptedException;
   }
   
   public static boolean newSearcherHook(Hook hook) {
@@ -518,9 +519,7 @@ public class TestInjection {
   }
 
   public static boolean injectSearcherHooks(String collectionName) {
-    for (Hook hook : newSearcherHooks) {
-      hook.newSearcher(collectionName);
-    }
+    newSearcherHooks.forEach((h) -> h.newSearcher(collectionName)); 
     return true;
   }
   

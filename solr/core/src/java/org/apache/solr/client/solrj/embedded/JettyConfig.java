@@ -84,7 +84,7 @@ public class JettyConfig {
     String context = "/solr";
     boolean enableV2 = true;
     boolean stopAtShutdown = true;
-    Long waitForLoadingCoresToFinishMs = 300000L;
+    Long waitForLoadingCoresToFinishMs = 15000L;
     Map<ServletHolder, String> extraServlets = new TreeMap<>();
     Map<Class<? extends Filter>, String> extraFilters = new LinkedHashMap<>();
     SSLConfig sslConfig = null;

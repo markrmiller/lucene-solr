@@ -30,8 +30,24 @@ public class IOUtils {
       if (closeable != null) {
         closeable.close();
       }
-    } catch (Exception e) {
-      log.error("Error while closing", e);
+    } catch (Throwable t) {
+      log.error("Error while closing", t);
+      if (t instanceof Error) {
+        throw (Error) t;
+      }
+    }
+  }
+
+  public static void closeQuietly(AutoCloseable closeable) {
+    try {
+      if (closeable != null) {
+        closeable.close();
+      }
+    } catch (Throwable t) {
+      log.error("Error while closing", t);
+      if (t instanceof Error) {
+        throw (Error) t;
+      }
     }
   }
 }

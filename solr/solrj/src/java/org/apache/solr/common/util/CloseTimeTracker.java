@@ -64,11 +64,23 @@ public class CloseTimeTracker {
   }
 
   public void doneClose() {
+    if (log.isDebugEnabled()) {
+      log.debug("doneClose() - start");
+    }
+
     doneTime = System.nanoTime();
     //System.out.println("done close: " + trackedObject + " "  + label + " " + getElapsedNS());
+
+    if (log.isDebugEnabled()) {
+      log.debug("doneClose() - end");
+    }
   }
   
   public void doneClose(String label) {
+    if (log.isDebugEnabled()) {
+      log.debug("doneClose(String label={}) - start", label);
+    }
+
    // if (theObject == null) return;
    // log.info(theObject instanceof String ? theObject.getClass().getName() : theObject.toString() +  " was closed");
     doneTime = System.nanoTime();
@@ -85,29 +97,69 @@ public class CloseTimeTracker {
     }
     
     this.label.insert(0, spacer.toString() + extra);
+
+    if (log.isDebugEnabled()) {
+      log.debug("doneClose(String) - end");
+    }
   }
 
   public long getElapsedNS() {
-    return getElapsedNS(startTime, doneTime);
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedNS() - start");
+    }
+
+    long returnlong = getElapsedNS(startTime, doneTime);
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedNS() - end");
+    }
+    return returnlong;
   }
 
   public CloseTimeTracker startSubClose(String label) {
+    if (log.isDebugEnabled()) {
+      log.debug("startSubClose(String label={}) - start", label);
+    }
+
     CloseTimeTracker subTracker = new CloseTimeTracker(null, label, depth+1);
     children.add(subTracker);
+
+    if (log.isDebugEnabled()) {
+      log.debug("startSubClose(String) - end");
+    }
     return subTracker;
   }
   
   public CloseTimeTracker startSubClose(Object object) {
+    if (log.isDebugEnabled()) {
+      log.debug("startSubClose(Object object={}) - start", object);
+    }
+
     CloseTimeTracker subTracker = new CloseTimeTracker(object, object.getClass().getName(), depth+1);
     children.add(subTracker);
+
+    if (log.isDebugEnabled()) {
+      log.debug("startSubClose(Object) - end");
+    }
     return subTracker;
   }
   
   public void printCloseTimes() {
+    if (log.isDebugEnabled()) {
+      log.debug("printCloseTimes() - start");
+    }
+
     System.out.println("\n------\n" + getCloseTimes() + "\n------\n");
+
+    if (log.isDebugEnabled()) {
+      log.debug("printCloseTimes() - end");
+    }
   }
 
   public String getCloseTimes() {
+    if (log.isDebugEnabled()) {
+      log.debug("getCloseTimes() - start");
+    }
+
     StringBuilder sb = new StringBuilder();
 //    if (trackedObject != null) {
 //      if (trackedObject instanceof String) {
@@ -130,7 +182,11 @@ public class CloseTimeTracker {
       }
     }
     //sb.append("]\n");
-    return sb.toString();
+    String returnString = sb.toString();
+    if (log.isDebugEnabled()) {
+      log.debug("getCloseTimes() - end");
+    }
+    return returnString;
 
     // synchronized (startTimes) {
     // synchronized (endTimes) {
@@ -157,7 +213,15 @@ public class CloseTimeTracker {
   }
 
   private long getElapsedNS(long startTime, long doneTime) {
-    return doneTime - startTime;
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedNS(long startTime={}, long doneTime={}) - start", startTime, doneTime);
+    }
+
+    long returnlong = doneTime - startTime;
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedNS(long, long) - end");
+    }
+    return returnlong;
   }
 
   public Class<? extends Object> getClazz() {
@@ -165,12 +229,28 @@ public class CloseTimeTracker {
   }
   
   public long getElapsedMS() {
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedMS() - start");
+    }
+
     long ms = getElapsedMS(startTime, doneTime);
-    return ms < 0 ? 0 : ms;
+    long returnlong = ms < 0 ? 0 : ms;
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedMS() - end");
+    }
+    return returnlong;
   }
 
   public long getElapsedMS(long startTime, long doneTime) {
-    return TimeUnit.MILLISECONDS.convert(doneTime - startTime, TimeUnit.NANOSECONDS);
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedMS(long startTime={}, long doneTime={}) - start", startTime, doneTime);
+    }
+
+    long returnlong = TimeUnit.MILLISECONDS.convert(doneTime - startTime, TimeUnit.NANOSECONDS);
+    if (log.isDebugEnabled()) {
+      log.debug("getElapsedMS(long, long) - end");
+    }
+    return returnlong;
   }
 
 

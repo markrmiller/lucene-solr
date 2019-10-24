@@ -70,6 +70,7 @@ import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
+import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CloudConfig;
@@ -79,7 +80,6 @@ import org.apache.solr.handler.component.HttpShardHandler;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.solr.update.UpdateShardHandlerConfig;
-import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
@@ -243,8 +243,9 @@ public class OverseerTest extends SolrTestCaseJ4 {
               ZkStateReader.CORE_NODE_NAME_PROP, coreNodeName);
           LeaderElector elector = new LeaderElector(zkClient);
           ShardLeaderElectionContextBase ctx = new ShardLeaderElectionContextBase(
-              elector, shardId, collection, nodeName + "_" + coreName, props,
-              MockSolrSource.makeSimpleMock(overseer, zkStateReader, null));
+              nodeName + "_" + coreName, shardId, collection, props,
+              zkStateReader.getZkClient());
+          // nocommit
           elector.setup(ctx);
           electionContext.put(coreName, ctx);
           elector.joinElection(ctx, false);
@@ -734,8 +735,7 @@ public class OverseerTest extends SolrTestCaseJ4 {
       Overseer overseer = new Overseer((HttpShardHandler) httpShardHandlerFactory.getShardHandler(), updateShardHandler, "/admin/cores", reader, zkController,
           new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "").build());
       overseers.add(overseer);
-      ElectionContext ec = new OverseerElectionContext(zkClient, overseer,
-          server.getZkAddress().replaceAll("/", "_"));
+      ElectionContext ec = new OverseerElectionContext(server.getZkAddress().replaceAll("/", "_"), zkClient, overseer);
       overseerElector.setup(ec);
       overseerElector.joinElection(ec, false);
 
@@ -1403,8 +1403,7 @@ public class OverseerTest extends SolrTestCaseJ4 {
     Overseer overseer = new Overseer((HttpShardHandler) httpShardHandlerFactory.getShardHandler(), updateShardHandler, "/admin/cores", reader, zkController,
         new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "").build());
     overseers.add(overseer);
-    ElectionContext ec = new OverseerElectionContext(zkClient, overseer,
-        address.replaceAll("/", "_"));
+    ElectionContext ec = new OverseerElectionContext(address.replaceAll("/", "_"), zkClient, overseer);
     overseerElector.setup(ec);
     overseerElector.joinElection(ec, false);
     return zkClient;

@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -65,6 +66,7 @@ import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.handler.component.ShardHandlerFactory;
@@ -95,7 +97,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
       "cloud.autoscaling."
   };
   private static final java.lang.String SOLR_CORE_NAME = "solr.core.name";
-  private static Set<String> loggedOnce = new ConcurrentSkipListSet<>();
+ // private static Set<String> loggedOnce = new ConcurrentSkipListSet<>();
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
 
@@ -104,9 +106,9 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   private final Path instanceDir;
   private String dataDir;
 
-  private final List<SolrCoreAware> waitingForCore = Collections.synchronizedList(new ArrayList<SolrCoreAware>());
-  private final List<SolrInfoBean> infoMBeans = Collections.synchronizedList(new ArrayList<SolrInfoBean>());
-  private final List<ResourceLoaderAware> waitingForResources = Collections.synchronizedList(new ArrayList<ResourceLoaderAware>());
+  private final Set<SolrCoreAware> waitingForCore = ConcurrentHashMap.newKeySet(5000);
+  private final Set<SolrInfoBean> infoMBeans = ConcurrentHashMap.newKeySet(5000);
+  private final Set<ResourceLoaderAware> waitingForResources = ConcurrentHashMap.newKeySet(5000);
 
   private final Properties coreProperties;
 
@@ -500,12 +502,12 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   /*
    * A static map of short class name to fully qualified class name
    */
-  private static final Map<String, String> classNameCache = new ConcurrentHashMap<>();
+  private final Map<String, String> classNameCache = new ConcurrentHashMap<>(2000, .75f, 100);
 
-  @VisibleForTesting
-  static void clearCache() {
-    classNameCache.clear();
-  }
+//  @VisibleForTesting
+//  static void clearCache() {
+//    classNameCache.clear();
+//  }
 
   // Using this pattern, legacy analysis components from previous Solr versions are identified and delegated to SPI loader:
   private static final Pattern legacyAnalysisPattern =
@@ -704,20 +706,30 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   /**
    * Tell all {@link SolrCoreAware} instances about the SolrCore
    */
+  @SuppressWarnings("resource")
   public void inform(SolrCore core) {
     this.dataDir = core.getDataDir();
 
     // make a copy to avoid potential deadlock of a callback calling newInstance and trying to
     // add something to waitingForCore.
-    SolrCoreAware[] arr;
 
     while (waitingForCore.size() > 0) {
-      synchronized (waitingForCore) {
-        arr = waitingForCore.toArray(new SolrCoreAware[waitingForCore.size()]);
-        waitingForCore.clear();
+      Set<SolrCoreAware> awareSet = new HashSet<>(waitingForCore.size() + 20);
+      waitingForCore.forEach((it) -> awareSet.add(it));
+
+      for (SolrCoreAware aware : awareSet) {
+        waitingForCore.remove(aware);
       }
 
-      for (SolrCoreAware aware : arr) {
+      if (awareSet.size() == 0) {
+        try {
+          Thread.sleep(50); // lttle throttle
+        } catch (Exception e) {
+          throw new SW.Exp(e);
+        }
+      }
+
+      for (SolrCoreAware aware : awareSet.toArray(new SolrCoreAware[0])) {
         aware.inform(core);
       }
     }
@@ -729,18 +741,28 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   /**
    * Tell all {@link ResourceLoaderAware} instances about the loader
    */
+  @SuppressWarnings("resource")
   public void inform(ResourceLoader loader) throws IOException {
 
     // make a copy to avoid potential deadlock of a callback adding to the list
-    ResourceLoaderAware[] arr;
-
+    
     while (waitingForResources.size() > 0) {
-      synchronized (waitingForResources) {
-        arr = waitingForResources.toArray(new ResourceLoaderAware[waitingForResources.size()]);
-        waitingForResources.clear();
+      Set<ResourceLoaderAware> awareSet = new HashSet<>(waitingForResources.size() + 20);
+      waitingForResources.forEach((it) -> awareSet.add(it));
+
+      if (awareSet.size() == 0) {
+        try {
+          Thread.sleep(50); // lttle throttle
+        } catch (Exception e) {
+          throw new SW.Exp(e);
+        } 
+      }
+      
+      for (ResourceLoaderAware aware : awareSet) {
+        waitingForResources.remove(aware);
       }
 
-      for (ResourceLoaderAware aware : arr) {
+      for (ResourceLoaderAware aware : awareSet.toArray(new ResourceLoaderAware[0])) {
         aware.inform(loader);
       }
     }
@@ -751,21 +773,28 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
    *
    * @param infoRegistry The Info Registry
    */
-  public void inform(Map<String, SolrInfoBean> infoRegistry) {
+  @SuppressWarnings("resource")
+  public void inform(Map<String,SolrInfoBean> infoRegistry) {
     // this can currently happen concurrently with requests starting and lazy components
-    // loading.  Make sure infoMBeans doesn't change.
+    // loading. Make sure infoMBeans doesn't change.
 
-    SolrInfoBean[] arr;
-    synchronized (infoMBeans) {
-      arr = infoMBeans.toArray(new SolrInfoBean[infoMBeans.size()]);
-      waitingForResources.clear();
-    }
+    while (infoMBeans.size() > 0) {
+      Set<SolrInfoBean> beanSet = new HashSet<>(infoMBeans.size() + 20);
+      infoMBeans.forEach((it) -> beanSet.add(it));
 
+      if (beanSet.size() == 0) {
+        try {
+          Thread.sleep(50); // lttle throttle
+        } catch (Exception e) {
+          throw new SW.Exp(e);
+        } 
+      }
+      
+      for (SolrInfoBean bean : beanSet) {
+        infoMBeans.remove(bean);
+      }
 
-    for (SolrInfoBean bean : arr) {
-      // Too slow? I suspect not, but we may need
-      // to start tracking this in a Set.
-      if (!infoRegistry.containsValue(bean)) {
+      for (SolrInfoBean bean : beanSet.toArray(new SolrInfoBean[0])) {
         try {
           infoRegistry.put(bean.getName(), bean);
         } catch (Exception e) {
@@ -801,7 +830,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
     try {
       Context c = new InitialContext();
       home = (String) c.lookup("java:comp/env/" + project + "/home");
-      logOnceInfo("home_using_jndi", "Using JNDI solr.home: " + home);
+      log.info("home_using_jndi", "Using JNDI solr.home: " + home);
     } catch (NoInitialContextException e) {
       log.debug("JNDI not configured for " + project + " (NoInitialContextEx)");
     } catch (NamingException e) {
@@ -815,14 +844,14 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
       String prop = project + ".solr.home";
       home = System.getProperty(prop);
       if (home != null) {
-        logOnceInfo("home_using_sysprop", "Using system property " + prop + ": " + home);
+        log.info("home_using_sysprop", "Using system property " + prop + ": " + home);
       }
     }
 
     // if all else fails, try 
     if (home == null) {
       home = project + '/';
-      logOnceInfo("home_default", project + " home defaulted to '" + home + "' (could not find system property or JNDI)");
+      log.info("home_default", project + " home defaulted to '" + home + "' (could not find system property or JNDI)");
     }
     return Paths.get(home);
   }
@@ -855,13 +884,13 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   }
 
   // Logs a message only once per startup
-  private static void logOnceInfo(String key, String msg) {
-    if (!loggedOnce.contains(key)) {
-      loggedOnce.add(key);
-      log.info(msg);
-    }
-  }
-
+//  private static void logOnceInfo(String key, String msg) {
+//    if (!loggedOnce.contains(key)) {
+//      loggedOnce.add(key);
+//      log.info(msg);
+//    }
+//  }
+// nocommit
   /**
    * @return the instance path for this resource loader
    */
@@ -935,7 +964,10 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   }
 
   public List<SolrInfoBean> getInfoMBeans() {
-    return Collections.unmodifiableList(infoMBeans);
+    List<SolrInfoBean> infoBeanList = new ArrayList<>(10);
+    infoMBeans.forEach(it -> infoBeanList.add(it));
+    
+    return infoBeanList;
   }
 
 

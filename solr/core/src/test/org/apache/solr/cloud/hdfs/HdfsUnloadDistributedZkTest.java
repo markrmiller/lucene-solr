@@ -52,8 +52,8 @@ public class HdfsUnloadDistributedZkTest extends UnloadDistributedZkTest {
     }
   }
   
-  @Override
-  protected String getDataDir(String dataDir) {
-    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
-  }
+//  @Override
+//  protected String getDataDir(String dataDir) {
+//    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
+//  }
 }

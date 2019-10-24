@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest.Field;
@@ -156,7 +157,7 @@ public class TestSegmentSorting extends SolrCloudTestCase {
                                  updateField, random().nextInt(60)));
         // atomic update
         cloudSolrClient.add(sdoc("id", TestUtil.nextInt(random(), 1, numDocs),
-                                 updateField, map("set", random().nextInt(60))));
+                                 updateField, SolrTestCaseJ4.map("set", random().nextInt(60))));
       }
       cloudSolrClient.commit();
     }
@@ -167,7 +168,7 @@ public class TestSegmentSorting extends SolrCloudTestCase {
     final int id = TestUtil.nextInt(random(), 1, numDocs);
     final int oldDocId = (Integer) cloudSolrClient.getById(""+id, params("fl","[docid]")).get("[docid]");
     
-    cloudSolrClient.add(sdoc("id", id, updateField, map("inc","666")));
+    cloudSolrClient.add(sdoc("id", id, updateField, SolrTestCaseJ4.map("inc","666")));
     cloudSolrClient.commit();
     
     // loop incase we're waiting for a newSearcher to be opened
