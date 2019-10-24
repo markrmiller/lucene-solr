@@ -243,7 +243,6 @@ public class ZkStateReader implements SolrCloseable {
    * @return current configuration from <code>autoscaling.json</code>. NOTE:
    * this data is retrieved from ZK on each call.
    */
-  @SuppressWarnings("unchecked")
   public AutoScalingConfig getAutoScalingConfig(Watcher watcher) throws KeeperException, InterruptedException {
     Stat stat = new Stat();
 
@@ -900,21 +899,35 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public void close() {
-    this.closed = true;
+	    this.closed = true;
 
-    notifications.shutdownNow();
+	    try (SmartClose closer = new SmartClose(this)) {
+	      notifications.shutdown();
+	      collectionPropsNotifications.shutdown();
 
-    waitLatches.parallelStream().forEach(c -> {
-      c.countDown();
-    });
+	      try {
+	        collectionPropsCacheCleaner.cancel(true);
+	      } catch (NullPointerException e) {
+	        // okay
+	      }
 
-    ExecutorUtil.shutdownAndAwaitTermination(notifications);
-    ExecutorUtil.shutdownAndAwaitTermination(collectionPropsNotifications);
-    if (closeClient) {
-      zkClient.close();
-    }
-    assert ObjectReleaseTracker.release(this);
-  }
+	      notifications.shutdownNow();
+	      collectionPropsNotifications.shutdownNow();
+	      
+	      closer.add("", closeClient ? zkClient : null, notifications, collectionPropsNotifications, () -> {
+	        Set<CountDownLatch> latches = new HashSet<>(waitLatches.size());
+	        synchronized (waitLatches) {
+	         latches.addAll(waitLatches); 
+	        }
+	        for (CountDownLatch latch : latches) {
+	          latch.countDown();
+	        }
+	        return null;
+	        
+	      });
+	    }
+	    assert ObjectReleaseTracker.release(this);
+	  }
 
   @Override
   public boolean isClosed() {
