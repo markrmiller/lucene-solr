@@ -741,7 +741,6 @@ public class BasicDistributedZkTest extends SolrCloudBridgeTestCase {
     
     // we added a role of none on these creates - check for it
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-    zkStateReader.forceUpdateCollection(oneInstanceCollection2);
     Map<String,Slice> slices = zkStateReader.getClusterState().getCollection(oneInstanceCollection2).getSlicesMap();
     assertNotNull(slices);
 

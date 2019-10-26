@@ -47,6 +47,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -282,7 +283,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           searchHolder.decref();
         }
       } catch (Exception e) {
-        log.debug("Error in solrcloud_debug block", e);
+        throw new DW.Exp(e);
       }
     }
 
@@ -318,13 +319,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
       try {
         doRecovery(core);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        SolrException.log(log, "", e);
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
       } catch (Exception e) {
-        log.error("", e);
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
+        throw new DW.Exp(e);
       }
     } finally {
       MDCLoggingContext.clear();
@@ -804,9 +800,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
         if (e.getCause() instanceof IOException) {
           log.error("Failed to connect leader {} on recovery, try again", leaderReplica.getBaseUrl());
           Thread.sleep(500);
-        } else {
-          return leaderReplica;
         }
+        throw new DW.Exp(e);
       }
     }
   }
@@ -864,7 +859,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
         searchHolder.decref();
       }
     } catch (Exception e) {
-      log.debug("Error in solrcloud_debug block", e);
+      throw new DW.Exp(e);
     }
   }
 

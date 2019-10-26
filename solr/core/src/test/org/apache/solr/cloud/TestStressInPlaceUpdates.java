@@ -582,7 +582,6 @@ public class TestStressInPlaceUpdates extends AbstractFullDistribZkTestBase {
    */
   public SolrClient getClientForLeader() throws KeeperException, InterruptedException {
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-    cloudClient.getZkStateReader().forceUpdateCollection(DEFAULT_COLLECTION);
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     Replica leader = null;
     Slice shard1 = clusterState.getCollection(DEFAULT_COLLECTION).getSlice(SHARD1);

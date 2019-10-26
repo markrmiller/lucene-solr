@@ -71,8 +71,6 @@ public class ForceLeaderTest extends HttpPartitionTest {
   public void testReplicasInLowerTerms() throws Exception {
     handle.put("maxScore", SKIPVAL);
     handle.put("timestamp", SKIPVAL);
-    
-
 
     String testCollectionName = "forceleader_lower_terms_collection";
     createCollection(testCollectionName, "conf1", 1, 3, 1);
@@ -96,7 +94,7 @@ public class ForceLeaderTest extends HttpPartitionTest {
         waitForState(testCollectionName, replica.getName(), State.DOWN, 60000);
       }
       waitForState(testCollectionName, leader.getName(), State.DOWN, 60000);
-      cloudClient.getZkStateReader().forceUpdateCollection(testCollectionName);
+
       ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
       int numActiveReplicas = getNumberOfActiveReplicas(clusterState, testCollectionName, SHARD1);
       assertEquals("Expected only 0 active replica but found " + numActiveReplicas +
@@ -122,7 +120,6 @@ public class ForceLeaderTest extends HttpPartitionTest {
       // By now we have an active leader. Wait for recoveries to begin
       waitForRecoveriesToFinish(testCollectionName, cloudClient.getZkStateReader(), true);
 
-      cloudClient.getZkStateReader().forceUpdateCollection(testCollectionName);
       clusterState = cloudClient.getZkStateReader().getClusterState();
       log.info("After forcing leader: " + clusterState.getCollection(testCollectionName).getSlice(SHARD1));
       // we have a leader
@@ -241,7 +238,6 @@ public class ForceLeaderTest extends HttpPartitionTest {
     getProxyForReplica(leader).reopen();
     leaderJetty.start();
     waitForRecoveriesToFinish(collection, cloudClient.getZkStateReader(), true);
-    cloudClient.getZkStateReader().forceUpdateCollection(collection);
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     log.info("After bringing back leader: " + clusterState.getCollection(collection).getSlice(SHARD1));
     int numActiveReplicas = getNumberOfActiveReplicas(clusterState, collection, SHARD1);

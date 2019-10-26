@@ -36,6 +36,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.AnalysisParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
@@ -175,7 +176,7 @@ public class DocumentAnalysisRequestHandler extends AnalysisRequestHandlerBase {
 
     } finally {
       if (parser != null) parser.close();
-      IOUtils.closeQuietly(is);
+      DW.close(is);
     }
   }
 

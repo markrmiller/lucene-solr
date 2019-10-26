@@ -50,6 +50,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 
@@ -342,7 +343,7 @@ public class DeepRandomStream extends TupleStream implements Expressible {
 
       }
     } catch (Exception e) {
-      throw new IOException(e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -364,7 +365,7 @@ public class DeepRandomStream extends TupleStream implements Expressible {
           }
         }
       } catch (Exception e) {
-        throw new IOException(e);
+        throw new DW.Exp(e);
       }
     } finally {
       service.shutdown();

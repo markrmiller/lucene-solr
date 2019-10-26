@@ -32,6 +32,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.SolrCore;
@@ -404,7 +405,7 @@ public class TolerantUpdateProcessorTest extends UpdateProcessorTestBase {
       processor.finish();
       
     } finally {
-      IOUtils.closeQuietly(processor);
+      DW.close(processor);
       req.close();
     }
     return rsp;

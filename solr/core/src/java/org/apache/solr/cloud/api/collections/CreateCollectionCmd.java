@@ -61,10 +61,12 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
+import org.apache.solr.common.util.TimeSource.NanoTimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.admin.ConfigSetsHandlerApi;
 import org.apache.solr.handler.component.ShardHandler;
@@ -104,6 +106,10 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
   @Override
   public void call(ClusterState clusterState, ZkNodeProps message, NamedList results) throws Exception {
+    if (log.isDebugEnabled()) {
+      log.debug("call(ClusterState clusterState={}, ZkNodeProps message={}, NamedList results={}) - start", clusterState, message, results);
+    }
+
     if (ocmh.zkStateReader.aliasesManager != null) { // not a mock ZkStateReader
       ocmh.zkStateReader.aliasesManager.update();
     }
@@ -171,39 +177,39 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       
       ocmh.overseer.offerStateUpdate(Utils.toJSON(message));
 
-      // wait for a while until we see the collection
-      TimeOut waitUntil = new TimeOut(30, TimeUnit.SECONDS, timeSource);
-      boolean created = false;
-      while (! waitUntil.hasTimedOut()) {
-        waitUntil.sleep(100);
-        created = ocmh.cloudManager.getClusterStateProvider().getClusterState().hasCollection(collectionName);
-        if(created) break;
-      }
-      if (!created) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Could not fully create collection: " + collectionName);
-      }
-
-      // refresh cluster state
-      clusterState = ocmh.cloudManager.getClusterStateProvider().getClusterState();
+      assert timeSource instanceof NanoTimeSource;
+      
+      System.out.println("wait for state");
+      zkStateReader.waitForState( collectionName,  15, TimeUnit.SECONDS, (l,c) -> c != null);
 
       List<ReplicaPosition> replicaPositions = null;
       try {
-        replicaPositions = buildReplicaPositions(ocmh.cloudManager, clusterState, clusterState.getCollection(collectionName), message, shardNames, sessionWrapper);
-      } catch (Assign.AssignmentException e) {
-        ZkNodeProps deleteMessage = new ZkNodeProps("name", collectionName);
-        new DeleteCollectionCmd(ocmh).call(clusterState, deleteMessage, results);
-        // unwrap the exception
-        throw new SolrException(ErrorCode.SERVER_ERROR, e.getMessage(), e.getCause());
+        replicaPositions = buildReplicaPositions(ocmh.cloudManager, clusterState,
+            clusterState.getCollection(collectionName), message, shardNames, sessionWrapper);
+      } catch (Exception e) {
+        DW.Exp exp = new DW.Exp("call(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", e);
+        try {
+          ZkNodeProps deleteMessage = new ZkNodeProps("name", collectionName);
+          new DeleteCollectionCmd(ocmh).call(clusterState, deleteMessage, results);
+          // unwrap the exception
+        } catch (Exception e1) {
+          DW.propegateInterrupt(e1);
+          exp.addSuppressed(e1);
+        }
+        throw exp;
       }
 
       if (replicaPositions.isEmpty()) {
-        log.debug("Finished create command for collection: {}", collectionName);
+        if (log.isDebugEnabled()) {
+          log.debug("Finished create command for collection: {}", collectionName);
+        }
         return;
       }
 
       final ShardRequestTracker shardRequestTracker = ocmh.asyncRequestTracker(async);
-      log.debug(formatString("Creating SolrCores for new collection {0}, shardNames {1} , message : {2}",
-          collectionName, shardNames, message));
+      if (log.isDebugEnabled()) {
+        log.debug(formatString("Creating SolrCores for new collection {0}, shardNames {1} , message : {2}", collectionName, shardNames, message));
+      }
       Map<String,ShardRequest> coresToCreate = new LinkedHashMap<>();
       ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
       for (ReplicaPosition replicaPosition : replicaPositions) {
@@ -228,7 +234,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         String coreName = Assign.buildSolrCoreName(ocmh.cloudManager.getDistribStateManager(),
             ocmh.cloudManager.getClusterStateProvider().getClusterState().getCollection(collectionName),
             replicaPosition.shard, replicaPosition.type, true);
-        log.debug(formatString("Creating core {0} as part of shard {1} of collection {2} on {3}"
+        if (log.isDebugEnabled()) log.debug(formatString("Creating core {0} as part of shard {1} of collection {2} on {3}"
             , coreName, replicaPosition.shard, collectionName, nodeName));
 
 
@@ -338,9 +344,13 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     } catch (SolrException ex) {
       throw ex;
     } catch (Exception ex) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, null, ex);
+      throw new DW.Exp("call(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", ex);
     } finally {
       if (sessionWrapper.get() != null) sessionWrapper.get().release();
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("call(ClusterState, ZkNodeProps, NamedList) - end");
     }
   }
 
@@ -349,6 +359,10 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
                                                             ZkNodeProps message,
                                                             List<String> shardNames,
                                                             AtomicReference<PolicyHelper.SessionWrapper> sessionWrapper) throws IOException, InterruptedException, Assign.AssignmentException {
+    if (log.isDebugEnabled()) {
+      log.debug("buildReplicaPositions(SolrCloudManager cloudManager={}, ClusterState clusterState={}, DocCollection docCollection={}, ZkNodeProps message={}, List<String> shardNames={}, AtomicReference<PolicyHelper.SessionWrapper> sessionWrapper={}) - start", cloudManager, clusterState, docCollection, message, shardNames, sessionWrapper);
+    }
+
     final String collectionName = message.getStr(NAME);
     // look at the replication factor and see if it matches reality
     // if it does not, find best nodes to create more cores
@@ -387,7 +401,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           maxShardsPerNode * nodeList.size();
       int requestedShardsToCreate = numSlices * totalNumReplicas;
       if (maxShardsAllowedToCreate < requestedShardsToCreate) {
-        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Cannot create collection " + collectionName + ". Value of "
+        String msg = "Cannot create collection " + collectionName + ". Value of "
             + MAX_SHARDS_PER_NODE + " is " + maxShardsPerNode
             + ", and the number of nodes currently live or live and part of your "+OverseerCollectionMessageHandler.CREATE_NODE_SET+" is " + nodeList.size()
             + ". This allows a maximum of " + maxShardsAllowedToCreate
@@ -396,7 +410,9 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
             + ", value of " + TLOG_REPLICAS + " is " + numTlogReplicas
             + " and value of " + PULL_REPLICAS + " is " + numPullReplicas
             + ". This requires " + requestedShardsToCreate
-            + " shards to be created (higher than the allowed number)");
+            + " shards to be created (higher than the allowed number)";
+        
+        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, msg);
       }
       Assign.AssignRequest assignRequest = new Assign.AssignRequestBuilder()
           .forCollection(collectionName)
@@ -411,19 +427,35 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       replicaPositions = assignStrategy.assign(cloudManager, assignRequest);
       sessionWrapper.set(PolicyHelper.getLastSessionWrapper(true));
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("buildReplicaPositions(SolrCloudManager, ClusterState, DocCollection, ZkNodeProps, List<String>, AtomicReference<PolicyHelper.SessionWrapper>) - end");
+    }
     return replicaPositions;
   }
 
   public static void checkReplicaTypes(ZkNodeProps message) {
+    if (log.isDebugEnabled()) {
+      log.debug("checkReplicaTypes(ZkNodeProps message={}) - start", message);
+    }
+
     int numTlogReplicas = message.getInt(TLOG_REPLICAS, 0);
     int numNrtReplicas = message.getInt(NRT_REPLICAS, message.getInt(REPLICATION_FACTOR, numTlogReplicas > 0 ? 0 : 1));
 
     if (numNrtReplicas + numTlogReplicas <= 0) {
       throw new SolrException(ErrorCode.BAD_REQUEST, NRT_REPLICAS + " + " + TLOG_REPLICAS + " must be greater than 0");
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("checkReplicaTypes(ZkNodeProps) - end");
+    }
   }
 
   public static List<String> populateShardNames(ZkNodeProps message, String router) {
+    if (log.isDebugEnabled()) {
+      log.debug("populateShardNames(ZkNodeProps message={}, String router={}) - start", message, router);
+    }
+
     List<String> shardNames = new ArrayList<>();
     Integer numSlices = message.getInt(OverseerCollectionMessageHandler.NUM_SLICES, null);
     if (ImplicitDocRouter.NAME.equals(router)) {
@@ -438,10 +470,18 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       }
       ClusterStateMutator.getShardNames(numSlices, shardNames);
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("populateShardNames(ZkNodeProps, String) - end");
+    }
     return shardNames;
   }
 
   String getConfigName(String coll, ZkNodeProps message) throws KeeperException, InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("getConfigName(String coll={}, ZkNodeProps message={}) - start", coll, message);
+    }
+
     String configName = message.getStr(COLL_CONF);
 
     if (configName == null) {
@@ -451,10 +491,17 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         configNames = ocmh.zkStateReader.getZkClient().getChildren(ZkConfigManager.CONFIGS_ZKNODE, null, true);
         if (configNames.contains(ConfigSetsHandlerApi.DEFAULT_CONFIGSET_NAME)) {
           if (CollectionAdminParams.SYSTEM_COLL.equals(coll)) {
+            if (log.isDebugEnabled()) {
+              log.debug("getConfigName(String, ZkNodeProps) - end");
+            }
             return coll;
           } else {
             String intendedConfigSetName = ConfigSetsHandlerApi.getSuffixedNameForAutoGeneratedConfigSet(coll);
             copyDefaultConfigSetTo(configNames, intendedConfigSetName);
+
+            if (log.isDebugEnabled()) {
+              log.debug("getConfigName(String, ZkNodeProps) - end");
+            }
             return intendedConfigSetName;
           }
         } else if (configNames != null && configNames.size() == 1) {
@@ -463,16 +510,25 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           log.info("Only one config set found in zk - using it:" + configName);
         }
       } catch (KeeperException.NoNodeException e) {
+        log.warn("getConfigName(String=" + coll + ", ZkNodeProps=" + message + ") - exception ignored", e);
 
       }
     }
-    return "".equals(configName)? null: configName;
+    String returnString = "".equals(configName) ? null : configName;
+    if (log.isDebugEnabled()) {
+      log.debug("getConfigName(String, ZkNodeProps) - end");
+    }
+    return returnString;
   }
 
   /**
    * Copies the _default configset to the specified configset name (overwrites if pre-existing)
    */
   private void copyDefaultConfigSetTo(List<String> configNames, String targetConfig) {
+    if (log.isDebugEnabled()) {
+      log.debug("copyDefaultConfigSetTo(List<String> configNames={}, String targetConfig={}) - start", configNames, targetConfig);
+    }
+
     ZkConfigManager configManager = new ZkConfigManager(ocmh.zkStateReader.getZkClient());
 
     // if a configset named collection exists, re-use it
@@ -485,94 +541,104 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     try {
       configManager.copyConfigDir(ConfigSetsHandlerApi.DEFAULT_CONFIGSET_NAME, targetConfig, new HashSet<>());
     } catch (Exception e) {
-      throw new SolrException(ErrorCode.INVALID_STATE, "Error while copying _default to " + targetConfig, e);
+     throw new DW.Exp("copyDefaultConfigSetTo(List<String>=" + configNames + ", String=" + targetConfig + ")", e);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("copyDefaultConfigSetTo(List<String>, String) - end");
     }
   }
 
   public static void createCollectionZkNode(DistribStateManager stateManager, String collection, Map<String,String> params) {
-    log.debug("Check for collection zkNode:" + collection);
+    if (log.isDebugEnabled()) {
+      log.debug("createCollectionZkNode(DistribStateManager stateManager={}, String collection={}, Map<String,String> params={}) - start", stateManager, collection, params);
+    }
+
     String collectionPath = ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection;
     // clean up old terms node
     String termsPath = ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + "/terms";
     try {
       stateManager.removeRecursively(termsPath, true, true);
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error deleting old term nodes for collection from Zookeeper", e);
-    } catch (KeeperException | IOException | NotEmptyException | BadVersionException e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error deleting old term nodes for collection from Zookeeper", e);
+    } catch (Exception e) {
+      throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
     try {
-      if (!stateManager.hasData(collectionPath)) {
-        log.debug("Creating collection in ZooKeeper:" + collection);
 
-        try {
-          Map<String,Object> collectionProps = new HashMap<>();
+      log.debug("Creating collection in ZooKeeper:" + collection);
 
-          if (params.size() > 0) {
-            collectionProps.putAll(params);
-            // if the config name wasn't passed in, use the default
-            if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP)) {
-              // users can create the collection node and conf link ahead of time, or this may return another option
-              getConfName(stateManager, collection, collectionPath, collectionProps);
-            }
+      try {
+        Map<String,Object> collectionProps = new HashMap<>();
 
-          } else if (System.getProperty("bootstrap_confdir") != null) {
-            String defaultConfigName = System.getProperty(ZkController.COLLECTION_PARAM_PREFIX + ZkController.CONFIGNAME_PROP, collection);
-
-            // if we are bootstrapping a collection, default the config for
-            // a new collection to the collection we are bootstrapping
-            log.info("Setting config for collection:" + collection + " to " + defaultConfigName);
-
-            Properties sysProps = System.getProperties();
-            for (String sprop : System.getProperties().stringPropertyNames()) {
-              if (sprop.startsWith(ZkController.COLLECTION_PARAM_PREFIX)) {
-                collectionProps.put(sprop.substring(ZkController.COLLECTION_PARAM_PREFIX.length()), sysProps.getProperty(sprop));
-              }
-            }
-
-            // if the config name wasn't passed in, use the default
-            if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP))
-              collectionProps.put(ZkController.CONFIGNAME_PROP, defaultConfigName);
-
-          } else if (Boolean.getBoolean("bootstrap_conf")) {
-            // the conf name should should be the collection name of this core
-            collectionProps.put(ZkController.CONFIGNAME_PROP, collection);
-          } else {
+        if (params.size() > 0) {
+          collectionProps.putAll(params);
+          // if the config name wasn't passed in, use the default
+          if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP)) {
+            // users can create the collection node and conf link ahead of time, or this may return another option
             getConfName(stateManager, collection, collectionPath, collectionProps);
           }
 
-          collectionProps.remove(ZkStateReader.NUM_SHARDS_PROP);  // we don't put numShards in the collections properties
+        } else if (System.getProperty("bootstrap_confdir") != null) {
+          String defaultConfigName = System
+              .getProperty(ZkController.COLLECTION_PARAM_PREFIX + ZkController.CONFIGNAME_PROP, collection);
 
-          ZkNodeProps zkProps = new ZkNodeProps(collectionProps);
-          stateManager.makePath(collectionPath, Utils.toJSON(zkProps), CreateMode.PERSISTENT, false);
+          // if we are bootstrapping a collection, default the config for
+          // a new collection to the collection we are bootstrapping
+          log.info("Setting config for collection:" + collection + " to " + defaultConfigName);
 
-        } catch (KeeperException e) {
-          //TODO shouldn't the stateManager ensure this does not happen; should throw AlreadyExistsException
-          // it's okay if the node already exists
-          if (e.code() != KeeperException.Code.NODEEXISTS) {
-            throw e;
+          Properties sysProps = System.getProperties();
+          for (String sprop : System.getProperties().stringPropertyNames()) {
+            if (sprop.startsWith(ZkController.COLLECTION_PARAM_PREFIX)) {
+              collectionProps.put(sprop.substring(ZkController.COLLECTION_PARAM_PREFIX.length()),
+                  sysProps.getProperty(sprop));
+            }
           }
-        } catch (AlreadyExistsException e) {
-          // it's okay if the node already exists
+
+          // if the config name wasn't passed in, use the default
+          if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP))
+            collectionProps.put(ZkController.CONFIGNAME_PROP, defaultConfigName);
+
+        } else if (Boolean.getBoolean("bootstrap_conf")) {
+          // the conf name should should be the collection name of this core
+          collectionProps.put(ZkController.CONFIGNAME_PROP, collection);
+        } else {
+          getConfName(stateManager, collection, collectionPath, collectionProps);
         }
-      } else {
-        log.debug("Collection zkNode exists");
+
+        collectionProps.remove(ZkStateReader.NUM_SHARDS_PROP); // we don't put numShards in the collections properties
+
+        ZkNodeProps zkProps = new ZkNodeProps(collectionProps);
+        stateManager.makePath(collectionPath, Utils.toJSON(zkProps), CreateMode.PERSISTENT, false);
+        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection
+            + "/leader_elect/" , null, CreateMode.PERSISTENT, false);
+        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + "/"
+            + ZkStateReader.SHARD_LEADERS_ZKNODE , null, CreateMode.PERSISTENT, false);
+      } catch (KeeperException e) {
+        log.error("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection
+            + ", Map<String,String>=" + params + ")", e);
+
+        // TODO shouldn't the stateManager ensure this does not happen; should throw AlreadyExistsException
+        // it's okay if the node already exists
+        if (e.code() != KeeperException.Code.NODEEXISTS) {
+          throw e;
+        }
       }
 
-    } catch (KeeperException e) {
+    } catch (Exception e) {
       // it's okay if another beats us creating the node
-      if (e.code() == KeeperException.Code.NODEEXISTS) {
+      if (e instanceof KeeperException && ((KeeperException) e).code() == KeeperException.Code.NODEEXISTS) {
+        if (log.isDebugEnabled()) {
+          log.debug("createCollectionZkNode(DistribStateManager, String, Map<String,String>) - end");
+        }
         return;
       }
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error creating collection node in Zookeeper", e);
-    } catch (IOException e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error creating collection node in Zookeeper", e);
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error creating collection node in Zookeeper", e);
+
+      throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
 
+
+    if (log.isDebugEnabled()) {
+      log.debug("createCollectionZkNode(DistribStateManager, String, Map<String,String>) - end");
+    }
   }
 
   private static void getConfName(DistribStateManager stateManager, String collection, String collectionPath, Map<String,Object> collectionProps) throws IOException,
@@ -599,6 +665,8 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       try {
         configNames = stateManager.listData(ZkConfigManager.CONFIGS_ZKNODE);
       } catch (NoSuchElementException | NoNodeException e) {
+        log.warn("getConfName(DistribStateManager=" + stateManager + ", String=" + collection + ", String=" + collectionPath + ", Map<String,Object>=" + collectionProps + ") - exception ignored", e);
+
         // just keep trying
       }
 
@@ -632,6 +700,10 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       throw new ZooKeeperException(
           SolrException.ErrorCode.SERVER_ERROR,
           "Could not find configName for collection " + collection + " found:" + configNames);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getConfName(DistribStateManager, String, String, Map<String,Object>) - end");
     }
   }
 }

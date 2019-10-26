@@ -57,8 +57,6 @@ public class DefaultConnectionStrategy extends ZkClientConnectionStrategy {
           .update(zk);
       success = true;
       log.info("Reconnected to ZooKeeper");
-    } catch (AlreadyClosedException e) {
-
     } finally {
       if (!success) {
         try {

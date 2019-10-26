@@ -50,6 +50,7 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -405,6 +406,7 @@ public abstract class LBSolrClient extends SolrClient {
         throw e;
       }
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       throw new SolrServerException(e);
     }
 
@@ -513,6 +515,7 @@ public abstract class LBSolrClient extends SolrClient {
         }
       }
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       //Expected. The server is still down.
       zombieServer.failedPings++;
 
@@ -616,6 +619,7 @@ public abstract class LBSolrClient extends SolrClient {
           throw e;
         }
       } catch (Exception e) {
+        DW.propegateInterrupt(e);
         throw new SolrServerException(e);
       }
     }
@@ -646,6 +650,7 @@ public abstract class LBSolrClient extends SolrClient {
           throw e;
         }
       } catch (Exception e) {
+        DW.propegateInterrupt(e);
         throw new SolrServerException(e);
       }
     }

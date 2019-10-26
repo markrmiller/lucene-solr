@@ -50,7 +50,7 @@ public class SecurityConfHandlerZk extends SecurityConfHandler {
    */
   @Override
   public SecurityConfig getSecurityConfig(boolean getFresh) {
-    ZkStateReader.ConfigData configDataFromZk = cores.getZkController().getZkStateReader().getSecurityProps(getFresh);
+    ZkStateReader.ConfigData configDataFromZk = null;// nocommit cores.getZkController().getZkStateReader().getSecurityProps(getFresh);
     return configDataFromZk == null ? 
         new SecurityConfig() :
         new SecurityConfig().setData(configDataFromZk.data).setVersion(configDataFromZk.version);
@@ -58,14 +58,14 @@ public class SecurityConfHandlerZk extends SecurityConfHandler {
 
   @Override
   protected void getConf(SolrQueryResponse rsp, String key) {
-    ZkStateReader.ConfigData map = cores.getZkController().getZkStateReader().getSecurityProps(false);
-    Object o = map == null ? null : map.data.get(key);
-    if (o == null) {
-      rsp.add(CommandOperation.ERR_MSGS, Collections.singletonList("No " + key + " configured"));
-    } else {
-      rsp.add(key+".enabled", getPlugin(key)!=null);
-      rsp.add(key, o);
-    }
+    // nocommit ZkStateReader.ConfigData map = cores.getZkController().getZkStateReader().getSecurityProps(false);
+//    Object o = map == null ? null : map.data.get(key);
+//    if (o == null) {
+//      rsp.add(CommandOperation.ERR_MSGS, Collections.singletonList("No " + key + " configured"));
+//    } else {
+//      rsp.add(key+".enabled", getPlugin(key)!=null);
+//      rsp.add(key, o);
+//    }
   }
   
   @Override

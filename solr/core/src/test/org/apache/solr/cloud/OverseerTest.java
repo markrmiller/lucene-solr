@@ -67,6 +67,7 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -337,7 +338,7 @@ public class OverseerTest extends SolrTestCaseJ4 {
     }
 
     for (SolrClient solrClient : solrClients) {
-      customThreadPool.submit( () -> IOUtils.closeQuietly(solrClient));
+      customThreadPool.submit( () -> DW.close(solrClient));
     }
 
     for (ZkStateReader reader : readers) {
@@ -345,7 +346,7 @@ public class OverseerTest extends SolrTestCaseJ4 {
     }
 
     for (SolrZkClient solrZkClient : zkClients) {
-      customThreadPool.submit( () -> IOUtils.closeQuietly(solrZkClient));
+      customThreadPool.submit( () -> DW.close(solrZkClient));
     }
 
     ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
@@ -413,9 +414,9 @@ public class OverseerTest extends SolrTestCaseJ4 {
         assertEquals(rmap.toString(), 2, reader.getClusterState().getCollection(COLLECTION).getSlice("shard3").getReplicasMap().size());
 
         //make sure leaders are in cloud state
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard1", 15000));
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard2", 15000));
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard3", 15000));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard1"));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard2"));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard3"));
       }
     } finally {
       if (mockController != null) {
@@ -455,9 +456,9 @@ public class OverseerTest extends SolrTestCaseJ4 {
         assertEquals(1, reader.getClusterState().getCollection(COLLECTION).getSlice("shard3").getReplicasMap().size());
 
         //make sure leaders are in cloud state
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard1", 15000));
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard2", 15000));
-        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard3", 15000));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard1"));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard2"));
+        assertNotNull(reader.getLeaderUrl(COLLECTION, "shard3"));
 
         // publish a bad queue item
         String emptyCollectionName = "";
@@ -478,9 +479,9 @@ public class OverseerTest extends SolrTestCaseJ4 {
         assertEquals(1, reader.getClusterState().getCollection("collection2").getSlice("shard3").getReplicasMap().size());
 
         //make sure leaders are in cloud state
-        assertNotNull(reader.getLeaderUrl("collection2", "shard1", 15000));
-        assertNotNull(reader.getLeaderUrl("collection2", "shard2", 15000));
-        assertNotNull(reader.getLeaderUrl("collection2", "shard3", 15000));
+        assertNotNull(reader.getLeaderUrl("collection2", "shard1"));
+        assertNotNull(reader.getLeaderUrl("collection2", "shard2"));
+        assertNotNull(reader.getLeaderUrl("collection2", "shard3"));
       }
 
     } finally {
@@ -694,7 +695,6 @@ public class OverseerTest extends SolrTestCaseJ4 {
       reader.waitForState(COLLECTION, 5000,
             TimeUnit.MILLISECONDS, (liveNodes, collectionState) -> collectionState != null && collectionState.getReplica(core_node) == null);
 
-      reader.forceUpdateCollection(COLLECTION);
       // as of SOLR-5209 core removal does not cascade to remove the slice and collection
       assertTrue(COLLECTION +" should remain after removal of the last core", 
           reader.getClusterState().hasCollection(COLLECTION));
@@ -1050,7 +1050,6 @@ public class OverseerTest extends SolrTestCaseJ4 {
 
       mockController.publishState(COLLECTION, "core1", "core_node1","shard1", Replica.State.RECOVERING, 1, true, overseers.get(0));
 
-      reader.forceUpdateCollection(COLLECTION);
       ClusterState state = reader.getClusterState();
 
       int numFound = 0;

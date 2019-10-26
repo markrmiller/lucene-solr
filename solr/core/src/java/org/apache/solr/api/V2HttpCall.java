@@ -41,6 +41,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.JsonSchemaValidator;
 import org.apache.solr.common.util.PathTrie;
 import org.apache.solr.common.util.ValidatingJsonMap;
@@ -214,10 +215,8 @@ public class V2HttpCall extends HttpSolrCall {
     // ensure our view is up to date before trying again
     try {
       zkStateReader.aliasesManager.update();
-      zkStateReader.forceUpdateCollection(collectionsList.get(0));
     } catch (Exception e) {
-      log.error("Error trying to update state while resolving collection.", e);
-      //don't propagate exception on purpose
+      throw new DW.Exp("Error trying to update state while resolving collection.", e);
     }
     return logic.get();
   }
@@ -340,6 +339,7 @@ public class V2HttpCall extends HttpSolrCall {
     try {
       api.call(this.solrReq, solrResp);
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       solrResp.setException(e);
     }
   }
@@ -354,6 +354,7 @@ public class V2HttpCall extends HttpSolrCall {
       try {
         api.call(solrReq, rsp);
       } catch (Exception e) {
+        DW.propegateInterrupt(e);
         rsp.setException(e);
       }
     }

@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since solr 1.3
  */
-public class CoreDescriptor {
+public final class CoreDescriptor {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   // Properties file name constants
   public static final String CORE_NAME = "name";
@@ -242,7 +242,7 @@ public class CoreDescriptor {
    * File paths are taken as read from the core's instance directory
    * if they are not absolute.
    */
-  protected void loadExtraProperties() {
+  void loadExtraProperties() {
     String filename = coreProperties.getProperty(CORE_PROPERTIES, DEFAULT_EXTERNAL_PROPERTIES_FILE);
     Path propertiesFile = instanceDir.resolve(filename);
     if (Files.exists(propertiesFile)) {
@@ -263,7 +263,7 @@ public class CoreDescriptor {
    * substitution.  The default solr properties are prefixed with 'solr.core.', so,
    * e.g., 'name' becomes 'solr.core.name'
    */
-  protected void buildSubstitutableProperties() {
+  private void buildSubstitutableProperties() {
     for (String propName : coreProperties.stringPropertyNames()) {
       String propValue = coreProperties.getProperty(propName);
       if (!isUserDefinedProperty(propName))

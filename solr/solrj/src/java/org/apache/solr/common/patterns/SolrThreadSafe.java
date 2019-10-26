@@ -14,27 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.util;
+package org.apache.solr.common.patterns;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 
-import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.CoreDescriptor;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
+@Documented
+@Retention(SOURCE)
+@Target(TYPE)
+public @interface SolrThreadSafe {
 
-public class MockCoreContainer extends CoreContainer {
-  public static class MockCoreDescriptor extends CoreDescriptor {
-    public MockCoreDescriptor() {
-      super("mock", Paths.get("path"), null, false);
-    }
-  }
-  
-  public MockCoreContainer() {
-    super(new Object());
-  }
-  
-  public Path getCoreRootDirectory() {
-    return Paths.get("coreroot");
-  }
 }

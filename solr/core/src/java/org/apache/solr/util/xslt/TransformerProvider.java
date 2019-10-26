@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.slf4j.Logger;
@@ -112,7 +113,7 @@ public class TransformerProvider {
         result = tFactory.newTemplates(src);
       } finally {
         // some XML parsers are broken and don't close the byte stream (but they should according to spec)
-        IOUtils.closeQuietly(src.getInputStream());
+        DW.close(src.getInputStream());
       }
     } catch (Exception e) {
       log.error(getClass().getName(), "newTemplates", e);

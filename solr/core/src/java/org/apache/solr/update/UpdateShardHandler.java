@@ -16,6 +16,8 @@
  */
 package org.apache.solr.update;
 
+import static org.apache.solr.util.stats.InstrumentedHttpRequestExecutor.KNOWN_METRIC_NAME_STRATEGIES;
+
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
@@ -25,7 +27,6 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -33,8 +34,9 @@ import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.metrics.SolrMetricManager;
@@ -51,8 +53,9 @@ import org.apache.solr.util.stats.MetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.util.stats.InstrumentedHttpRequestExecutor.KNOWN_METRIC_NAME_STRATEGIES;
+import com.google.common.annotations.VisibleForTesting;
 
+@SolrThreadSafe
 public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -62,7 +65,7 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
    * and then undetected shard inconsistency as a result.
    * Therefore this thread pool is left unbounded. See SOLR-8205
    */
-  private ExecutorService updateExecutor = new ExecutorUtil.MDCAwareThreadPoolExecutor(0, Integer.MAX_VALUE,
+  private volatile ExecutorService updateExecutor = new ExecutorUtil.MDCAwareThreadPoolExecutor(0, Integer.MAX_VALUE,
       60L, TimeUnit.SECONDS,
       new SynchronousQueue<>(),
       new SolrjNamedThreadFactory("updateExecutor"),
@@ -70,7 +73,7 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
       // see SOLR-11880 for more details
       false);
   
-  private ExecutorService recoveryExecutor;
+  private volatile ExecutorService recoveryExecutor;
   
   private final Http2SolrClient updateOnlyClient;
   
@@ -90,10 +93,10 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
 
 
   private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
-  private SolrMetricsContext solrMetricsContext;
+  private volatile SolrMetricsContext solrMetricsContext;
 
-  private int socketTimeout = HttpClientUtil.DEFAULT_SO_TIMEOUT;
-  private int connectionTimeout = HttpClientUtil.DEFAULT_CONNECT_TIMEOUT;
+  private volatile int socketTimeout = HttpClientUtil.DEFAULT_SO_TIMEOUT;
+  private volatile int connectionTimeout = HttpClientUtil.DEFAULT_CONNECT_TIMEOUT;
 
   public UpdateShardHandler(UpdateShardHandlerConfig cfg) {
     updateOnlyConnectionManager = new InstrumentedPoolingHttpClientConnectionManager(HttpClientUtil.getSchemaRegisteryProvider().getSchemaRegistry());
@@ -252,23 +255,19 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
   }
 
   public void close() {
-    try {
-      // do not interrupt, do not interrupt
-      ExecutorUtil.shutdownAndAwaitTermination(updateExecutor);
-      ExecutorUtil.shutdownAndAwaitTermination(recoveryExecutor);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    } finally {
-      try {
-        SolrMetricProducer.super.close();
-      } catch (Exception e) {
-        // do nothing
-      }
-      IOUtils.closeQuietly(updateOnlyClient);
-      HttpClientUtil.close(recoveryOnlyClient);
-      HttpClientUtil.close(defaultClient);
-      defaultConnectionManager.close();
-      recoveryOnlyConnectionManager.close();
+    updateExecutor.shutdown();
+    recoveryExecutor.shutdown();
+
+    try (DW closer = new DW(this)) {
+      Set<Object> objects = new HashSet<>(10);
+      objects.add(updateExecutor);
+      objects.add(recoveryExecutor);
+      objects.add(updateOnlyClient);
+      objects.add(recoveryOnlyClient);
+      objects.add(defaultConnectionManager); 
+      objects.add(recoveryOnlyConnectionManager);
+      
+      closer.add("UpdateShardHandler", objects, () -> {SolrMetricProducer.super.close(); return this;});
     }
   }
 

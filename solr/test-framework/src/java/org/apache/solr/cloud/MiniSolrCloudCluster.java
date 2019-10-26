@@ -65,6 +65,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -257,69 +258,71 @@ public class MiniSolrCloudCluster {
    */
    MiniSolrCloudCluster(int numServers, Path baseDir, String solrXml, JettyConfig jettyConfig,
       ZkTestServer zkTestServer, Optional<String> securityJson, boolean trackJettyMetrics) throws Exception {
+    try {
+      Objects.requireNonNull(securityJson);
+      this.baseDir = Objects.requireNonNull(baseDir);
+      this.jettyConfig = Objects.requireNonNull(jettyConfig);
+      this.trackJettyMetrics = trackJettyMetrics;
 
-    Objects.requireNonNull(securityJson);
-    this.baseDir = Objects.requireNonNull(baseDir);
-    this.jettyConfig = Objects.requireNonNull(jettyConfig);
-    this.trackJettyMetrics = trackJettyMetrics;
+      log.info("Starting cluster of {} servers in {}", numServers, baseDir);
 
-    log.info("Starting cluster of {} servers in {}", numServers, baseDir);
+      Files.createDirectories(baseDir);
 
-    Files.createDirectories(baseDir);
+      this.externalZkServer = zkTestServer != null;
+      if (!externalZkServer) {
+        Path zkDir = baseDir.resolve("zookeeper/server1/data");
+        this.zkServer = new ZkTestServer(zkDir);
 
-    this.externalZkServer = zkTestServer != null;
-    if (!externalZkServer) {
-      Path zkDir = baseDir.resolve("zookeeper/server1/data");
-      zkTestServer = new ZkTestServer(zkDir);
-      try {
-        zkTestServer.run();
-      } catch (Exception e) {
-        log.error("Error starting Zk Test Server, trying again ...");
-        zkTestServer.shutdown();
-        zkTestServer = new ZkTestServer(zkDir);
-        zkTestServer.run();
+        this.zkServer.run();
+        SolrZkClient zkClient = this.zkServer.getZkClient();
+        log.info("Using zkClient host={} to create solr.xml", zkClient.getZkServerAddress());
+        zkClient.mkdirs("/solr.xml", solrXml.getBytes(Charset.defaultCharset()));
+        if (jettyConfig.sslConfig != null && jettyConfig.sslConfig.isSSLMode()) {
+          zkClient.mkdirs(ZkStateReader.CLUSTER_PROPS,
+              "{'urlScheme':'https'}".getBytes(StandardCharsets.UTF_8));
+        }
+        if (securityJson.isPresent()) { // configure Solr security
+          zkClient.makePath("/solr/security.json", securityJson.get().getBytes(Charset.defaultCharset()), true);
+        }
       }
-    }
-    this.zkServer = zkTestServer;
 
-    try (SolrZkClient zkClient = new SolrZkClient(zkServer.getZkHost(), AbstractZkTestCase.TIMEOUT)) {
-      zkClient.makePath("/solr/solr.xml", solrXml.getBytes(Charset.defaultCharset()), true);
-      if (jettyConfig.sslConfig != null && jettyConfig.sslConfig.isSSLMode()) {
-        zkClient.makePath("/solr" + ZkStateReader.CLUSTER_PROPS, "{'urlScheme':'https'}".getBytes(StandardCharsets.UTF_8), true);
+      // tell solr to look in zookeeper for solr.xml
+      System.setProperty("zkHost", zkServer.getZkAddress());
+
+      List<Callable<JettySolrRunner>> startups = new ArrayList<>(numServers);
+      for (int i = 0; i < numServers; ++i) {
+        startups.add(() -> startJettySolrRunner(newNodeName(), jettyConfig.context, jettyConfig));
       }
-      if (securityJson.isPresent()) { // configure Solr security
-        zkClient.makePath("/solr/security.json", securityJson.get().getBytes(Charset.defaultCharset()), true);
+
+      final ExecutorService executorLauncher = ExecutorUtil
+          .newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("jetty-launcher"));
+      Collection<Future<JettySolrRunner>> futures = executorLauncher.invokeAll(startups);
+      ExecutorUtil.shutdownAndAwaitTermination(executorLauncher);
+      Exception startupError = checkForExceptions("Error starting up MiniSolrCloudCluster", futures);
+      if (startupError != null) {
+        try {
+          this.shutdown();
+        } catch (Throwable t) {
+          if (t instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+
+          }
+          if (t instanceof Error) {
+            throw (Error) t;
+          }
+          startupError.addSuppressed(t);
+        }
+        throw startupError;
       }
-    }
 
-    // tell solr to look in zookeeper for solr.xml
-    System.setProperty("zkHost", zkServer.getZkAddress());
+      solrClient = buildSolrClient();
 
-    List<Callable<JettySolrRunner>> startups = new ArrayList<>(numServers);
-    for (int i = 0; i < numServers; ++i) {
-      startups.add(() -> startJettySolrRunner(newNodeName(), jettyConfig.context, jettyConfig));
-    }
-
-    final ExecutorService executorLauncher = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("jetty-launcher"));
-    Collection<Future<JettySolrRunner>> futures = executorLauncher.invokeAll(startups);
-    ExecutorUtil.shutdownAndAwaitTermination(executorLauncher);
-    Exception startupError = checkForExceptions("Error starting up MiniSolrCloudCluster", futures);
-    if (startupError != null) {
-      try {
-        this.shutdown();
+      if (numServers > 0) {
+        waitForAllNodes(numServers, 60);
       }
-      catch (Throwable t) {
-        startupError.addSuppressed(t);
-      }
-      throw startupError;
+    } catch (Throwable t) {
+      throw new DW.Exp(t);
     }
-
-    solrClient = buildSolrClient();
-    
-    if (numServers > 0) {
-      waitForAllNodes(numServers, 60);
-    }
-
   }
 
   private void waitForAllNodes(int numServers, int timeoutSeconds) throws IOException, InterruptedException, TimeoutException {
@@ -328,9 +331,11 @@ public class MiniSolrCloudCluster {
     List<JettySolrRunner> runners = getJettySolrRunners();
     
     int numRunning = 0;
-    TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
+    TimeOut timeout = new TimeOut(15, TimeUnit.SECONDS, TimeSource.NANO_TIME); // nocommit
     
     ZkStateReader reader = getSolrClient().getZkStateReader();
+    assert reader != null;
+    
     int numReady = 0;
     for (JettySolrRunner jetty : runners) {
       reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> n != null && jetty != null && jetty.getNodeName() != null && n.contains(jetty.getNodeName()));
@@ -354,7 +359,7 @@ public class MiniSolrCloudCluster {
       if (numServers == numRunning) {
         break;
       }
-      Thread.sleep(250);
+      Thread.sleep(100);
     }
     
     log.info("Done waitForAllNodes: numServers={}", numServers);
@@ -534,12 +539,10 @@ public class MiniSolrCloudCluster {
    * @param configDir a path to the config set to upload
    * @param configName the name to give the configset
    */
-  public void uploadConfigSet(Path configDir, String configName) throws IOException, KeeperException, InterruptedException {
-    try(SolrZkClient zkClient = new SolrZkClient(zkServer.getZkAddress(),
-        AbstractZkTestCase.TIMEOUT, AbstractZkTestCase.TIMEOUT, null)) {
-      ZkConfigManager manager = new ZkConfigManager(zkClient);
-      manager.uploadConfigDir(configDir, configName);
-    }
+  public void uploadConfigSet(Path configDir, String configName)
+      throws IOException, KeeperException, InterruptedException {
+    ZkConfigManager manager = new ZkConfigManager(zkServer.getZkClient());
+    manager.uploadConfigDir(configDir, configName);
   }
 
   /** Delete all collections (and aliases) */
@@ -613,7 +616,7 @@ public class MiniSolrCloudCluster {
   public void shutdown() throws Exception {
     try {
        // no commiit - do it ourselves
-      IOUtils.closeQuietly(solrClient);
+      DW.close(solrClient);
       List<Callable<JettySolrRunner>> shutdowns = new ArrayList<>(jettys.size());
       for (final JettySolrRunner jetty : jettys) {
         shutdowns.add(() -> stopJettySolrRunner(jetty));
@@ -699,7 +702,7 @@ public class MiniSolrCloudCluster {
     CoreContainer cores = jetty.getCoreContainer();
     if (cores != null) {
       SolrZkClient zkClient = cores.getZkController().getZkClient();
-      zkClient.getSolrZooKeeper().closeCnxn();
+     // zkClient.getSolrZooKeeper().closeCnxn(); nocommit
       long sessionId = zkClient.getSolrZooKeeper().getSessionId();
       zkServer.expire(sessionId);
       log.info("Expired zookeeper session {} from node {}", sessionId, jetty.getBaseUrl());

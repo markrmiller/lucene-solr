@@ -75,6 +75,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.NamedList;
@@ -395,7 +396,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
     } catch (Exception e) {
       log.warn("Exception in finding checksum of " + f, e);
     } finally {
-      IOUtils.closeQuietly(fis);
+      DW.close(fis);
     }
     return null;
   }
@@ -1678,7 +1679,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
       } catch (IOException e) {
         log.warn("Exception while writing response for params: " + params, e);
       } finally {
-        IOUtils.closeQuietly(inputStream);
+        DW.close(inputStream);
         extendReserveAndReleaseCommitPoint();
       }
     }

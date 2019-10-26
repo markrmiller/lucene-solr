@@ -50,8 +50,7 @@ public class TestCloudSolrClientConnections extends SolrTestCaseJ4 {
       // should work now!
       client.request(listReq);
 
-    }
-    finally {
+    } finally {
       cluster.shutdown();
     }
 
@@ -66,7 +65,7 @@ public class TestCloudSolrClientConnections extends SolrTestCaseJ4 {
     try {
       CloudSolrClient client = cluster.getSolrClient();
       SolrException e = expectThrows(SolrException.class, () -> {
-        ((ZkClientClusterStateProvider)client.getClusterStateProvider()).uploadConfig(configPath, "testconfig");
+        ((ZkClientClusterStateProvider) client.getClusterStateProvider()).uploadConfig(configPath, "testconfig");
       });
       assertTrue("Unexpected message: " + e.getMessage(), e.getMessage().contains("cluster not found/not ready"));
 
@@ -74,10 +73,11 @@ public class TestCloudSolrClientConnections extends SolrTestCaseJ4 {
       cluster.waitForAllNodes(30);
       client.connect(20, TimeUnit.SECONDS);
 
-      ((ZkClientClusterStateProvider)client.getClusterStateProvider()).uploadConfig(configPath, "testconfig");
+      ((ZkClientClusterStateProvider) client.getClusterStateProvider()).uploadConfig(configPath, "testconfig");
 
       ZkConfigManager configManager = new ZkConfigManager(client.getZkStateReader().getZkClient());
-      assertTrue("List of uploaded configs does not contain 'testconfig'", configManager.listConfigs().contains("testconfig"));
+      assertTrue("List of uploaded configs does not contain 'testconfig'",
+          configManager.listConfigs().contains("testconfig"));
 
     } finally {
       cluster.shutdown();
@@ -86,27 +86,28 @@ public class TestCloudSolrClientConnections extends SolrTestCaseJ4 {
 
   @Test
   public void testAlreadyClosedClusterStateProvider() throws Exception {
-    
+
     final MiniSolrCloudCluster cluster = new MiniSolrCloudCluster(1, createTempDir(),
-                                                                  buildJettyConfig("/solr"));
+        buildJettyConfig("/solr"));
     // from a client perspective the behavior of ZkClientClusterStateProvider should be
     // consistent regardless of wether it's constructed with a zkhost or an existing ZkStateReader
     try {
-      final ZkClientClusterStateProvider zkHost_provider
-        = new ZkClientClusterStateProvider(cluster.getZkServer().getZkAddress());
-      
-      checkAndCloseProvider(zkHost_provider);
-      
+
       final ZkStateReader reusedZkReader = new ZkStateReader(cluster.getZkClient());
+
+      final ZkClientClusterStateProvider zkHost_provider = new ZkClientClusterStateProvider(reusedZkReader);
+
+      checkAndCloseProvider(zkHost_provider);
       try {
+
         reusedZkReader.createClusterStateWatchersAndUpdate();
         final ZkClientClusterStateProvider reader_provider = new ZkClientClusterStateProvider(reusedZkReader);
         checkAndCloseProvider(reader_provider);
-        
+
         // but in the case of a reused StateZkReader,
         // closing the provider must not have closed the ZkStateReader...
         assertEquals(false, reusedZkReader.isClosed());
-        
+
       } finally {
         reusedZkReader.close();
       }
@@ -127,13 +128,13 @@ public class TestCloudSolrClientConnections extends SolrTestCaseJ4 {
 
     if (random().nextBoolean()) {
       expectThrows(AlreadyClosedException.class, () -> {
-          provider.connect();
-        });
+        provider.connect();
+      });
     }
     expectThrows(AlreadyClosedException.class, () -> {
-        Object ignored = provider.getClusterState();
-      });
-    
+      Object ignored = provider.getClusterState();
+    });
+
   }
 
 }

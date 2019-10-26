@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CoreAdminParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CorePropertiesLocator;
 import org.apache.solr.response.SolrQueryResponse;
@@ -110,7 +111,7 @@ public class CoreAdminCreateDiscoverTest extends SolrTestCaseJ4 {
     try {
       props.load(new InputStreamReader(is, StandardCharsets.UTF_8));
     } finally {
-      org.apache.commons.io.IOUtils.closeQuietly(is);
+      DW.close(is);
     }
 
     assertEquals("Unexpected value preserved in properties file " + propFile.getAbsolutePath(),
@@ -244,7 +245,7 @@ public class CoreAdminCreateDiscoverTest extends SolrTestCaseJ4 {
     try {
       props.load(new InputStreamReader(is, StandardCharsets.UTF_8));
     } finally {
-      org.apache.commons.io.IOUtils.closeQuietly(is);
+      DW.close(is);
     }
 
     assertEquals("Unexpected value preserved in properties file " + propFile.getAbsolutePath(),

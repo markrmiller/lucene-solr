@@ -57,6 +57,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.TimeOut;
@@ -1967,7 +1968,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
           recoveryInfo.errors++;
           loglog.error("Replay exception: finish()", ex);
         } finally {
-          IOUtils.closeQuietly(proc);
+          DW.close(proc);
         }
 
       } finally {

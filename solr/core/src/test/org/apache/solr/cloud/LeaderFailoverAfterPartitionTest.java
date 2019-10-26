@@ -148,7 +148,7 @@ public class LeaderFailoverAfterPartitionTest extends HttpPartitionTest {
     Thread.sleep(10000); // give chance for new leader to be elected.
     
     Replica newLeader = 
-        cloudClient.getZkStateReader().getLeaderRetry(testCollectionName, "shard1", 60000);
+        cloudClient.getZkStateReader().getLeaderRetry(testCollectionName, "shard1");
         
     assertNotNull("No new leader was elected after 60 seconds; clusterState: "+
       printClusterStateInfo(testCollectionName),newLeader);

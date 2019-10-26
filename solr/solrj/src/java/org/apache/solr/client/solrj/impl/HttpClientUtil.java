@@ -61,6 +61,7 @@ import org.apache.http.protocol.HttpRequestExecutor;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,10 +82,8 @@ public class HttpClientUtil {
   public static final int DEFAULT_MAXCONNECTIONSPERHOST = 100000;
   public static final int DEFAULT_MAXCONNECTIONS = 100000;
   
-  private static final int VALIDATE_AFTER_INACTIVITY_DEFAULT = 3000;
-  public static final int EVICT_IDLE_CONNECTIONS_DEFAULT = 50000;
-  private static final String VALIDATE_AFTER_INACTIVITY = "validateAfterInactivity";
-  private static final String EVICT_IDLE_CONNECTIONS = "evictIdleConnections";
+  public static final String EVICT_IDLE_CONNECTIONS = "evictIdleConnections";
+  public static final int EVICT_IDLE_CONNECTIONS_DEFAULT = Integer.getInteger(EVICT_IDLE_CONNECTIONS, 50000);
 
   // Maximum connections allowed per host
   public static final String PROP_MAX_CONNECTIONS_PER_HOST = "maxConnectionsPerHost";
@@ -137,7 +136,7 @@ public class HttpClientUtil {
 
   private static volatile SolrHttpClientBuilder httpClientBuilder;
 
-  private static SolrHttpClientContextBuilder httpClientRequestContextBuilder = new SolrHttpClientContextBuilder();
+  private static volatile SolrHttpClientContextBuilder httpClientRequestContextBuilder = new SolrHttpClientContextBuilder();
 
   private static volatile SchemaRegistryProvider schemaRegistryProvider;
   private static volatile String cookiePolicy;
@@ -172,17 +171,16 @@ public class HttpClientUtil {
       // don't synchronize traversal - can lead to deadlock - CopyOnWriteArrayList is critical
       // we also do not want to have to acquire the mutex when the list is empty or put a global
       // mutex around the process calls
-      interceptors.forEach(new Consumer<HttpRequestInterceptor>() {
-
-        @Override
-        public void accept(HttpRequestInterceptor interceptor) {
+      try (DW worker = new DW(this)) {
+        interceptors.forEach((it) -> worker.collect(() -> {
           try {
-            interceptor.process(request, context);
-          } catch (Exception e) {
-            log.error("", e);
+            it.process(request, context);
+          } catch (HttpException | IOException e) {
+            throw new DW.Exp(e);
           }
-        }
-      });
+        }));
+
+      }
 
     }
   }
@@ -277,7 +275,7 @@ public class HttpClientUtil {
 
     cm.setMaxTotal(params.getInt(HttpClientUtil.PROP_MAX_CONNECTIONS, 10000));
     cm.setDefaultMaxPerRoute(params.getInt(HttpClientUtil.PROP_MAX_CONNECTIONS_PER_HOST, 10000));
-    cm.setValidateAfterInactivity(Integer.getInteger(VALIDATE_AFTER_INACTIVITY, VALIDATE_AFTER_INACTIVITY_DEFAULT));
+//   cm.setValidateAfterInactivity(Integer.getInteger(VALIDATE_AFTER_INACTIVITY, VALIDATE_AFTER_INACTIVITY_DEFAULT));
 
 
     HttpClientBuilder newHttpClientBuilder = HttpClientBuilder.create();
@@ -292,7 +290,7 @@ public class HttpClientUtil {
       @Override
       public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
         // we only close connections based on idle time, not ttl expiration
-        return -1;
+        return EVICT_IDLE_CONNECTIONS_DEFAULT;
       }
     };
 
@@ -307,9 +305,6 @@ public class HttpClientUtil {
     }
 
     newHttpClientBuilder.addInterceptorLast(new DynamicInterceptor());
-
-    newHttpClientBuilder = newHttpClientBuilder.setKeepAliveStrategy(keepAliveStrat)
-        .evictIdleConnections((long) Integer.getInteger(EVICT_IDLE_CONNECTIONS, EVICT_IDLE_CONNECTIONS_DEFAULT), TimeUnit.MILLISECONDS);
 
     if (httpRequestExecutor != null)  {
       newHttpClientBuilder.setRequestExecutor(httpRequestExecutor);
@@ -375,7 +370,7 @@ public class HttpClientUtil {
 
   public static void close(HttpClient httpClient) { 
 
-    org.apache.solr.common.util.IOUtils.closeQuietly((CloseableHttpClient) httpClient);
+    DW.close((CloseableHttpClient) httpClient);
 
     assert ObjectReleaseTracker.release(httpClient);
   }

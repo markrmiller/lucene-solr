@@ -36,6 +36,7 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 
 class StatementImpl implements Statement {
 
@@ -102,7 +103,7 @@ class StatementImpl implements Statement {
       String url = zkProps.getCoreUrl();
       return new SolrStream(url, params);
     } catch (Exception e) {
-      throw new IOException(e);
+      throw new DW.Exp(e);
     }
   }
 

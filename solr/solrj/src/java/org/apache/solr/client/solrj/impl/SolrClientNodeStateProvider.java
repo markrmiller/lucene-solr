@@ -51,6 +51,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.StrUtils;
@@ -188,12 +189,12 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
 
   }
 
-  static void fetchReplicaMetrics(String solrNode, ClientSnitchCtx ctx, Map<String, Object> metricsKeyVsTag) {
+  static void fetchReplicaMetrics(String solrNode, ClientSnitchCtx ctx, Map<String,Object> metricsKeyVsTag) {
     if (!ctx.isNodeAlive(solrNode)) return;
     ModifiableSolrParams params = new ModifiableSolrParams();
     params.add("key", metricsKeyVsTag.keySet().toArray(new String[0]));
     try {
-      
+
       SimpleSolrResponse rsp = null;
       int cnt = 0;
       while (cnt++ < 3) {
@@ -219,21 +220,24 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
           }
         }
       }
-      
-      
-      SimpleSolrResponse frsp = rsp;
-      metricsKeyVsTag.forEach((key, tag) -> {
-        Object v = Utils.getObjectByPath(frsp.nl, true, Arrays.asList("metrics", key));
-        if (tag instanceof Function) {
-          Pair<String, Object> p = (Pair<String, Object>) ((Function) tag).apply(v);
-          ctx.getTags().put(p.first(), p.second());
-        } else {
-          if (v != null) ctx.getTags().put(tag.toString(), v);
-        }
-      });
+
+      if (rsp != null) {
+        SimpleSolrResponse frsp = rsp;
+        metricsKeyVsTag.forEach((key, tag) -> {
+          Object v = Utils.getObjectByPath(frsp.nl, true, Arrays.asList("metrics", key));
+          if (tag instanceof Function) {
+            Pair<String,Object> p = (Pair<String,Object>) ((Function) tag).apply(v);
+            ctx.getTags().put(p.first(), p.second());
+          } else {
+            if (v != null) ctx.getTags().put(tag.toString(), v);
+          }
+        });
+      }
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       log.warn("could not get tags from node " + solrNode, e);
     }
+
   }
 
   @Override
@@ -361,6 +365,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
           if (n != null) ctx.getTags().put(HEAPUSAGE, n.doubleValue() * 100.0d);
         }
       } catch (Exception e) {
+        DW.propegateInterrupt(e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error getting remote info", e);
       }
     }

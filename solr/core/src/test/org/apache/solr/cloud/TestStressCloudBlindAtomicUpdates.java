@@ -56,6 +56,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.util.DefaultSolrThreadFactory;
@@ -167,14 +168,14 @@ public class TestStressCloudBlindAtomicUpdates extends SolrCloudTestCase {
       EXEC_SERVICE = null;
     }
     if (null != CLOUD_CLIENT) {
-      IOUtils.closeQuietly(CLOUD_CLIENT);
+      DW.close(CLOUD_CLIENT);
       CLOUD_CLIENT = null;
     }
     for (HttpSolrClient client : CLIENTS) {
       if (null == client) {
         log.error("CLIENTS contains a null SolrClient???");
       }
-      IOUtils.closeQuietly(client);
+      DW.close(client);
     }
     CLIENTS.clear();
   }
@@ -488,7 +489,6 @@ public class TestStressCloudBlindAtomicUpdates extends SolrCloudTestCase {
 
   public static void waitForRecoveriesToFinish(CloudSolrClient client) throws Exception {
     assert null != client.getDefaultCollection();
-    client.getZkStateReader().forceUpdateCollection(client.getDefaultCollection());
     AbstractDistribZkTestBase.waitForRecoveriesToFinish(client.getDefaultCollection(),
                                                         client.getZkStateReader(),
                                                         true, true, 330);

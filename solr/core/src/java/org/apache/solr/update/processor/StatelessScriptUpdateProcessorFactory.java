@@ -20,6 +20,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.request.SolrQueryRequest;
@@ -320,7 +321,7 @@ public class StatelessScriptUpdateProcessorFactory extends UpdateRequestProcesso
                                   "Unable to evaluate script: " + 
                                   scriptFile.getFileName(), e);
         } finally {
-          IOUtils.closeQuietly(scriptSrc);
+          DW.close(scriptSrc);
         }
       } catch (IOException ioe) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, 

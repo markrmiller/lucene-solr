@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.AddUpdateCommand;
@@ -147,7 +148,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
         }
       }
     } finally {
-      IOUtils.closeQuietly(reader);
+      DW.close(reader);
     }
 
     return newBoostEntries;

@@ -32,6 +32,7 @@ import org.apache.solr.common.cloud.CollectionProperties;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -128,10 +129,7 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
               try {
                 deleteTargetCollection(clusterState, results, aliasName, aliasesManager, action);
               } catch (Exception e) {
-                log.warn("Deletion of {} by {} failed (this might be ok if two clients were " +
-                        "writing to a routed alias at the same time and both caused a deletion)",
-                    action.targetCollection, ra.getAliasName());
-                log.debug("Exception for last message:", e);
+                throw new DW.Exp(e);
               }
             });
           }

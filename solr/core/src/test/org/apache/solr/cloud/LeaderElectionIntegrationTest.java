@@ -123,8 +123,8 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
     String leader = getLeader(collection);
     JettySolrRunner jetty = getRunner(leader);
     ZkController zkController = jetty.getCoreContainer().getZkController();
-
-    zkController.getZkClient().getSolrZooKeeper().closeCnxn();
+    // nocommit
+    //zkController.getZkClient().getSolrZooKeeper().closeCnxn();
     cluster.getZkServer().expire(zkController.getZkClient().getSolrZooKeeper().getSessionId());
 
     for (int i = 0; i < 60; i++) { // wait till leader is changed
@@ -167,7 +167,7 @@ public class LeaderElectionIntegrationTest extends SolrCloudTestCase {
 
   private String getLeader(String collection) throws InterruptedException {
 
-    ZkNodeProps props = cluster.getSolrClient().getZkStateReader().getLeaderRetry(collection, "shard1", 30000);
+    ZkNodeProps props = cluster.getSolrClient().getZkStateReader().getLeaderRetry(collection, "shard1");
     String leader = props.getStr(ZkStateReader.NODE_NAME_PROP);
 
     return leader;

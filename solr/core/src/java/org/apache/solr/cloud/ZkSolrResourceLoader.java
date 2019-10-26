@@ -29,6 +29,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZooKeeperException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.SolrResourceNotFoundException;
 import org.apache.solr.schema.ZkIndexSchemaReader;
@@ -110,7 +111,7 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
         Thread.currentThread().interrupt();
         throw new IOException("Error opening " + file, e);
       } catch (Exception e) {
-        throw new IOException("Error opening " + file, e);
+        throw new DW.Exp(e);
       }
     }
 
@@ -122,7 +123,7 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
       // delegate to the class loader (looking into $INSTANCE_DIR/lib jars)
       is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'));
     } catch (Exception e) {
-      throw new IOException("Error opening " + resource, e);
+      throw new DW.Exp(e);
     }
     if (is == null) {
       throw new SolrResourceNotFoundException("Can't find resource '" + resource

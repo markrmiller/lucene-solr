@@ -21,14 +21,13 @@
     <Console name="STDERR" target="SYSTEM_ERR">
       <PatternLayout>
         <Pattern>
-           %maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %c{1.} %m%notEmpty{
-            =>%ex{short}}}{10240}%n
+          %-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %c{1.} %m  %notEmpty{%ex}%n
         </Pattern>
       </PatternLayout>
     </Console>
     
-    <File name="FILE" fileName="/home/miller/solr-test.log" immediateFlush="false" append="false">
-    <PatternLayout pattern="%maxLen{%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%t)}{yellow,bold} [%style{%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m=>%ex{short}}}{10240}%n"/>
+    <File name="FILE" fileName="/home/miller/Solr/logoutput/solr-test.log" immediateFlush="false" append="false">
+      <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%t)}{yellow,bold} [%style{%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m %notEmpty{%ex}}%n"/>
     </File>   
     
   </Appenders>
@@ -40,10 +39,18 @@
     <AsyncLogger name="org.eclipse.jetty" level="INFO"/>
     <AsyncLogger name="org.apache.solr.handler.admin.CollectionsHandler" level="DEBUG"/>
     <AsyncLogger name="org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler" level="DEBUG"/>
-
+    <AsyncLogger name="org.apache.solr.cloud.api.collections.CreateCollectionCmd" level="DEBUG"/>
+   <!--  <AsyncLogger name="org.apache.solr.common.patterns.DW" level="DEBUG"/> -->
+    <AsyncLogger name="org.apache.solr.cloud.overseer.ZkStateWriter" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.cloud.Overseer" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.cloud.OverseerTaskProcessor" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.cloud.ZkDistributedQueue" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.common.cloud.SolrZkClient" level="DEBUG"/>
+    
+    
     <AsyncRoot level="INFO">
       <AppenderRef ref="STDERR"/>
-       <AppenderRef ref="FILE"/>
+      <AppenderRef ref="FILE"/>
     </AsyncRoot>
   </Loggers>
 </Configuration>

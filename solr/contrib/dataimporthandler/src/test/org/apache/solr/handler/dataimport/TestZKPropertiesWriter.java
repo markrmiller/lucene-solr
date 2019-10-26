@@ -101,7 +101,7 @@ public class TestZKPropertiesWriter extends AbstractDataImportHandlerTestCase {
     assertTrue("Not using ZooKeeper", h.getCoreContainer().isZooKeeperAware());
 
     // for the really slow/busy computer, we wait to make sure we have a leader before starting
-    h.getCoreContainer().getZkController().getZkStateReader().getLeaderUrl("collection1", "shard1", 30000);
+    h.getCoreContainer().getZkController().getZkStateReader().getLeaderUrl("collection1", "shard1");
 
     assertQ("test query on empty index", request("qlkciyopsbgzyvkylsjhchghjrdf"),
         "//result[@numFound='0']");

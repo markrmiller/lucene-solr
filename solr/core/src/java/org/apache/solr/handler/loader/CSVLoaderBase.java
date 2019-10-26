@@ -22,6 +22,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.update.*;
@@ -362,7 +363,7 @@ abstract class CSVLoaderBase extends ContentStreamLoader {
       }
     } finally{
       if (reader != null) {
-        IOUtils.closeQuietly(reader);
+        DW.close(reader);
       }
     }
   }

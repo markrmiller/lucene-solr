@@ -85,8 +85,8 @@ public class TestRandomRequestDistribution extends AbstractFullDistribZkTestBase
 
     waitForRecoveriesToFinish("a1x2", true);
     waitForRecoveriesToFinish("b1x1", true);
-
-    cloudClient.getZkStateReader().forceUpdateCollection("b1x1");
+    
+    // nocommit - wait for collection
 
     // get direct access to the metrics counters for each core/replica we're interested to monitor them
     final Map<String,Counter> counters = new LinkedHashMap<>();
@@ -153,8 +153,6 @@ public class TestRandomRequestDistribution extends AbstractFullDistribZkTestBase
         .process(cloudClient);
 
     waitForRecoveriesToFinish("football", true);
-
-    cloudClient.getZkStateReader().forceUpdateCollection("football");
 
     Replica leader = null;
     Replica notLeader = null;

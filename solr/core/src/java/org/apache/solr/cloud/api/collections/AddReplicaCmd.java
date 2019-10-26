@@ -66,6 +66,7 @@ import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.component.ShardHandler;
@@ -256,7 +257,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
         try {
           ocmh.overseer.offerStateUpdate(Utils.toJSON(props));
         } catch (Exception e) {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception updating Overseer state queue", e);
+          throw new DW.Exp("Exception updating Overseer state queue", e);
         }
       }
       params.set(CoreAdminParams.CORE_NODE_NAME,

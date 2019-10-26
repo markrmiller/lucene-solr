@@ -22,6 +22,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.AnalysisParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.ContentStream;
@@ -154,7 +155,7 @@ public class FieldAnalysisRequestHandler extends AnalysisRequestHandlerBase {
           // do nothing, leave value set to the request parameter
         }
         finally {
-          IOUtils.closeQuietly(reader);
+          DW.close(reader);
         }
         break;
       }

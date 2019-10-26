@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.JsonSchemaValidator;
@@ -70,13 +71,7 @@ public class ApiBag {
     try {
       validateAndRegister(api, nameSubstitutes);
     } catch (Exception e) {
-      log.error("Unable to register plugin:" + api.getClass().getName() + "with spec :" + Utils.toJSONString(api.getSpec()), e);
-      if (e instanceof RuntimeException) {
-        throw (RuntimeException) e;
-      } else {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-      }
-
+      throw new DW.Exp("Unable to register plugin:" + api.getClass().getName() + "with spec :" + Utils.toJSONString(api.getSpec()), e);
     }
   }
 
@@ -188,7 +183,7 @@ public class ApiBag {
       try {
         validators.put((String) cmd.getKey(), new JsonSchemaValidator((Map) cmd.getValue()));
       } catch (Exception e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error in api spec", e);
+        throw new DW.Exp("Error in api spec", e);
       }
     }
     return validators;

@@ -315,7 +315,6 @@ public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
     Replica.State replicaState = Replica.State.ACTIVE;
     while (!timeOut.hasTimedOut()) {
       ZkStateReader zkr = cloudClient.getZkStateReader();
-      zkr.forceUpdateCollection(collection);; // force the state to be fresh
       ClusterState cs = zkr.getClusterState();
       Collection<Slice> slices = cs.getCollection(collection).getActiveSlices();
       Slice slice = slices.iterator().next();
@@ -492,7 +491,7 @@ public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
       String testCollectionName, int firstDocId, int lastDocId)
       throws Exception {
     Replica leader =
-        cloudClient.getZkStateReader().getLeaderRetry(testCollectionName, "shard1", 10000);
+        cloudClient.getZkStateReader().getLeaderRetry(testCollectionName, "shard1");
     HttpSolrClient leaderSolr = getHttpSolrClient(leader, testCollectionName);
     List<HttpSolrClient> replicas =
         new ArrayList<HttpSolrClient>(notLeaders.size());
@@ -588,7 +587,6 @@ public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
     final RTimer timer = new RTimer();
 
     ZkStateReader zkr = cloudClient.getZkStateReader();
-    zkr.forceUpdateCollection(testCollectionName);
     ClusterState cs = zkr.getClusterState();
     boolean allReplicasUp = false;
     long waitMs = 0L;

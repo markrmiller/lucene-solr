@@ -46,8 +46,7 @@ import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.SW;
-import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
@@ -362,7 +361,7 @@ public class ZkTestServer {
           }
         }
       } catch (InterruptedException e) {
-        throw new SW.Exp("Exception shutting down ZKTestServer", e);
+        throw new DW.Exp("Exception shutting down ZKTestServer", e);
       }
     }
 
@@ -389,7 +388,7 @@ public class ZkTestServer {
           Thread.currentThread().interrupt();
         }
       } catch (Exception e) {
-        throw new SW.Exp("Exception shutting down ZKTestServer", e);
+        throw new DW.Exp("Exception shutting down ZKTestServer", e);
       } finally {
         ObjectReleaseTracker.release(this);
       }
@@ -587,42 +586,34 @@ public class ZkTestServer {
       init(solrFormat);
     } catch (Exception e) {
       log.error("Error trying to run ZK Test Server", e);
-      throw new RuntimeException(e);
+      throw new DW.Exp(e);
     }
   }
 
   public void shutdown() throws IOException, InterruptedException {
     log.info("Shutting down ZkTestServer.");
-    Thread thread = new Thread() {
-      @Override
-      public void run() {
-        IOUtils.closeQuietly(rootClient);
-        IOUtils.closeQuietly(chRootClient);
-      }
-    };
+    chRootClient.printLayout();
+    try (DW worker = new DW(this)) {
+      worker.add("zkClients", rootClient, chRootClient);
+    }
+
+    // TODO: this can log an exception while trying to unregister a JMX MBean
     try {
+      zkServer.shutdown();
+    } catch (Exception e) {
+      log.error("Exception shutting down ZooKeeper Test Server", e);
+    }
 
-      thread.start();
-      // TODO: this can log an exception while trying to unregister a JMX MBean
+    while (true) {
       try {
-        zkServer.shutdown();
-      } catch (Exception e) {
-        log.error("Exception shutting down ZooKeeper Test Server", e);
+        // zooThread.join();
+        ObjectReleaseTracker.release(zooThread);
+        zooThread = null;
+        break;
+      } catch (NullPointerException e) {
+        // okay
+        break;
       }
-
-      while (true) {
-        try {
-          //zooThread.join();
-          ObjectReleaseTracker.release(zooThread);
-          zooThread = null;
-          break;
-        } catch (NullPointerException e) {
-          // okay
-          break;
-        }
-      }
-    } finally {
-      thread.join();
     }
 
     ObjectReleaseTracker.release(this);

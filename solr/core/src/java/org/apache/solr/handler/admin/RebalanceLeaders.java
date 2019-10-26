@@ -174,7 +174,6 @@ class RebalanceLeaders {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
           String.format(Locale.ROOT, "The " + COLLECTION_PROP + " is required for the Rebalance Leaders command."));
     }
-    coreContainer.getZkController().getZkStateReader().forceUpdateCollection(collectionName);
     ClusterState clusterState = coreContainer.getZkController().getClusterState();
 
     DocCollection dc = clusterState.getCollection(collectionName);
@@ -206,7 +205,6 @@ class RebalanceLeaders {
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);
-      coreContainer.getZkController().getZkStateReader().forciblyRefreshAllClusterStateSlow();
     }
     addAnyFailures();
   }
@@ -389,7 +387,6 @@ class RebalanceLeaders {
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);
-      zkStateReader.forciblyRefreshAllClusterStateSlow();
     }
     return -1;
   }

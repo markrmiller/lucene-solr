@@ -26,7 +26,7 @@ import java.security.PrivilegedAction;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.zookeeper.ClientCnxn;
 import org.apache.zookeeper.Watcher;
@@ -82,7 +82,7 @@ public class SolrZooKeeper extends ZooKeeper {
               }
             }
           } catch (Exception e) {
-            throw new RuntimeException("Closing Zookeeper send channel failed.", e);
+            throw new DW.Exp(e);
           }
         }
         return null; // Void
@@ -95,7 +95,7 @@ public class SolrZooKeeper extends ZooKeeper {
   
   public void close() throws InterruptedException {
     
-    try (SW worker = new SW(this)) {
+    try (DW worker = new DW(this)) {
       worker.add("SolrZooKeeper", () -> {
         try {
           SolrZooKeeper.super.close();
@@ -150,7 +150,7 @@ public class SolrZooKeeper extends ZooKeeper {
         }
       }
     } catch (Exception e) {
-      throw new RuntimeException("Closing Zookeeper send channel failed.", e);
+      throw new DW.Exp(e);
     }
   }
 }

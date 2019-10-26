@@ -17,6 +17,7 @@
 
 package org.apache.solr.cloud;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,8 +34,10 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.impl.PreferenceRule;
 import org.apache.solr.common.SolrCloseable;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ShardParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.util.TestInjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +84,7 @@ public class NodesSysPropsCacher implements SolrCloseable {
               .map(r -> r.value)
               .collect(Collectors.toSet());
         } catch (Exception e) {
-          log.info("Error on parsing shards preference:{}", shardPreferences);
+          throw new DW.Exp("Error on parsing shards preference:{}", e);
         }
       }
 
@@ -147,7 +150,7 @@ public class NodesSysPropsCacher implements SolrCloseable {
         Map<String, Object> props = nodeStateProvider.getNodeValues(node, tags);
         cache.put(node, Collections.unmodifiableMap(props));
         break;
-      } catch (Exception e) {
+      } catch (SolrException e) {
         try {
           // 1, 4, 9
           int backOffTime = 1000 * (i+1);

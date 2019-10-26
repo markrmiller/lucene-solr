@@ -36,6 +36,7 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.InfoStream;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
@@ -335,7 +336,7 @@ public class SolrIndexWriter extends IndexWriter {
     if (doClose) {
       
       if (infoStream != null) {
-        IOUtils.closeQuietly(infoStream);
+        DW.close(infoStream);
       }
       numCloses.incrementAndGet();
 

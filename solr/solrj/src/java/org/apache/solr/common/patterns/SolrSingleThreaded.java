@@ -14,23 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.cloud;
+package org.apache.solr.common.patterns;
 
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 
-import org.apache.solr.core.CloudConfig;
-import org.apache.solr.core.CoreContainer;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-public class MockSimpleZkController extends ZkController {
+@Documented
+@Retention(SOURCE)
+@Target(TYPE)
+public @interface SolrSingleThreaded {
 
-  public MockSimpleZkController(CoreContainer cc, String zkServerAddress, int zkClientConnectTimeout, CloudConfig cloudConfig,
-      CurrentCoreDescriptorProvider registerOnReconnect) throws InterruptedException, TimeoutException, IOException {
-    super(cc, zkServerAddress, zkClientConnectTimeout, cloudConfig, registerOnReconnect, null);
-  }
-
-  @Override
-  public CoreContainer getCoreContainer() {
-    return super.getCoreContainer();
-  }
 }

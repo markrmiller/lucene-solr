@@ -197,33 +197,6 @@ public class ZkSolrClientTest extends SolrTestCaseJ4 {
       }
     }
   }
-  
-  public void testZkCmdExectutor() throws Exception {
-    Path zkDir = createTempDir("zkData");
-    ZkTestServer server = null;
-
-    try {
-      server = new ZkTestServer(zkDir);
-      server.run();
-
-      final int timeout = random().nextInt(10000) + 5000;
-      
-      ZkCmdExecutor zkCmdExecutor = new ZkCmdExecutor(timeout);
-      final long start = System.nanoTime();
-      expectThrows(KeeperException.SessionExpiredException.class, () -> {
-        zkCmdExecutor.retryOperation(() -> {
-          if (System.nanoTime() - start > TimeUnit.NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS)) {
-            throw new KeeperException.SessionExpiredException();
-          }
-          throw new KeeperException.ConnectionLossException();
-        });
-      });
-    } finally {
-      if (server != null) {
-        server.shutdown();
-      }
-    }
-  }
 
   @Test
   public void testMultipleWatchesAsync() throws Exception {

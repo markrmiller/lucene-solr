@@ -303,7 +303,6 @@ public class ShardSplitTest extends SolrCloudBridgeTestCase {
 
     // assert that sub-shards cores exist and sub-shard is in construction state
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-    zkStateReader.forceUpdateCollection(DEFAULT_COLLECTION);
     ClusterState state = zkStateReader.getClusterState();
     DocCollection collection = state.getCollection(DEFAULT_COLLECTION);
 
@@ -377,7 +376,6 @@ public class ShardSplitTest extends SolrCloudBridgeTestCase {
    
     cloudClient.waitForState(collectionName, 30, TimeUnit.SECONDS, SolrCloudTestCase.activeClusterShape(2, 12));
 
-    cloudClient.getZkStateReader().forceUpdateCollection(collectionName);
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     DocCollection coll = clusterState.getCollection(collectionName);
     log.info("coll: " + coll);
@@ -496,7 +494,6 @@ public class ShardSplitTest extends SolrCloudBridgeTestCase {
      // CloudJettyRunner cjetty = shardToLeaderJetty.get(SHARD1);
      // log.info("Starting shard1 leader jetty at port {}", cjetty.jetty.getLocalPort());
      // cjetty.jetty.start();
-      cloudClient.getZkStateReader().forceUpdateCollection(DEFAULT_COLLECTION);
       //log.info("Current collection state: {}", printClusterStateInfo(DEFAULT_COLLECTION));
 
       // true if sub-shard states switch to 'active' eventually
@@ -721,7 +718,6 @@ public class ShardSplitTest extends SolrCloudBridgeTestCase {
     final int[] docCounts = new int[ranges.size()];
     int numReplicas = shard1.getReplicas().size();
 
-    cloudClient.getZkStateReader().forceUpdateCollection(DEFAULT_COLLECTION);
     clusterState = cloudClient.getZkStateReader().getClusterState();
     log.debug("-- COLLECTION: {}", clusterState.getCollection(DEFAULT_COLLECTION));
     del("*:*");

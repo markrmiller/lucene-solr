@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.analytics.SolrAnalyticsTestCase;
+import org.apache.solr.common.patterns.DW;
 import org.junit.Before;
 
 public class SolrAnalyticsFacetTestCase extends SolrAnalyticsTestCase {
@@ -58,7 +59,7 @@ public class SolrAnalyticsFacetTestCase extends SolrAnalyticsTestCase {
     try {
       testGrouping("grouping", expressions, facets, results);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -66,7 +67,7 @@ public class SolrAnalyticsFacetTestCase extends SolrAnalyticsTestCase {
     try {
       testGrouping("grouping", expressions, facets, results, sortAscending);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -74,7 +75,7 @@ public class SolrAnalyticsFacetTestCase extends SolrAnalyticsTestCase {
     try {
       testGrouping("grouping", expressions, facets, results, sortExpression, sortAscending);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new DW.Exp(e);
     }
   }
 }

@@ -41,6 +41,7 @@ import org.apache.solr.common.cloud.VMParamsAllAndReadonlyDigestZkACLProvider;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.util.ExternalPaths;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -168,7 +169,7 @@ public class ZkCLITest extends SolrTestCaseJ4 {
     try {
       fromLoc = new String(IOUtils.toByteArray(is), StandardCharsets.UTF_8);
     } finally {
-      IOUtils.closeQuietly(is);
+      DW.close(is);
     }
     assertEquals("Should get back what we put in ZK", fromZk, fromLoc);
   }

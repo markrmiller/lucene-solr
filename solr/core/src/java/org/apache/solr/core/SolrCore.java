@@ -87,12 +87,11 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CommonParams.EchoParamStyle;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -444,7 +443,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       // no associated value or does not have an index property at all.
       return dataDir + "index/";
     } finally {
-      IOUtils.closeQuietly(is);
+      DW.close(is);
     }
   }
 
@@ -724,7 +723,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       } finally {
         // close the new core on any errors that have occurred.
         if (!success) {
-          IOUtils.closeQuietly(core); // this should decref the core state
+          DW.close(core); // this should decref the core state
         }
         // TODO: bring this into core close and only decref there if you know you should
         if (decRefOnFail) {
@@ -824,7 +823,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         writer = SolrIndexWriter.create(this, "SolrCore.initIndex", indexDir, getDirectoryFactory(), true,
             getLatestSchema(), solrConfig.indexConfig, solrDelPolicy, codec);
       } finally {
-        IOUtils.closeQuietly(writer);
+        DW.close(writer);
       }
 
     }
@@ -1378,7 +1377,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       } catch (Exception e) {
         log.error("Unable to load {}", IndexFetcher.INDEX_PROPERTIES, e);
       } finally {
-        IOUtils.closeQuietly(is);
+        DW.close(is);
       }
     } catch (IOException e) {
       // ignore; file does not exist
@@ -1396,7 +1395,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } catch (Exception e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to write " + IndexFetcher.INDEX_PROPERTIES, e);
     } finally {
-      IOUtils.closeQuietly(os);
+      DW.close(os);
     }
   }
 
@@ -1600,7 +1599,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       }
     }
     
-    try (SW closer = new SW(this)) {
+    try (DW closer = new DW(this)) {
       List<Callable<?>> closeHookCalls = new ArrayList<>();
 
       if (closeHooks != null) {
@@ -1624,35 +1623,35 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 
       List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(coreMetricManager);
+        DW.close(coreMetricManager);
         return "SolrCoreMetricManager";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(reqHandlers);
+        DW.close(reqHandlers);
         return "reqHandlers";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(responseWriters);
+        DW.close(responseWriters);
         return "responseWriters";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(searchComponents);
+        DW.close(searchComponents);
         return "searchComponents";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(qParserPlugins);
+        DW.close(qParserPlugins);
         return "qParserPlugins";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(valueSourceParsers);
+        DW.close(valueSourceParsers);
         return "valueSourceParsers";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(transformerFactories);
+        DW.close(transformerFactories);
         return "transformerFactories";
       });
       closeCalls.add(() -> {
-        IOUtils.closeQuietly(memClassLoader);
+        DW.close(memClassLoader);
         return "memClassLoader";
       });
 
@@ -1711,7 +1710,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       closer.add("CleanupOldIndexDirs", () ->  {if (coreStateClosed.get()) cleanupOldIndexDirectories(false);});
 
       closer.add("directoryFactory", () -> {
-        if (coreStateClosed.get()) IOUtils.closeQuietly(directoryFactory);
+        if (coreStateClosed.get()) DW.close(directoryFactory);
       });
 
       closeHookCalls = new ArrayList<Callable<?>>();
@@ -1770,7 +1769,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 //    executorTracker.doneClose();
 //    
 //    CloseTimeTracker metricsTracker = tracker.startSubClose("MetricManager");
-//    IOUtils.closeQuietly(coreMetricManager);
+//    DW.close(coreMetricManager);
 //    metricsTracker.doneClose();
 //
 //    CloseTimeTracker internalSubTracker = tracker.startSubClose("Internals");
@@ -1801,7 +1800,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 //      }
 //
 //      CloseTimeTracker uHandlerSubTracker = tracker.startSubClose(" - updateHandler");
-//      IOUtils.closeQuietly(updateHandler);
+//      DW.close(updateHandler);
 //      uHandlerSubTracker.doneClose();
 //
 //      return null;
@@ -1933,13 +1932,13 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   private void closeInternals(ExecutorService closeThreadPool, CloseTimeTracker tracker) {
     List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
 
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - requestHandlers");IOUtils.closeQuietly(reqHandlers);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - responseWriters");IOUtils.closeQuietly(responseWriters);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - searchComponents");IOUtils.closeQuietly(searchComponents);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - qParserPlugins");IOUtils.closeQuietly(qParserPlugins);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - valueSourceParsers");IOUtils.closeQuietly(valueSourceParsers);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - transformerFactories");IOUtils.closeQuietly(transformerFactories);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - memClassLoader");IOUtils.closeQuietly(memClassLoader);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - requestHandlers");DW.close(reqHandlers);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - responseWriters");DW.close(responseWriters);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - searchComponents");DW.close(searchComponents);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - qParserPlugins");DW.close(qParserPlugins);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - valueSourceParsers");DW.close(valueSourceParsers);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - transformerFactories");DW.close(transformerFactories);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - memClassLoader");DW.close(memClassLoader);subTracker.doneClose(); return null;});
     try {
       closeThreadPool.invokeAll(closeCalls);
     } catch (InterruptedException e1) {

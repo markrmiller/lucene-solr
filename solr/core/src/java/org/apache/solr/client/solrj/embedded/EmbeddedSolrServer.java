@@ -43,6 +43,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.JavaBinCodec;
@@ -177,7 +178,7 @@ public class EmbeddedSolrServer extends SolrClient {
       } catch (IOException | SolrException iox) {
         throw iox;
       } catch (Exception ex) {
-        throw new SolrServerException(ex);
+        throw new DW.Exp(ex);
       }
     }
 
@@ -256,7 +257,7 @@ public class EmbeddedSolrServer extends SolrClient {
             }
           }
         } catch (Exception ex) {
-          throw new RuntimeException(ex);
+          throw new DW.Exp(ex);
         }
       }
 
@@ -266,7 +267,7 @@ public class EmbeddedSolrServer extends SolrClient {
     } catch (IOException | SolrException iox) {
       throw iox;
     } catch (Exception ex) {
-      throw new SolrServerException(ex);
+      throw new DW.Exp(ex);
     } finally {
       if (req != null) req.close();
       SolrRequestInfo.clearRequestInfo();

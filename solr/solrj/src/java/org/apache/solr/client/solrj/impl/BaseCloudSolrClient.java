@@ -75,6 +75,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.NamedList;
@@ -307,16 +308,6 @@ public abstract class BaseCloudSolrClient extends SolrClient {
   /** Gets the default collection for request */
   public String getDefaultCollection() {
     return defaultCollection;
-  }
-
-  /** Set the connect timeout to the zookeeper ensemble in ms */
-  public void setZkConnectTimeout(int zkConnectTimeout) {
-    assertZKStateProvider().zkConnectTimeout = zkConnectTimeout;
-  }
-
-  /** Set the timeout to the zookeeper ensemble in ms */
-  public void setZkClientTimeout(int zkClientTimeout) {
-    assertZKStateProvider().zkClientTimeout = zkClientTimeout;
   }
 
   /** Gets whether direct updates are sent in parallel */
@@ -560,11 +551,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           NamedList<Object> rsp = getLbClient().request(lbRequest).getResponse();
           shardResponses.add(url, rsp);
         } catch (Exception e) {
-          if(e instanceof SolrException) {
-            throw (SolrException) e;
-          } else {
-            throw new SolrServerException(e);
-          }
+          throw new DW.Exp(e);
         }
       }
     }
@@ -595,7 +582,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         LBSolrClient.Rsp rsp = getLbClient().request(req);
         shardResponses.add(urlList.get(0), rsp.getResponse());
       } catch (Exception e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, urlList.get(0), e);
+        throw new DW.Exp(urlList.get(0), e);
       }
     }
 
@@ -908,7 +895,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
       }
     } catch (Exception exc) {
-
+      DW.propegateInterrupt(exc);
       Throwable rootCause = SolrException.getRootCause(exc);
       // don't do retry support for admin requests
       // or if the request doesn't have a collection specified

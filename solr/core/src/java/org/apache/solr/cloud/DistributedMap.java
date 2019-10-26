@@ -19,10 +19,7 @@ package org.apache.solr.cloud;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
@@ -36,16 +33,12 @@ import org.apache.zookeeper.data.Stat;
 public class DistributedMap {
   protected final String dir;
 
-  protected SolrZkClient zookeeper;
+  protected final SolrZkClient zookeeper;
 
   protected static final String PREFIX = "mn-";
 
   public DistributedMap(SolrZkClient zookeeper, String dir) {
     this.dir = dir;
-
-    ZkCmdExecutor cmdExecutor = new ZkCmdExecutor(zookeeper.getZkClientTimeout());
-    cmdExecutor.ensureExists(dir, zookeeper);
-
 
     this.zookeeper = zookeeper;
   }
@@ -116,6 +109,10 @@ public class DistributedMap {
     childs.stream().forEach((child) -> ids.add(child.substring(PREFIX.length())));
     return ids;
 
+  }
+  
+  public String getDir() {
+    return dir;
   }
 
 }

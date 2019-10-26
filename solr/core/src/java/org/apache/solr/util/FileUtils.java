@@ -23,8 +23,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import org.apache.commons.io.FileExistsException;
 
@@ -49,10 +51,7 @@ public class FileUtils {
   }
 
   public static void copyFile(File src , File destination) throws IOException {
-    try (FileChannel in = new FileInputStream(src).getChannel();
-         FileChannel out = new FileOutputStream(destination).getChannel()) {
-      in.transferTo(0, in.size(), out);
-    }
+    Files.copy(src.toPath(), destination.toPath());
   }
 
   /**

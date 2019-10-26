@@ -60,7 +60,7 @@ public class TestLeaderElectionZkExpiry extends SolrTestCaseJ4 {
         public List<CoreDescriptor> getCurrentDescriptors() {
           return Collections.EMPTY_LIST;
         }
-      });
+      }, null);
       try {
         Thread killer = new Thread() {
           @Override

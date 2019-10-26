@@ -26,6 +26,7 @@ import org.apache.solr.analytics.facet.RangeFacet;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.FacetParams.FacetRangeInclude;
 import org.apache.solr.common.params.FacetParams.FacetRangeOther;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.NumericFieldType;
 import org.apache.solr.schema.SchemaField;
@@ -60,7 +61,7 @@ public abstract class FacetRangeGenerator<T extends Comparable<T>> {
     try {
       return parseVal(rawval);
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Can't parse value "+rawval+" for field: " + field.getName(), e);
+      throw new DW.Exp("Can't parse value "+rawval+" for field: " + field.getName(), e);
     }
   }
 
@@ -82,7 +83,7 @@ public abstract class FacetRangeGenerator<T extends Comparable<T>> {
     try {
       return parseGap(gap);
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Can't parse gap "+gap+" for field: " + field.getName(), e);
+      throw new DW.Exp("Can't parse gap "+gap+" for field: " + field.getName(), e);
     }
   }
 
@@ -106,7 +107,7 @@ public abstract class FacetRangeGenerator<T extends Comparable<T>> {
     try {
       return parseAndAddGap(value, gap);
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Can't add gap "+gap+" to value " + value + " for field: " + field.getName(), e);
+      throw new DW.Exp("Can't add gap "+gap+" to value " + value + " for field: " + field.getName(), e);
     }
   }
 

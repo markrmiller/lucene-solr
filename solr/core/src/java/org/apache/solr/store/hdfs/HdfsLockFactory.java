@@ -30,6 +30,7 @@ import org.apache.lucene.store.Lock;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.LockReleaseFailedException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +85,7 @@ public class HdfsLockFactory extends LockFactory {
       } catch (IOException e) {
         throw new LockObtainFailedException("Cannot obtain lock file: " + lockFile, e);
       } finally {
-        IOUtils.closeQuietly(file);
+        DW.close(file);
       }
     }
 
@@ -113,7 +114,7 @@ public class HdfsLockFactory extends LockFactory {
           throw new LockReleaseFailedException("failed to delete: " + lockFile);
         }
       } finally {
-        IOUtils.closeQuietly(fs);
+        DW.close(fs);
       }
     }
 

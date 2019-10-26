@@ -35,6 +35,7 @@ import java.util.stream.StreamSupport;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.StrUtils;
@@ -268,7 +269,7 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
     try {
       return val == null ? null : Long.valueOf(val);
     } catch (Exception ex) {
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, ex.getMessage(), ex);
+      throw new DW.Exp(ex);
     }
   }
 
@@ -278,7 +279,7 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
     try {
       return val == null ? def : Long.parseLong(val);
     } catch (Exception ex) {
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, ex.getMessage(), ex);
+      throw new DW.Exp(ex);
     }
   }
 

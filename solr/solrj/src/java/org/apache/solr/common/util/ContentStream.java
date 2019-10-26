@@ -43,7 +43,7 @@ public interface ContentStream {
    *     // use the stream...
    *   }
    *   finally {
-   *     IOUtils.closeQuietly(stream);
+   *     DW.close(stream);
    *   }
    *  </pre>
    *  
@@ -65,7 +65,7 @@ public interface ContentStream {
    *     // use the reader...
    *   }
    *   finally {
-   *     IOUtils.closeQuietly(reader);
+   *     DW.close(reader);
    *   }
    *  </pre>
    *  

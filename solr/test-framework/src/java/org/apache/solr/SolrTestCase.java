@@ -41,7 +41,8 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.SuppressFileSystems;
 import org.apache.lucene.util.LuceneTestCase.SuppressSysoutChecks;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.client.solrj.impl.HttpClientUtil;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
@@ -121,7 +122,6 @@ public class SolrTestCase extends LuceneTestCase {
    */
   @BeforeClass
   public static void beforeSolrTestCase() throws Exception {
-    
     // this is the main thread running through the tests - give it max consideration
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     
@@ -166,7 +166,6 @@ public class SolrTestCase extends LuceneTestCase {
 
     System.setProperty("solr.v2RealPath", "true");
     System.setProperty("zookeeper.forceSync", "no");
-    System.setProperty("jetty.testMode", "true");
     System.setProperty("enable.update.log", usually() ? "true" : "false");
     System.setProperty("tests.shardhandler.randomSeed", Long.toString(random().nextLong()));
     System.setProperty("solr.clustering.enabled", "false");
@@ -186,7 +185,7 @@ public class SolrTestCase extends LuceneTestCase {
       System.setProperty("solr.lowContainerThreadsThreshold", "-1");
       System.setProperty("solr.minContainerThreads", "0");
       System.setProperty("solr.containerThreadsIdle", "30000");
-      System.setProperty("evictIdleConnections", "20000");
+      System.setProperty(HttpClientUtil.EVICT_IDLE_CONNECTIONS, "20000");
       
       System.setProperty("solr.commitOnClose", "false"); // can make things quite slow
       System.setProperty("solr.codec", "solr.SchemaCodecFactory");
@@ -348,11 +347,11 @@ public class SolrTestCase extends LuceneTestCase {
     
     for (Object object : ObjectReleaseTracker.OBJECTS.values()) {
       if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
-        IOUtils.closeQuietly(((SolrCore) object)); // core container doesn't wait for SolrCores created after load (would be slow anyway), IW who knows...
+        DW.close(((SolrCore) object)); // core container doesn't wait for SolrCores created after load (would be slow anyway), IW who knows...
         waitSeconds = 15;
       }
       if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
-        IOUtils.closeQuietly(((SolrIndexWriter) object));
+        DW.close(((SolrIndexWriter) object));
         waitSeconds = 15;
       }
     }

@@ -219,8 +219,6 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         writer.enqueueUpdate(reader.getClusterState(), Collections.singletonList(c1), null);
         writer.writePendingUpdates();
 
-        reader.forceUpdateCollection("c1");
-        reader.forceUpdateCollection("c2");
         ClusterState clusterState = reader.getClusterState(); // keep a reference to the current cluster state object
         assertTrue(clusterState.hasCollection("c1"));
         assertFalse(clusterState.hasCollection("c2"));
@@ -303,7 +301,6 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         zkClient.setData(ZkStateReader.getCollectionPath("c2"), data, true);
 
         // get the most up-to-date state
-        reader.forceUpdateCollection("c2");
         state = reader.getClusterState();
         log.info("Cluster state: {}", state);
         assertTrue(state.hasCollection("c2"));
@@ -314,7 +311,6 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         assertTrue(writer.hasPendingUpdates());
 
         // get the most up-to-date state
-        reader.forceUpdateCollection("c2");
         state = reader.getClusterState();
 
         // Will trigger flush

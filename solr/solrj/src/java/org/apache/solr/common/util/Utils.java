@@ -72,6 +72,7 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkOperation;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.server.ByteBufferInputStream;
 import org.noggit.CharArr;
@@ -370,7 +371,7 @@ public class Utils {
     try {
       return STANDARDOBJBUILDER.apply(getJSONParser(new StringReader(json))).getValStrict();
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Parse error : " + json, e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -607,7 +608,6 @@ public class Utils {
    *
    * @param zkClient        the zookeeper client
    * @param path            the path to the znode being read
-   * @param retryOnConnLoss whether to retry the operation automatically on connection loss, see {@link org.apache.solr.common.cloud.ZkCmdExecutor#retryOperation(ZkOperation)}
    * @return a Map if the node exists and contains valid JSON or an empty map if znode does not exist or has a null data
    */
   public static Map<String, Object> getJson(SolrZkClient zkClient, String path, boolean retryOnConnLoss) throws KeeperException, InterruptedException {
@@ -724,6 +724,7 @@ public class Utils {
     try {
       return c.call();
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       logger.error(e.getMessage(), e);
     }
     return def;

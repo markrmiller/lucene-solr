@@ -43,7 +43,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
@@ -146,7 +146,7 @@ public class DeleteReplicaCmd implements Cmd {
       }
     }
 
-    try (SW worker = new SW(this)) {
+    try (DW worker = new DW(this)) {
 
       for (Map.Entry<Slice,Set<String>> entry : shardToReplicasMapping.entrySet()) {
         Slice shardSlice = entry.getKey();
@@ -267,8 +267,7 @@ public class DeleteReplicaCmd implements Cmd {
         if (ocmh.waitForCoreNodeGone(collectionName, shard, replicaName, 30000)) return Boolean.TRUE;
         return Boolean.FALSE;
       } catch (Exception e) {
-        results.add("failure", "Could not complete delete " + e.getMessage());
-        throw e;
+        throw new DW.Exp(e);
       } finally {
         if (onComplete != null) onComplete.run();
       }
@@ -279,10 +278,8 @@ public class DeleteReplicaCmd implements Cmd {
         if (!callable.call())
           throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
                   "Could not remove replica : " + collectionName + "/" + shard + "/" + replicaName);
-      } catch (InterruptedException | KeeperException e) {
-        throw e;
-      } catch (Exception ex) {
-        throw new SolrException(SolrException.ErrorCode.UNKNOWN, "Error waiting for corenode gone", ex);
+      } catch (Exception e) {
+        throw new DW.Exp(e);
       }
 
     } else {

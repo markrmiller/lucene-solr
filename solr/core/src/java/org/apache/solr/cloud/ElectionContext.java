@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +42,7 @@ import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -56,6 +57,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.Op;
 import org.apache.zookeeper.OpResult;
+import org.apache.zookeeper.OpResult.ErrorResult;
 import org.apache.zookeeper.OpResult.SetDataResult;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.Stat;
@@ -106,35 +108,29 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       ZkNodeProps props, SolrZkClient zkClient) {
     super(coreNodeName, electionPath, leaderPath, props);
     this.zkClient = zkClient;
-
-    
-    String parent = Paths.get(leaderPath).getParent().toString();
-    ZkCmdExecutor zcmd = new ZkCmdExecutor(30000);
-    // only if /collections/{collection} exists already do we succeed in creating this path
-    log.info("make sure parent is created {}", parent);
-    zcmd.ensureExists(parent, (byte[])null, CreateMode.PERSISTENT, zkClient, 2);
-
   }
   
   @Override
   public void cancelElection() throws InterruptedException, KeeperException {
     super.cancelElection();
-    if (leaderZkNodeParentVersion != null) {
+    
+    Integer version = leaderZkNodeParentVersion;
+    if (version != null) {
       try {
         // We need to be careful and make sure we *only* delete our own leader registration node.
         // We do this by using a multi and ensuring the parent znode of the leader registration node
         // matches the version we expect - there is a setData call that increments the parent's znode
         // version whenever a leader registers.
-        log.debug("Removing leader registration node on cancel: {} {}", leaderPath, leaderZkNodeParentVersion);
+        log.debug("Removing leader registration node on cancel: {} {}", leaderPath, version);
         List<Op> ops = new ArrayList<>(2);
-        ops.add(Op.check(Paths.get(leaderPath).getParent().toString(), leaderZkNodeParentVersion));
+        ops.add(Op.check(Paths.get(leaderPath).getParent().toString(), version));
         ops.add(Op.check(electionPath, -1));
         ops.add(Op.delete(leaderPath, -1));
         zkClient.multi(ops, true);
       } catch (Exception e) {
-        throw new SW.Exp(e);
+        throw new DW.Exp(e);
       } finally {
-        leaderZkNodeParentVersion = null;
+        version = null;
       }
     } else {
       log.info("No version found for ephemeral leader parent node, won't remove previous leader registration.");
@@ -148,6 +144,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
     // register as leader - if an ephemeral is already there, wait to see if it goes away
 
     String parent = Paths.get(leaderPath).getParent().toString();
+    List<String> errors = new ArrayList<>();
     try {
 
       log.info("Creating leader registration node {} after winning as {}", leaderPath, leaderSeqPath);
@@ -159,24 +156,30 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       // increment the version. We also do a sanity check that our leaderSeqPath exists.
 
       ops.add(Op.check(leaderSeqPath, -1));
-      ops.add(Op.create(leaderPath, Utils.toJSON(leaderProps), zkClient.getZkACLProvider().getACLsToAdd(leaderPath),
-          CreateMode.EPHEMERAL));
+      ops.add(Op.create(leaderPath, Utils.toJSON(leaderProps), zkClient.getZkACLProvider().getACLsToAdd(leaderPath), CreateMode.EPHEMERAL));
       ops.add(Op.setData(parent, null, -1));
       List<OpResult> results;
 
       results = zkClient.multi(ops, true);
+      Iterator<Op> it = ops.iterator();
       for (OpResult result : results) {
         if (result.getType() == ZooDefs.OpCode.setData) {
           SetDataResult dresult = (SetDataResult) result;
           Stat stat = dresult.getStat();
           leaderZkNodeParentVersion = stat.getVersion();
-          return;
         }
+        if (result.getType() == ZooDefs.OpCode.error) {
+          ErrorResult dresult = (ErrorResult) result;
+          if (dresult.getErr() > 0) {
+            errors.add(it.next().getPath());
+          }
+        }
+        
       }
       assert leaderZkNodeParentVersion != null;
 
     } catch (Throwable t) {
-      throw new SW.Exp("Could not register as the leader because creating the ephemeral registration node in ZooKeeper failed", t);
+      throw new DW.Exp("Could not register as the leader because creating the ephemeral registration node in ZooKeeper failed: " + errors, t);
     }
   }
 
@@ -324,8 +327,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
           result = syncStrategy.sync(zkController, core, leaderProps, weAreReplacement);
           success = result.isSuccess();
         } catch (Exception e) {
-          SolrException.log(log, "Exception while trying to sync", e);
-          result = PeerSync.PeerSyncResult.failure();
+          throw new DW.Exp(e);
         }
 
         UpdateLog ulog = core.getUpdateHandler().getUpdateLog();
@@ -367,7 +369,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               searchHolder.decref();
             }
           } catch (Exception e) {
-            log.error("Error in solrcloud_debug block", e);
+            throw new DW.Exp(e);
           }
         }
         if (!success) {
@@ -426,8 +428,8 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         } catch (Exception e) {
           SolrException.log(log, "There was a problem trying to register as the leader", e);
 
-          if (!(e instanceof IOException
-              || (e instanceof KeeperException && (!(e instanceof SessionExpiredException))))) {
+          if(e instanceof IOException
+              || (e instanceof KeeperException && (!(e instanceof SessionExpiredException)))) {
 
             try (SolrCore core = cc.getCore(coreName)) {
 
@@ -442,11 +444,11 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               try {
                 rejoinLeaderElection(core);
               } catch (Exception exc) {
-                throw new SW.Exp(e);
+                throw new DW.Exp(e);
               }
             }
           } else {
-            throw new SW.Exp(e);
+            throw new DW.Exp(e);
           }
         }
       }

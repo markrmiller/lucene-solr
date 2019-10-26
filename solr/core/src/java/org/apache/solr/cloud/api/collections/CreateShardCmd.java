@@ -80,7 +80,7 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
     ocmh.overseer.offerStateUpdate(Utils.toJSON(message));
     // wait for a while until we see the shard
     // wait for a while until we see the shard and update the local view of the cluster state
-    clusterState = ocmh.waitForNewShard(collectionName, sliceName);
+    ocmh.waitForNewShard(collectionName, sliceName);
 
     String async = message.getStr(ASYNC);
     ZkNodeProps addReplicasProps = new ZkNodeProps(

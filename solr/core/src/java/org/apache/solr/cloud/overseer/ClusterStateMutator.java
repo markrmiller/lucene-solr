@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,6 +27,7 @@ import java.util.Map;
 
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
+import org.apache.solr.client.solrj.cloud.autoscaling.AlreadyExistsException;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
@@ -36,6 +38,9 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +95,14 @@ public class ClusterStateMutator {
         sliceProps.put(Slice.RANGE, ranges == null ? null : ranges.get(i));
 
         slices.put(sliceName, new Slice(sliceName, null, sliceProps));
+        
+        
+        try {
+          stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + cName + "/"
+              + ZkStateReader.SHARD_LEADERS_ZKNODE + "/" + sliceName , null, CreateMode.PERSISTENT, false);
+        } catch (Exception e) {
+          throw new DW.Exp(e);
+        }
       }
     }
 

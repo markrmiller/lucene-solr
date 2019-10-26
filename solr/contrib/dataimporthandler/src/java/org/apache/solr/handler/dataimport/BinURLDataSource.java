@@ -18,6 +18,8 @@ package org.apache.solr.handler.dataimport;
 
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.*;
 import static org.apache.solr.handler.dataimport.URLDataSource.*;
+
+import org.apache.solr.common.patterns.DW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,9 +87,7 @@ public class BinURLDataSource extends DataSource<InputStream>{
       conn.setReadTimeout(readTimeout);
       return conn.getInputStream();
     } catch (Exception e) {
-      log.error("Exception thrown while getting data", e);
-      wrapAndThrow (SEVERE, e, "Exception in invoking url " + url);
-      return null;//unreachable
+      throw new DW.Exp("Exception thrown while getting data", e);
     }
   }
 

@@ -92,6 +92,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrInfoBean;
@@ -393,7 +394,7 @@ public class SimClusterStateProvider implements ClusterStateProvider {
     try {
       cloudManager.getDistribStateManager().makePath(path, Utils.toJSON(id), CreateMode.EPHEMERAL, false);
     } catch (Exception e) {
-      log.warn("Exception saving overseer leader id", e);
+      throw new DW.Exp(e);
     }
   }
 

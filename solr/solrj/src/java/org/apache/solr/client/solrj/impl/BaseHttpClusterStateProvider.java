@@ -36,6 +36,7 @@ import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.Utils;
@@ -167,7 +168,7 @@ public abstract class BaseHttpClusterStateProvider implements ClusterStateProvid
           liveNodesTimestamp = System.nanoTime();
           return liveNodes;
         } catch (Exception e) {
-          log.warn("Attempt to fetch cluster state from {} failed.", baseUrl, e);
+          throw new DW.Exp("Attempt to fetch cluster state from failed " + baseUrl, e);
         }
       }
       throw new RuntimeException("Tried fetching live_nodes using all the node names we knew of, i.e. " + liveNodes +". However, "

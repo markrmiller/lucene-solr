@@ -223,8 +223,6 @@ public class TestCloudRecovery extends SolrCloudTestCase {
     
     cluster.waitForActiveCollection(COLLECTION, 2, 2 * (nrtReplicas + tlogReplicas));
     
-    cloudClient.getZkStateReader().forceUpdateCollection(COLLECTION);
-    
     resp = cloudClient.query(COLLECTION, params);
     // Make sure cluster still healthy
     // TODO: AwaitsFix - this will fail under test beasting

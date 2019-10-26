@@ -73,7 +73,7 @@ public class MetricsConfig {
     return historyHandler;
   }
 
-  public static class MetricsConfigBuilder {
+  public final static class MetricsConfigBuilder {
     private PluginInfo[] metricReporterPlugins = new PluginInfo[0];
     private Set<String> hiddenSysProps = new HashSet<>();
     private PluginInfo counterSupplier;

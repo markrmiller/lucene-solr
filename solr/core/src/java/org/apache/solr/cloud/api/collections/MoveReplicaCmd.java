@@ -17,6 +17,7 @@
 
 package org.apache.solr.cloud.api.collections;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,11 +37,13 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CoreAdminParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.update.UpdateLog;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,7 +228,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     NamedList addResult = new NamedList();
     try {
       ocmh.addReplica(ocmh.zkStateReader.getClusterState(), addReplicasProps, addResult, null);
-    } catch (Exception e) {
+    } catch (KeeperException | IOException e) {
       // fatal error - try rolling back
       String errorString = String.format(Locale.ROOT, "Failed to create replica for collection=%s shard=%s" +
           " on node=%s, failure=%s", coll.getName(), slice.getName(), targetNode, addResult.get("failure"));
@@ -252,7 +255,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
       try {
         ocmh.addReplica(ocmh.zkStateReader.getClusterState(), addReplicasProps, rollback, null);
       } catch (Exception e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Fatal error during MOVEREPLICA of " + replica
+        throw new DW.Exp("Fatal error during MOVEREPLICA of " + replica
             + ", collection may be inconsistent!", e);
       }
       if (rollback.get("failure") != null) {

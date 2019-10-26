@@ -1597,7 +1597,7 @@ public class SolrCLI implements CLIO {
 
       Collection<Slice> slices = docCollection.getSlices();
       // Test http code using a HEAD request first, fail fast if authentication failure
-      String urlForColl = zkStateReader.getLeaderUrl(collection, slices.stream().findFirst().get().getName(), 1000);
+      String urlForColl = zkStateReader.getLeaderUrl(collection, slices.stream().findFirst().get().getName());
       attemptHttpHead(urlForColl, cloudSolrClient.getHttpClient());
 
       SolrQuery q = new SolrQuery("*:*");
@@ -1619,7 +1619,7 @@ public class SolrCLI implements CLIO {
         // since we're reporting health of this shard, there's no guarantee of a leader
         String leaderUrl = null;
         try {
-          leaderUrl = zkStateReader.getLeaderUrl(collection, shardName, 1000);
+          leaderUrl = zkStateReader.getLeaderUrl(collection, shardName);
         } catch (Exception exc) {
           log.warn("Failed to get leader for shard "+shardName+" due to: "+exc);
         }

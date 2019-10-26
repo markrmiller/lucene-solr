@@ -475,36 +475,36 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
         }
       }
     };
-
-    Thread connLossThread = new Thread() {
-      @Override
-      public void run() {
-
-        while (!stopStress) {
-          try {
-            Thread.sleep(50);
-            int j;
-            j = random().nextInt(threads.size());
-            try {
-              threads.get(j).es.zkClient.getSolrZooKeeper().closeCnxn();
-              if (random().nextBoolean()) {
-                long sessionId = zkClient.getSolrZooKeeper().getSessionId();
-                server.expire(sessionId);
-              }
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-            Thread.sleep(500);
-
-          } catch (Exception e) {
-
-          }
-        }
-      }
-    };
+// nocommit
+//    Thread connLossThread = new Thread() {
+//      @Override
+//      public void run() {
+//
+//        while (!stopStress) {
+//          try {
+//            Thread.sleep(50);
+//            int j;
+//            j = random().nextInt(threads.size());
+//            try {
+//              threads.get(j).es.zkClient.getSolrZooKeeper().closeCnxn();
+//              if (random().nextBoolean()) {
+//                long sessionId = zkClient.getSolrZooKeeper().getSessionId();
+//                server.expire(sessionId);
+//              }
+//            } catch (Exception e) {
+//              e.printStackTrace();
+//            }
+//            Thread.sleep(500);
+//
+//          } catch (Exception e) {
+//
+//          }
+//        }
+//      }
+//    };
 
     scheduleThread.start();
-    connLossThread.start();
+   // connLossThread.start();
     killThread.start();
 
     Thread.sleep(4000);
@@ -512,13 +512,13 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
     stopStress = true;
 
     scheduleThread.interrupt();
-    connLossThread.interrupt();
+   // connLossThread.interrupt();
     killThread.interrupt();
 
     scheduleThread.join();
     scheduler.shutdownNow();
 
-    connLossThread.join();
+    //connLossThread.join();
     killThread.join();
 
     int seq = threads.get(getLeaderThread()).getSeq();

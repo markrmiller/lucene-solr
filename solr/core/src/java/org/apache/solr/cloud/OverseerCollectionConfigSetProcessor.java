@@ -24,6 +24,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.handler.component.HttpShardHandler;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
 
@@ -91,7 +92,7 @@ public class OverseerCollectionConfigSetProcessor extends OverseerTaskProcessor 
     return new OverseerMessageHandlerSelector() {
       @Override
       public void close() throws IOException {
-        IOUtils.closeQuietly(collMessageHandler);
+        DW.close(collMessageHandler);
       }
 
       @Override

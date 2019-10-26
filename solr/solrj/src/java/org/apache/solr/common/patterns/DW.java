@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +37,6 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.util.OrderedExecutor;
 import org.apache.zookeeper.KeeperException;
@@ -45,10 +45,20 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * DoSmartWork. A utility class that tries to use good patterns, parallelism, logging and tracking.
+ * DoWork. A workhorse utility class that tries to use good patterns, parallelism, logging and tracking.
+ * 
+ * You can give it Closeable objects, executors, Runnables, Callables, Maps, or Collections and it will either run them, close them, or shut them down.
+ * Everything in an add call is executed in parralel with each add happening in order. Execution happens on DW#close.
+ * 
+ * You can also use collect and addCollect to build up a Collection of the above objects and then execute it like a single add.
+ * 
+ * DW$Exp handles exceptions properly in most contexts.
+ * 
  */
-@SuppressWarnings("serial")
-public class SW implements Closeable {
+@SolrSingleThreaded
+public class DW implements Closeable {
+
+  private static final String SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK = "Solr ran into an error while doing work!";
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -67,6 +77,18 @@ public class SW implements Closeable {
       this.objects = objects;
       this.tracker = tracker;
       this.label = label;
+      
+      assert checkTypesForTests(objects);
+    }
+
+    private boolean checkTypesForTests(List<Object> objects) {
+      for (Object object : objects) {
+        assert !(object instanceof Collection);
+        assert !(object instanceof Map);
+        assert !(object.getClass().isArray());
+      }
+      
+      return true;
     }
   }
 
@@ -74,13 +96,19 @@ public class SW implements Closeable {
 
   private final CloseTimeTracker tracker;
 
-  private boolean closeExecutor;
-  
+  private final boolean ignoreExceptions;
+
   // nocommit should take logger as well
   public static class Exp extends SolrException {
 
+    private static final String ERROR_MSG = "Solr ran into an unexpected Exception";
+
+    public Exp(String msg) {
+      this(ErrorCode.SERVER_ERROR, msg, null);
+    }
+    
     public Exp(Throwable th) {
-      this(ErrorCode.SERVER_ERROR, null, th);
+      this(ErrorCode.SERVER_ERROR, th.getMessage(), th);
     }
     
     public Exp(String msg, Throwable th) {
@@ -88,24 +116,26 @@ public class SW implements Closeable {
     }
     
     public Exp(ErrorCode code, String msg, Throwable th) {
-      super(code, msg == null ? "Hit an Exception" : msg, th);
-      log.error("Hit an Exception", th);
-      if (th instanceof InterruptedException) {
+      super(code, msg == null ? ERROR_MSG : msg, th);
+      log.error(ERROR_MSG, th);
+      if (th != null && th instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      if (th instanceof KeeperException) { // TODO maybe start using ZooKeeperException
+      if (th != null && th instanceof KeeperException) { // TODO maybe start using ZooKeeperException
         if (((KeeperException) th).code() == KeeperException.Code.SESSIONEXPIRED) {
           log.warn("The session has expired, give up any leadership roles!");
         }
       }
     }
-
   }
 
-  public SW(Object object) {
+  public DW(Object object) {
+    this(object, false);
+  }
 
-   tracker = new CloseTimeTracker(object, object.getClass().getName());
-
+  public DW(Object object, boolean ignoreExceptions) {
+    this.ignoreExceptions = ignoreExceptions;
+    tracker = new CloseTimeTracker(object, object == null ? "NullObject" : object.getClass().getName());
     // constructor must stay very light weight
   }
 
@@ -117,38 +147,41 @@ public class SW implements Closeable {
     collectSet.add(object);
   }
   
-  public void collect(Callable<?> object) {
-    collectSet.add(object);
+  
+  /**
+   * @param callable A Callable to run. If an object is return, it's toString is used to identify it.
+   */
+  public void collect(Callable<?> callable) {
+    if (collectSet == null) {
+      collectSet = new HashSet<>();
+    }
+    collectSet.add(callable);
   }
   
-  public void collect(Runnable object) {
-    collectSet.add(object);
+  /**
+   * @param runnable A Runnable to run. If an object is return, it's toString is used to identify it.
+   */
+  public void collect(Runnable runnable) {
+    if (collectSet == null) {
+      collectSet = new HashSet<>();
+    }
+    collectSet.add(runnable);
   }
   
-  public void addCollect(String label) {
+  public void addCollect(String label) {    
     add(label, collectSet);
     collectSet.clear();
   }
 
   // add a unit of work
-  @SuppressWarnings("unchecked")
   public void add(String label, Object... objects) {
     if (log.isDebugEnabled()) {
       log.debug("add(String label={}, Object objects={}) - start", label, objects);
     }
 
-    ArrayList<Object> objectList = new ArrayList<>();
+    List<Object> objectList = new ArrayList<>();
 
-    if (objects != null) {
-      for (Object object : objects) {
-        if (object == null) continue;
-        if (object instanceof Collection) {
-          objectList.addAll((Collection<? extends Object>) object);
-        } else {
-          objectList.add(object);
-        }
-      }
-    }
+    gatherObjects(objects, objectList);
 
     WorkUnit workUnit = new WorkUnit(objectList, tracker, label);
     workUnits.add(workUnit);
@@ -223,17 +256,38 @@ public class SW implements Closeable {
     }
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private void gatherObjects(Object object, List<Object> objects) {
     if (log.isDebugEnabled()) {
       log.debug("gatherObjects(Object object={}, List<Object> objects={}) - start", object, objects);
     }
 
     if (object != null) {
-      if (object instanceof Collection) {
-        objects.addAll((Collection<? extends Object>) object);
+      if (object.getClass().isArray()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Found an array to gather against");
+        }
+
+        for (Object obj : (Object[]) object) {
+          gatherObjects(obj, objects);
+        }
+
+      } else if (object instanceof Collection) {
+        if (log.isDebugEnabled()) {
+          log.debug("Found a Collectiom to gather against");
+        }
+        for (Object obj : (Collection)object) {
+          gatherObjects(obj, objects);
+        }
       } else if (object instanceof Map<?,?>) {
-        objects.addAll(((Map) object).keySet());
+        if (log.isDebugEnabled()) {
+          log.debug("Found a Map to gather against");
+        }
+        ((Map) object).forEach((k, v) -> gatherObjects(v, objects));
       } else {
+        if (log.isDebugEnabled()) {
+          log.debug("Found a non collection object to add");
+        }
         objects.add(object);
       }
     }
@@ -318,25 +372,6 @@ public class SW implements Closeable {
     if (log.isDebugEnabled()) {
       log.debug("close() - start");
     }
-
-    ExecutorService exec = threadLocal.get();
-
-    if (exec == null) {
-      if (log.isDebugEnabled()) {
-        log.debug("Starting a new executor");
-      }
-      executor = new MDCAwareThreadPoolExecutor(0, Runtime.getRuntime().availableProcessors(),
-          5L, TimeUnit.SECONDS,
-          new SynchronousQueue<>(),
-          new SolrjNamedThreadFactory("doSmartWork"));
-      closeExecutor = true;
-      threadLocal.set(executor);
-    } else {
-      if (log.isDebugEnabled()) {
-        log.debug("Reusing a parent executor");
-      }
-      executor = exec;
-    }
     
     if (collectSet != null && collectSet.size() > 1) {
       throw new IllegalStateException("addCollect must be called to add any objects collected!");
@@ -357,10 +392,12 @@ public class SW implements Closeable {
             if (object == null) continue;
 
             if (objects.size() == 1) {
-              handleObject(exception, workUnitTracker, closeCalls, object);
+              handleObject(workUnit.label, exception, workUnitTracker, closeCalls, object);
             } else {
+              initExecutor();
+              
               closeCalls.add(() -> {
-                handleObject(exception, workUnitTracker, closeCalls, object);
+                handleObject(workUnit.label, exception, workUnitTracker, closeCalls, object);
                 return object;
               });
             }
@@ -370,8 +407,8 @@ public class SW implements Closeable {
               executor.invokeAll(closeCalls);
             } catch (InterruptedException e1) {
               log.error("close()", e1);
-
               Thread.currentThread().interrupt();
+              throw new RuntimeException("Close was interrupted!");
             }
           }
         } finally {
@@ -388,20 +425,11 @@ public class SW implements Closeable {
       exception.set(t);
     } finally {
 
-      if (closeExecutor) {
-        threadLocal.set(null);
-        ExecutorUtil.shutdownAndAwaitTermination(executor);
-      }
-
       tracker.doneClose();
 
       if (exception.get() != null) {
         Throwable exp = exception.get();
-        if (exp instanceof RuntimeException) {
-          throw (RuntimeException) exp;
-        } else {
-          throw new SolrException(ErrorCode.SERVER_ERROR, exp);
-        }
+        throw new SolrException(ErrorCode.SERVER_ERROR, exp);
       }
     }
 
@@ -410,10 +438,41 @@ public class SW implements Closeable {
     }
   }
 
-  private void handleObject(AtomicReference<Throwable> exception, final CloseTimeTracker workUnitTracker,
+  private void initExecutor() {
+    if (executor != null) return;
+    
+    ExecutorService exec = threadLocal.get();
+
+    if (exec == null) {
+      if (log.isDebugEnabled()) {
+        log.debug("Starting a new executor");
+      }
+      
+      executor = new MDCAwareThreadPoolExecutor(1, Runtime.getRuntime().availableProcessors(),
+          5L, TimeUnit.SECONDS,
+          new SynchronousQueue<>(), new SolrjNamedThreadFactory("Solr-DoWork", true, 7));
+      
+      threadLocal.set(executor);
+    } else {
+      if (log.isDebugEnabled()) {
+        log.debug("Reusing a parent executor");
+      }
+      executor = exec;
+    }
+  }
+
+  private void handleObject(String label, AtomicReference<Throwable> exception, final CloseTimeTracker workUnitTracker,
       List<Callable<Object>> closeCalls, Object object) {
     if (log.isDebugEnabled()) {
-      log.debug("handleObject(AtomicReference<Throwable> exception={}, CloseTimeTracker workUnitTracker={}, List<Callable<Object>> closeCalls={}, Object object={}) - start", exception, workUnitTracker, closeCalls, object);
+      log.debug(
+          "handleObject(AtomicReference<Throwable> exception={}, CloseTimeTracker workUnitTracker={}, List<Callable<Object>> closeCalls={}, Object object={}) - start",
+          exception, workUnitTracker, closeCalls, object);
+    }
+    
+    if (object != null) {
+      assert !(object instanceof Collection);
+      assert !(object instanceof Map);
+      assert !(object.getClass().isArray());
     }
 
     Object returnObject = null;
@@ -429,11 +488,11 @@ public class SW implements Closeable {
         handled = true;
       }
       if (object instanceof Closeable) {
-        IOUtils.closeQuietly((Closeable) object);
+        ((Closeable) object).close();
         handled = true;
       }
       if (object instanceof AutoCloseable) {
-        IOUtils.closeQuietly((AutoCloseable) object);
+        ((AutoCloseable) object).close();
         handled = true;
       }
       if (object instanceof Callable) {
@@ -448,14 +507,30 @@ public class SW implements Closeable {
       }
 
       if (!handled) {
-        IllegalArgumentException illegal = new IllegalArgumentException(
-            "I do not know how to close: " + object.getClass().getName());
+        IllegalArgumentException illegal = new IllegalArgumentException(label + " -> I do not know how to close: " + object.getClass().getName());
         exception.set(illegal);
       }
-    } catch (Exception e) {
-      log.error("handleObject(AtomicReference<Throwable>=" + exception + ", CloseTimeTracker=" + workUnitTracker + ", List<Callable<Object>>=" + closeCalls + ", Object=" + object + ")", e);
+    } catch (Throwable t) {
 
-      throw new RuntimeException(e);
+      if (t instanceof NullPointerException) {
+        log.info("NPE closing " + object == null ? "Null Object" : object.getClass().getName());
+      } else {
+        if (ignoreExceptions) {
+          log.warn(SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK);
+          if (t instanceof Error) {
+            throw (Error) t;
+          }
+        } else {
+        
+        log.error("handleObject(AtomicReference<Throwable>=" + exception + ", CloseTimeTracker=" + workUnitTracker
+            + ", List<Callable<Object>>=" + closeCalls + ", Object=" + object + ")", t);
+        propegateInterrupt(t);
+        if (t instanceof Error) {
+          throw (Error) t;
+        }
+        throw new SolrException(ErrorCode.SERVER_ERROR, SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK, t);
+        }
+      }
     } finally {
       subTracker.doneClose(returnObject instanceof String ? (String) returnObject
           : (returnObject == null ? "" : returnObject.getClass().getName()));
@@ -463,6 +538,64 @@ public class SW implements Closeable {
 
     if (log.isDebugEnabled()) {
       log.debug("handleObject(AtomicReference<Throwable>, CloseTimeTracker, List<Callable<Object>>, Object) - end");
+    }
+  }
+  
+  /**
+   * Sugar method to close objects.
+   * 
+   * @param object to close
+   */
+  public static void close(Object object, boolean ignoreExceptions) {
+    try (DW dw = new DW(object, ignoreExceptions)) {
+      dw.add(object);
+    }
+  }
+  
+  public static void close(Object object) {
+    try (DW dw = new DW(object)) {
+      dw.add(object);
+    }
+  }
+
+  public static <K> Set<K> concSetSmallO() {
+    return ConcurrentHashMap.newKeySet(50);
+  }
+  
+  public static <K,V> ConcurrentHashMap<K,V> concMapSmallO() {
+    return new ConcurrentHashMap<K,V>(132, 0.75f, 50);
+  }
+  
+  public static ConcurrentHashMap<?,?> concReqsO() {
+    return new ConcurrentHashMap<>(128, 0.75f, 2048);
+  }
+  
+  public static ConcurrentHashMap<?,?> concMapClassesO() {
+    return new ConcurrentHashMap<>(132, 0.75f, 8192);
+  }
+
+  public static void propegateInterrupt(Throwable t) {
+    if (t instanceof InterruptedException) {
+      log.info("Interrupted", t);
+      Thread.currentThread().interrupt();
+    } else {
+      log.warn("Solr ran into an unexpected exception", t);
+    }
+    
+    if (t instanceof Error) {
+      throw (Error) t;
+    }
+  }
+
+  public static void propegateInterrupt(String msg, Throwable t) {
+    if (t instanceof InterruptedException) {
+      log.info("Interrupted", t);
+      Thread.currentThread().interrupt();
+    } else {
+      log.warn(msg, t);
+    }
+    if (t instanceof Error) {
+      throw (Error) t;
     }
   }
 

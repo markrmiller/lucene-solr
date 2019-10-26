@@ -39,6 +39,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.HighlightParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.SuppressForbidden;
@@ -170,8 +171,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
             AttributeValueSet defaultSet = avs.getDefaultAttributeValueSet();
             initAttributes.putAll(defaultSet.getAttributeValues());
           } catch (Exception e) {
-            throw new SolrException(ErrorCode.SERVER_ERROR, 
-                "Could not read attributes XML for clustering component: " + componentName, e);
+            throw new DW.Exp("Could not read attributes XML for clustering component: " + componentName, e);
           }
           return null;
         });
@@ -241,8 +241,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
           () -> clustersToNamedList(controller.process(attributes,
               clusteringAlgorithmClass).getClusters(), sreq.getParams()));
     } catch (Exception e) {
-      log.error("Carrot2 clustering failed", e);
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Carrot2 clustering failed", e);
+      throw new DW.Exp( "Carrot2 clustering failed", e);
     }
   }
 

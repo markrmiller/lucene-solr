@@ -57,7 +57,6 @@ dependencies {
   runtimeOnly ('org.slf4j:jcl-over-slf4j') // bridge java common logging to slf4j
 
   // kerb, kerby, and curator deps used for security and auth with zk/hdfs/kerberos
-  runtimeOnly ('org.apache.curator:curator-recipes') { transitive = false } // brings in a lot we don't use
   runtimeOnly ('org.apache.kerby:kerb-core')
   runtimeOnly ('org.apache.kerby:kerb-util')
   runtimeOnly ('org.apache.kerby:kerby-asn1')
@@ -118,8 +117,6 @@ dependencies {
   implementation ('com.google.re2j:re2j')
   implementation ('org.apache.commons:commons-lang3')
   implementation ('org.apache.htrace:htrace-core4')
-  implementation ('org.apache.curator:curator-framework') { transitive = false } // brings in a lot we don't use
-  implementation ('org.apache.curator:curator-client') { transitive = false } // brings in a lot we don't use
   implementation ('com.tdunning:t-digest')  // StatsComponents percentiles 
   implementation ('com.github.ben-manes.caffeine:caffeine')
   

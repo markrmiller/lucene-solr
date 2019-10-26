@@ -794,7 +794,6 @@ public class TestTlogReplica extends SolrCloudTestCase {
         if (t.hasTimedOut()) {
           fail("Timed out waiting for collection " + collection + " to be deleted.");
         }
-        cluster.getSolrClient().getZkStateReader().forceUpdateCollection(collection);
       } catch(SolrException e) {
         return;
       }
@@ -803,9 +802,7 @@ public class TestTlogReplica extends SolrCloudTestCase {
   }
 
   private DocCollection assertNumberOfReplicas(int numNrtReplicas, int numTlogReplicas, int numPullReplicas, boolean updateCollection, boolean activeOnly) throws KeeperException, InterruptedException {
-    if (updateCollection) {
-      cluster.getSolrClient().getZkStateReader().forceUpdateCollection(collectionName);
-    }
+
     DocCollection docCollection = getCollectionState(collectionName);
     assertNotNull(docCollection);
     assertEquals("Unexpected number of nrt replicas: " + docCollection, numNrtReplicas,

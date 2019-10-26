@@ -289,7 +289,7 @@ public class DOMUtil {
    * @param node DOM node to walk for substitutions
    * @param properties the Properties instance from which a value can be looked up
    */
-  public static void substituteProperties(Node node, Properties properties) {
+  public final static void substituteProperties(Node node, Properties properties) {
     // loop through child nodes
     Node child;
     Node next = node.getFirstChild();

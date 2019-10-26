@@ -53,8 +53,8 @@ public class ConnectionManagerTest extends SolrTestCaseJ4 {
       ConnectionManager cm = zkClient.getConnectionManager();
       try {
         assertFalse(cm.isLikelyExpired());
-
-        zkClient.getSolrZooKeeper().closeCnxn();
+//nocommit
+        //zkClient.getSolrZooKeeper().closeCnxn();
         
         long sessionId = zkClient.getSolrZooKeeper().getSessionId();
         server.expire(sessionId);

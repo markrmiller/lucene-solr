@@ -49,6 +49,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.RequiredSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.processor.RoutedAliasUpdateProcessor;
@@ -168,7 +169,7 @@ public class TimeRoutedAlias extends RoutedAlias {
         throw new SolrException(BAD_REQUEST, "duration must add to produce a time in the future");
       }
     } catch (Exception e) {
-      throw new SolrException(BAD_REQUEST, "bad " + TimeRoutedAlias.ROUTER_INTERVAL + ", " + e, e);
+      throw new DW.Exp("bad " + TimeRoutedAlias.ROUTER_INTERVAL + ", " + e, e);
     }
 
     if (autoDeleteAgeMath != null) {
@@ -178,14 +179,15 @@ public class TimeRoutedAlias extends RoutedAlias {
           throw new SolrException(BAD_REQUEST, "duration must round or subtract to produce a time in the past");
         }
       } catch (Exception e) {
-        throw new SolrException(BAD_REQUEST, "bad " + TimeRoutedAlias.ROUTER_AUTO_DELETE_AGE + ", " + e, e);
+        throw new DW.Exp("bad " + TimeRoutedAlias.ROUTER_AUTO_DELETE_AGE + ", " + e, e);
+
       }
     }
     if (preemptiveCreateMath != null) {
       try {
         new DateMathParser().parseMath(preemptiveCreateMath);
       } catch (ParseException e) {
-        throw new SolrException(BAD_REQUEST, "Invalid date math for preemptiveCreateMath:" + preemptiveCreateMath);
+        throw new DW.Exp("Invalid date math for preemptiveCreateMath:" + preemptiveCreateMath, e);   
       }
     }
 

@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,6 +50,7 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
@@ -65,15 +67,19 @@ import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SessionIdManager;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.server.session.DefaultSessionIdManager;
+import org.eclipse.jetty.server.session.HouseKeeper;
+import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlet.Source;
 import org.eclipse.jetty.util.component.LifeCycle;
+import org.eclipse.jetty.util.component.LifeCycle.Listener;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ReservedThreadExecutor;
@@ -90,7 +96,7 @@ public class JettySolrRunner {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final int THREAD_POOL_MAX_THREADS = 10000;
+  private static final int THREAD_POOL_MAX_THREADS = 100;
   // NOTE: needs to be larger than HttpClientUtil.SolrHttpClient.EVICT_IDLE_CONNECTIONS
   private static final int THREAD_POOL_MAX_IDLE_TIME_MS = HttpClientUtil.EVICT_IDLE_CONNECTIONS_DEFAULT + 10000;
 
@@ -122,6 +128,106 @@ public class JettySolrRunner {
   private volatile String host;
 
   private volatile boolean started = false;
+
+  private final class NoopSessionManager implements SessionIdManager {
+    @Override
+    public void stop() throws Exception {
+    }
+
+    @Override
+    public void start() throws Exception {
+    }
+
+    @Override
+    public void removeLifeCycleListener(Listener listener) {
+    }
+
+    @Override
+    public boolean isStopping() {
+      return false;
+    }
+
+    @Override
+    public boolean isStopped() {
+      return false;
+    }
+
+    @Override
+    public boolean isStarting() {
+      return false;
+    }
+
+    @Override
+    public boolean isStarted() {
+      return false;
+    }
+
+    @Override
+    public boolean isRunning() {
+      return false;
+    }
+
+    @Override
+    public boolean isFailed() {
+      return false;
+    }
+
+    @Override
+    public void addLifeCycleListener(Listener listener) {
+    }
+
+    @Override
+    public void setSessionHouseKeeper(HouseKeeper houseKeeper) {
+    }
+
+    @Override
+    public String renewSessionId(String oldId, String oldExtendedId, HttpServletRequest request) {
+      return null;
+    }
+
+    @Override
+    public String newSessionId(HttpServletRequest request, long created) {
+      return null;
+    }
+
+    @Override
+    public boolean isIdInUse(String id) {
+      return false;
+    }
+
+    @Override
+    public void invalidateAll(String id) {
+    }
+
+    @Override
+    public String getWorkerName() {
+      return null;
+    }
+
+    @Override
+    public HouseKeeper getSessionHouseKeeper() {
+      return null;
+    }
+
+    @Override
+    public Set<SessionHandler> getSessionHandlers() {
+      return null;
+    }
+
+    @Override
+    public String getId(String qualifiedId) {
+      return null;
+    }
+
+    @Override
+    public String getExtendedId(String id, HttpServletRequest request) {
+      return null;
+    }
+
+    @Override
+    public void expireAll(String id) {
+    }
+  }
 
   public static class DebugFilter implements Filter {
     private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -248,7 +354,7 @@ public class JettySolrRunner {
       try {
         proxy = new SocketProxy(0, config.sslConfig != null && config.sslConfig.isSSLMode());
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        throw new DW.Exp(e);
       }
       setProxyPort(proxy.getListenPort());
     } else {
@@ -295,12 +401,15 @@ public class JettySolrRunner {
       } else {
         sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
 
-        connector = new ServerConnector(server);
+        connector = new ServerConnector(server, 1, 1);
         SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
         connector.addConnectionFactory(sslConnectionFactory);
         connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
 
         HTTP2ServerConnectionFactory http2ConnectionFactory = new HTTP2ServerConnectionFactory(configuration);
+        
+        http2ConnectionFactory.setMaxConcurrentStreams(1500);
+        http2ConnectionFactory.setInputBufferSize(16384);
 
         ALPNServerConnectionFactory alpn = new ALPNServerConnectionFactory(
             http2ConnectionFactory.getProtocol(),
@@ -320,13 +429,12 @@ public class JettySolrRunner {
     }
 
     connector.setReuseAddress(true);
-    connector.setSoLingerTime(-1);
     connector.setPort(port);
     connector.setHost("127.0.0.1");
-    connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
+    connector.setIdleTimeout(Integer.getInteger("solr.containerThreadsIdle", THREAD_POOL_MAX_IDLE_TIME_MS));
     connector.setStopTimeout(10000);
     server.setConnectors(new Connector[] {connector});
-    server.setSessionIdManager(new DefaultSessionIdManager(server, new Random()));
+    server.setSessionIdManager(new NoopSessionManager());
 
     HandlerWrapper chain;
     {
@@ -767,6 +875,7 @@ public class JettySolrRunner {
       SolrDispatchFilter solrFilter = (SolrDispatchFilter) dispatchFilter.getFilter();
       CoreContainer cores = solrFilter.getCores();
       if (cores != null) {
+        cores.load();
         cores.waitForLoadingCoresToFinish(timeoutMs);
       } else {
         throw new IllegalStateException("The CoreContainer is not set!");

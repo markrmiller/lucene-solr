@@ -16,13 +16,14 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.SW;
-import org.apache.solr.common.patterns.SW.Exp;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.DW.Exp;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
@@ -33,7 +34,7 @@ import static org.apache.zookeeper.Watcher.Event.KeeperState.AuthFailed;
 import static org.apache.zookeeper.Watcher.Event.KeeperState.Disconnected;
 import static org.apache.zookeeper.Watcher.Event.KeeperState.Expired;
 
-public class ConnectionManager implements Watcher {
+public class ConnectionManager implements Watcher, Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final String name;
@@ -70,8 +71,16 @@ public class ConnectionManager implements Watcher {
     }
 
     public boolean isLikelyExpired(long timeToExpire) {
-      return stateType == StateType.EXPIRED
-        || ( stateType == StateType.TRACKING_TIME && (System.nanoTime() - lastDisconnectTime >  TimeUnit.NANOSECONDS.convert(timeToExpire, TimeUnit.MILLISECONDS)));
+      if (log.isDebugEnabled()) {
+        log.debug("isLikelyExpired(long timeToExpire={}) - start", timeToExpire);
+      }
+
+      boolean returnboolean = stateType == StateType.EXPIRED
+          || (stateType == StateType.TRACKING_TIME && (System.nanoTime() - lastDisconnectTime > TimeUnit.NANOSECONDS.convert(timeToExpire, TimeUnit.MILLISECONDS)));
+      if (log.isDebugEnabled()) {
+        log.debug("isLikelyExpired(long) - end");
+      }
+      return returnboolean;
     }
   }
 
@@ -94,12 +103,20 @@ public class ConnectionManager implements Watcher {
   }
 
   private synchronized void connected() {
+    if (log.isDebugEnabled()) {
+      log.debug("connected()");
+    }
+
     connected = true;
     likelyExpiredState = LikelyExpiredState.NOT_EXPIRED;
     notifyAll();
   }
 
   private synchronized void disconnected() {
+    if (log.isDebugEnabled()) {
+      log.debug("disconnected()");
+    }
+
     connected = false;
     // record the time we expired unless we are already likely expired
     if (!likelyExpiredState.isLikelyExpired(0)) {
@@ -110,6 +127,10 @@ public class ConnectionManager implements Watcher {
 
   @Override
   public void process(WatchedEvent event) {
+    if (log.isDebugEnabled()) {
+      log.debug("process(WatchedEvent event={}) - start", event);
+    }
+
     if (event.getState() == AuthFailed || event.getState() == Disconnected || event.getState() == Expired) {
       log.warn("Watcher {} name: {} got event {} path: {} type: {}", this, name, event, event.getPath(), event.getType());
     } else {
@@ -129,6 +150,9 @@ public class ConnectionManager implements Watcher {
       connectionStrategy.connected();
     } else if (state == Expired) {
       if (isClosed()) {
+        if (log.isDebugEnabled()) {
+          log.debug("process(WatchedEvent) - end");
+        }
         return;
       }
       // we don't call disconnected here, because we know we are expired
@@ -137,14 +161,18 @@ public class ConnectionManager implements Watcher {
 
       log.warn("Our previous ZooKeeper session was expired. Attempting to reconnect to recover relationship with ZooKeeper...");
       if (isClosed()) {
+        if (log.isDebugEnabled()) {
+          log.debug("process(WatchedEvent) - end");
+        }
         return;
       }
       if (beforeReconnect != null) {
         try {
           beforeReconnect.command();
         } catch (Exception e) {
-          log.warn("Exception running beforeReconnect command", e);
-          throw new SW.Exp(e);
+          log.error("process(WatchedEvent=" + event + ")", e);
+
+          throw new DW.Exp(e);
         }
       }
 
@@ -157,15 +185,23 @@ public class ConnectionManager implements Watcher {
               new ZkClientConnectionStrategy.ZkUpdate() {
                 @Override
                 public void update(SolrZooKeeper keeper) {
+                  if (log.isDebugEnabled()) {
+                    log.debug("$ZkClientConnectionStrategy.ZkUpdate.update(SolrZooKeeper keeper={}) - start", keeper);
+                  }
+
                   try {
                     waitForConnected(Long.MAX_VALUE);
                     try {
                       client.updateKeeper(keeper);
                     } catch (Exception e) {
-                      Exp exp = new SW.Exp(e);
+                      log.error("$ZkClientConnectionStrategy.ZkUpdate.update(SolrZooKeeper=" + keeper + ")", e);
+
+                      Exp exp = new DW.Exp(e);
                       try {
                         closeKeeper(keeper);
                       } catch (Exception e1) {
+                        log.error("$ZkClientConnectionStrategy.ZkUpdate.update(SolrZooKeeper=" + keeper + ")", e1);
+
                         exp.addSuppressed(e1);
                       } 
                       throw exp;
@@ -176,11 +212,23 @@ public class ConnectionManager implements Watcher {
                     }
 
                   } catch (Exception e1) {
+                    Exp exp = new DW.Exp(e1);
+
+             
                     // if there was a problem creating the new SolrZooKeeper
                     // or if we cannot run our reconnect command, close the keeper
                     // our retry loop will try to create one again
+                    try {
                     closeKeeper(keeper);
-                    throw new RuntimeException(e1);
+                    } catch (Exception e) {
+                      DW.propegateInterrupt(e);
+                      exp.addSuppressed(e);
+                    }
+                    throw exp;
+                  }
+
+                  if (log.isDebugEnabled()) {
+                    log.debug("$ZkClientConnectionStrategy.ZkUpdate.update(SolrZooKeeper) - end");
                   }
                 }
               });
@@ -207,10 +255,22 @@ public class ConnectionManager implements Watcher {
     } else if (state == KeeperState.AuthFailed) {
       log.warn("zkClient received AuthFailed");
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("process(WatchedEvent) - end");
+    }
   }
 
   public boolean isConnectedAndNotClosed() {
-    return !isClosed() && connected;
+    if (log.isDebugEnabled()) {
+      log.debug("isConnectedAndNotClosed() - start");
+    }
+
+    boolean returnboolean = !isClosed() && connected;
+    if (log.isDebugEnabled()) {
+      log.debug("isConnectedAndNotClosed() - end");
+    }
+    return returnboolean;
   }
 
   public boolean isConnected() {
@@ -220,23 +280,55 @@ public class ConnectionManager implements Watcher {
   // we use a volatile rather than sync
   // to avoid possible deadlock on shutdown
   public void close() {
+    if (log.isDebugEnabled()) {
+      log.debug("close() - start");
+    }
+
     this.isClosed = true;
     this.likelyExpiredState = LikelyExpiredState.EXPIRED;
+
+    if (log.isDebugEnabled()) {
+      log.debug("close() - end");
+    }
   }
 
   private boolean isClosed() {
-    return isClosed || isClosedCheck.isClosed();
+    if (log.isDebugEnabled()) {
+      log.debug("isClosed() - start");
+    }
+
+    boolean returnboolean = isClosed || isClosedCheck.isClosed();
+    if (log.isDebugEnabled()) {
+      log.debug("isClosed() - end");
+    }
+    return returnboolean;
   }
 
   public boolean isLikelyExpired() {
-    return isClosed() || likelyExpiredState.isLikelyExpired((long) (client.getZkClientTimeout() * 0.90));
+    if (log.isDebugEnabled()) {
+      log.debug("isLikelyExpired() - start");
+    }
+
+    boolean returnboolean = isClosed() || likelyExpiredState.isLikelyExpired((long) (client.getZkClientTimeout() * 0.90));
+    if (log.isDebugEnabled()) {
+      log.debug("isLikelyExpired() - end");
+    }
+    return returnboolean;
   }
 
   public synchronized void waitSleep(long waitFor) {
+    if (log.isDebugEnabled()) {
+      log.debug("waitSleep(long waitFor={}) - start", waitFor);
+    }
+
     try {
       wait(waitFor);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      throw new DW.Exp(e);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("waitSleep(long) - end");
     }
   }
 
@@ -252,8 +344,7 @@ public class ConnectionManager implements Watcher {
       try {
         wait(500);
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
+        throw new DW.Exp(e);
       }
       left = expire - System.nanoTime();
     }
@@ -265,6 +356,10 @@ public class ConnectionManager implements Watcher {
 
   public synchronized void waitForDisconnected(long timeout)
       throws InterruptedException, TimeoutException {
+    if (log.isDebugEnabled()) {
+      log.debug("waitForDisconnected(long timeout={}) - start", timeout);
+    }
+
     long expire = System.nanoTime() + TimeUnit.NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS);
     long left = timeout;
     while (connected && left > 0) {
@@ -274,17 +369,25 @@ public class ConnectionManager implements Watcher {
     if (connected) {
       throw new TimeoutException("Did not disconnect");
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("waitForDisconnected(long) - end");
+    }
   }
 
   private void closeKeeper(SolrZooKeeper keeper) {
+    if (log.isDebugEnabled()) {
+      log.debug("closeKeeper(SolrZooKeeper keeper={}) - start", keeper);
+    }
+
     try {
       keeper.close();
     } catch (InterruptedException e) {
-      // Restore the interrupted status
-      Thread.currentThread().interrupt();
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-          "", e);
+      throw new DW.Exp(e);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("closeKeeper(SolrZooKeeper) - end");
     }
   }
 }

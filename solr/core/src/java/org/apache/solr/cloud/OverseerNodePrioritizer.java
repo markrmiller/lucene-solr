@@ -27,6 +27,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
@@ -43,6 +44,7 @@ import static org.apache.solr.common.params.CommonParams.ID;
  * Responsible for prioritization of Overseer nodes, for example with the
  * ADDROLE collection command.
  */
+@SolrThreadSafe
 public class OverseerNodePrioritizer {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -51,9 +53,9 @@ public class OverseerNodePrioritizer {
   private final String adminPath;
   private final ShardHandlerFactory shardHandlerFactory;
 
-  private ZkDistributedQueue stateUpdateQueue;
+  private final ZkDistributedQueue stateUpdateQueue;
 
-  private HttpClient httpClient;
+  private final HttpClient httpClient;
 
   public OverseerNodePrioritizer(ZkStateReader zkStateReader, ZkDistributedQueue stateUpdateQueue, String adminPath, ShardHandlerFactory shardHandlerFactory, HttpClient httpClient) {
     this.zkStateReader = zkStateReader;
@@ -65,7 +67,6 @@ public class OverseerNodePrioritizer {
 
   public synchronized void prioritizeOverseerNodes(String overseerId) throws Exception {
     SolrZkClient zk = zkStateReader.getZkClient();
-    if(!zk.exists(ZkStateReader.ROLES,true))return;
     Map m = (Map) Utils.fromJSON(zk.getData(ZkStateReader.ROLES, null, new Stat(), true));
 
     List overseerDesignates = (List) m.get("overseer");

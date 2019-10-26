@@ -170,7 +170,8 @@ public class ChaosMonkey {
     if (cores != null) {
       monkeyLog("Will cause connection loss on " + jetty.getLocalPort());
       SolrZkClient zkClient = cores.getZkController().getZkClient();
-      zkClient.getSolrZooKeeper().closeCnxn();
+      //zkClient.getSolrZooKeeper().closeCnxn();
+      // nocommit
     }
   }
 
@@ -417,9 +418,6 @@ public class ChaosMonkey {
     int numIndexersFoundInShard = 0;
     for (CloudJettyRunner cloudJetty : shardToJetty.get(sliceName)) {
       
-      // get latest cloud state
-      zkStateReader.forceUpdateCollection(collection);
-      
       DocCollection docCollection = zkStateReader.getClusterState().getCollection(collection);
       
       Slice slice = docCollection.getSlice(sliceName);
@@ -445,9 +443,6 @@ public class ChaosMonkey {
 
   private int checkIfKillIsLegal(String sliceName, int numActive) throws KeeperException, InterruptedException {
     for (CloudJettyRunner cloudJetty : shardToJetty.get(sliceName)) {
-      
-      // get latest cloud state
-      zkStateReader.forceUpdateCollection(collection);
       
       DocCollection docCollection = zkStateReader.getClusterState().getCollection(collection);
       

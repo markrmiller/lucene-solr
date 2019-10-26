@@ -43,6 +43,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -212,9 +213,8 @@ public class ReplaceNodeCmd implements OverseerCollectionMessageHandler.Cmd {
           cleanupLatch.countDown();
           log.warn("Error deleting replica ", e);
         } catch (Exception e) {
-          log.warn("Error deleting replica ", e);
           cleanupLatch.countDown();
-          throw e;
+          throw new DW.Exp("Error deleting replica ", e);
         }
       }
       cleanupLatch.await(5, TimeUnit.MINUTES);

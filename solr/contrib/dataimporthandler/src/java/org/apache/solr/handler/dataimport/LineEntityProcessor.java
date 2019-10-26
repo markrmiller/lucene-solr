@@ -21,6 +21,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.solr.common.patterns.DW;
 
 
 /**
@@ -132,7 +133,7 @@ public class LineEntityProcessor extends EntityProcessorBase {
   @SuppressWarnings("deprecation")
   public void closeResources() {
     if (reader != null) {
-      IOUtils.closeQuietly(reader);
+      DW.close(reader);
     }
     reader= null;
   }

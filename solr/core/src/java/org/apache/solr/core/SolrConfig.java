@@ -54,7 +54,7 @@ import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.MapSerializable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.QueryResponseWriter;
@@ -100,7 +100,7 @@ import static org.apache.solr.core.SolrConfig.PluginOpts.REQUIRE_NAME_IN_OVERLAY
  * configuration data for a a Solr instance -- typically found in
  * "solrconfig.xml".
  */
-public class SolrConfig extends XmlConfigFile implements MapSerializable {
+public final class SolrConfig extends XmlConfigFile implements MapSerializable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -451,8 +451,8 @@ public class SolrConfig extends XmlConfigFile implements MapSerializable {
     } catch (Exception e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error reading config overlay", e);
     } finally {
-      IOUtils.closeQuietly(isr);
-      IOUtils.closeQuietly(in);
+      DW.close(isr);
+      DW.close(in);
     }
   }
 

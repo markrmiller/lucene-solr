@@ -42,9 +42,9 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.XMLErrorLogger;
 import org.apache.solr.util.DOMUtil;
 import org.apache.solr.util.SystemIdResolver;
@@ -141,7 +141,7 @@ public class XmlConfigFile { // formerly simply "Config"
         origDoc = copyDoc(doc);
       } finally {
         // some XML parsers are broken and don't close the byte stream (but they should according to spec)
-        IOUtils.closeQuietly(is.getByteStream());
+        DW.close(is.getByteStream());
       }
       if (substituteProps) {
         DOMUtil.substituteProperties(doc, getSubstituteProperties());

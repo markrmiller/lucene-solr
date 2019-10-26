@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
 
@@ -320,7 +321,7 @@ public class Rule {
         }
 
       } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid condition : " + key + ":" + val, e);
+        throw new DW.Exp(e);
       }
       this.val = expectedVal;
       this.fuzzy = fuzzy;

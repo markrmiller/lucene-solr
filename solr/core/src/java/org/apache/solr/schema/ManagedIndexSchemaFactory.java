@@ -29,6 +29,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
@@ -236,7 +237,7 @@ public class ManagedIndexSchemaFactory extends IndexSchemaFactory implements Sol
         } catch (IOException e) {
           // This is expected when the non-managed schema does not exist
         } finally {
-          IOUtils.closeQuietly(nonManagedSchemaInputStream);
+          DW.close(nonManagedSchemaInputStream);
         }
       }
       if (exists) {

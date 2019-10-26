@@ -59,8 +59,8 @@ public class HdfsBasicDistributedZkTest extends BasicDistributedZkTest {
     }
   }
   
-  @Override
-  protected String getDataDir(String dataDir) throws IOException {
-    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
-  }
+//  @Override
+//  protected String getDataDir(String dataDir) throws IOException {
+//    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
+//  }
 }

@@ -173,7 +173,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
   private boolean enable;
   private boolean enableReplicas;
   private boolean enableNodes;
-  private String versionString;
+  private volatile String versionString;
 
   public MetricsHistoryHandler(String nodeName, MetricsHandler metricsHandler,
         SolrClient solrClient, SolrCloudManager cloudManager, Map<String, Object> pluginArgs) {
@@ -347,21 +347,6 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     return nodeName;
   }
 
-  private boolean amIOverseerLeader() {
-    return amIOverseerLeader(null);
-  }
-
-  private boolean amIOverseerLeader(String leader) {
-    if (leader == null) {
-      leader = getOverseerLeader();
-    }
-    if (leader == null) {
-      return false;
-    } else {
-      return nodeName.equals(leader);
-    }
-  }
-
   private void collectMetrics() {
     log.debug("-- collectMetrics");
     // Make sure we are a solr server thread, so we can use PKI auth, SOLR-12860
@@ -448,7 +433,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
   }
 
   private void collectGlobalMetrics() {
-    if (!amIOverseerLeader()) {
+    if (!isOveerseer()) {
       return;
     }
     Set<String> nodes = new HashSet<>(cloudManager.getClusterStateProvider().getLiveNodes());
@@ -780,8 +765,8 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     // when using in-memory DBs non-overseer node has no access to overseer DBs - in this case
     // forward the request to Overseer leader if available
     if (!factory.isPersistent()) {
-      String leader = getOverseerLeader();
-      if (leader != null && !amIOverseerLeader(leader)) {
+      if (!isOveerseer()) {
+        String leader = getOverseerLeader();
         // get & merge remote response
         NamedList<Object> remoteRes = handleRemoteRequest(leader, req);
         mergeRemoteRes(rsp, remoteRes);
@@ -796,6 +781,11 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     }
     rsp.add("state", apiState);
     rsp.getResponseHeader().add("zkConnected", cloudManager != null);
+  }
+
+  private boolean isOveerseer() {
+    metricsHandler.getCc().getZkController().getOverseer().isOverSeerLeader();
+    return false;
   }
 
   private NamedList<Object> handleRemoteRequest(String nodeName, SolrQueryRequest req) {

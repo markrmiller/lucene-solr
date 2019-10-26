@@ -82,6 +82,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
@@ -505,7 +506,7 @@ public class SimCloudManager implements SolrCloudManager {
     if (liveNodesSet.isEmpty()) {
       // remove handlers
       if (metricsHistoryHandler != null) {
-        IOUtils.closeQuietly(metricsHistoryHandler);
+        DW.close(metricsHistoryHandler);
         metricsHistoryHandler = null;
       }
       if (metricsHandler != null) {
@@ -599,7 +600,7 @@ public class SimCloudManager implements SolrCloudManager {
   public void simRestartOverseer(String killNodeId) throws Exception {
     log.info("=== Restarting OverseerTriggerThread and clearing object cache...");
     triggerThread.interrupt();
-    IOUtils.closeQuietly(triggerThread);
+    DW.close(triggerThread);
     if (killNodeId != null) {
       log.info("  = killing node " + killNodeId);
       simRemoveNode(killNodeId, false);
@@ -609,7 +610,7 @@ public class SimCloudManager implements SolrCloudManager {
     try {
       simCloudManagerPool.shutdownNow();
     } catch (Exception e) {
-      // ignore
+      throw new DW.Exp(e);
     }
     simCloudManagerPool = ExecutorUtil.newMDCAwareFixedThreadPool(200, new DefaultSolrThreadFactory("simCloudManagerPool"));
 
@@ -731,7 +732,7 @@ public class SimCloudManager implements SolrCloudManager {
       Future<SolrResponse> rsp = simCloudManagerPool.submit(() -> simHandleSolrRequest(req));
       return rsp.get(120, TimeUnit.SECONDS); // longer then this and something is seriously wrong
     } catch (Exception e) {
-      throw new IOException(e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -888,7 +889,7 @@ public class SimCloudManager implements SolrCloudManager {
           try {
             clusterStateProvider.simCreateCollection(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case DELETE:
@@ -896,7 +897,7 @@ public class SimCloudManager implements SolrCloudManager {
             clusterStateProvider.simDeleteCollection(params.get(CommonParams.NAME),
                 params.get(CommonAdminParams.ASYNC), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case LIST:
@@ -906,14 +907,14 @@ public class SimCloudManager implements SolrCloudManager {
           try {
             clusterStateProvider.simAddReplica(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case MOVEREPLICA:
           try {
             clusterStateProvider.simMoveReplica(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case OVERSEERSTATUS:
@@ -935,21 +936,21 @@ public class SimCloudManager implements SolrCloudManager {
           try {
             clusterStateProvider.simCreateShard(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case SPLITSHARD:
           try {
             clusterStateProvider.simSplitShard(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         case DELETESHARD:
           try {
             clusterStateProvider.simDeleteShard(new ZkNodeProps(params.toNamedList().asMap(10)), results);
           } catch (Exception e) {
-            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+            throw new DW.Exp(e);
           }
           break;
         default:
@@ -977,20 +978,20 @@ public class SimCloudManager implements SolrCloudManager {
     simCloudManagerPool.shutdownNow();
     
     if (metricsHistoryHandler != null) {
-      IOUtils.closeQuietly(metricsHistoryHandler);
+      DW.close(metricsHistoryHandler);
     }
-    IOUtils.closeQuietly(clusterStateProvider);
-    IOUtils.closeQuietly(nodeStateProvider);
-    IOUtils.closeQuietly(stateManager);
+    DW.close(clusterStateProvider);
+    DW.close(nodeStateProvider);
+    DW.close(stateManager);
     triggerThread.interrupt();
-    IOUtils.closeQuietly(triggerThread);
+    DW.close(triggerThread);
     triggerThread.interrupt();
     try {
       triggerThread.join();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    IOUtils.closeQuietly(objectCache);
+    DW.close(objectCache);
   }
 
   /**

@@ -16,8 +16,8 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
 import java.io.File;
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,43 +25,45 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import org.apache.solr.cloud.CurrentCoreDescriptorProvider;
 import org.apache.solr.cloud.SolrZkServer;
 import org.apache.solr.cloud.ZkController;
-import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZooKeeperException;
-import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
+import org.apache.solr.common.patterns.DW.Exp;
 import org.apache.solr.logging.MDCLoggingContext;
-import org.apache.solr.util.DefaultSolrThreadFactory;
-import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ZkContainer {
+@SolrThreadSafe
+public class ZkContainer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  protected ZkController zkController;
-  private SolrZkServer zkServer;
-
-  private ExecutorService coreZkRegister = ExecutorUtil.newMDCAwareCachedThreadPool(
-      new DefaultSolrThreadFactory("coreZkRegister") );
+  protected volatile ZkController zkController;
+  private volatile SolrZkServer zkServer;
   
   // see ZkController.zkRunOnly
   private boolean zkRunOnly = Boolean.getBoolean("zkRunOnly"); // expert
+
+  private volatile SolrZkClient zkClient;
   
   public ZkContainer() {
-    
+    this.zkController = null;
+    this.zkServer = null;
+    this.zkClient = null;
   }
 
-  public void initZooKeeper(final CoreContainer cc, String solrHome, CloudConfig config) {
-
+  public void initZooKeeper(final CoreContainer cc, String solrHome, CloudConfig config, SolrZkClient zkClient) {
+    this.zkClient = zkClient;
+    assert zkClient != null;
+    
     ZkController zkController = null;
 
     String zkRun = System.getProperty("zkRun");
@@ -125,8 +127,7 @@ public class ZkContainer {
                 }
                 return descriptors;
               }
-            });
-
+            }, zkClient);
 
         if (zkRun != null && zkServer.getServers().size() > 1 && confDir == null && boostrapConf == false) {
           // we are part of an ensemble and we are not uploading the config - pause to give the config time
@@ -150,20 +151,8 @@ public class ZkContainer {
           ZkController.bootstrapConf(zkController.getZkClient(), cc, solrHome);
         }
         
-      } catch (InterruptedException e) {
-        // Restore the interrupted status
-        Thread.currentThread().interrupt();
-        log.error("", e);
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-            "", e);
-      } catch (TimeoutException e) {
-        log.error("Could not connect to ZooKeeper", e);
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-            "", e);
-      } catch (IOException | KeeperException e) {
-        log.error("", e);
-        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-            "", e);
+      } catch (Exception e) {
+        throw new DW.Exp(e);
       }
 
 
@@ -178,7 +167,7 @@ public class ZkContainer {
 
   public static volatile Predicate<CoreDescriptor> testing_beforeRegisterInZk;
 
-  public void registerInZk(final SolrCore core, boolean background, boolean skipRecovery) {
+  public void registerInZk(final SolrCore core, boolean skipRecovery) {
     CoreDescriptor cd = core.getCoreDescriptor(); // save this here - the core may not have it later
     Runnable r = () -> {
       MDCLoggingContext.setCore(core);
@@ -190,67 +179,39 @@ public class ZkContainer {
           if (!core.getCoreContainer().isShutDown()) {
             zkController.register(core.getName(), cd, skipRecovery);
           }
-        } catch (InterruptedException e) {
-          // Restore the interrupted status
-          Thread.currentThread().interrupt();
-          SolrException.log(log, "", e);
-        } catch (KeeperException e) {
-          SolrException.log(log, "", e);
-        } catch (AlreadyClosedException e) {
-
         } catch (Exception e) {
+          Exp exp = new DW.Exp(e);
           try {
-            zkController.publish(cd, Replica.State.DOWN);
-          } catch (InterruptedException e1) {
-            Thread.currentThread().interrupt();
-            log.error("", e1);
+            if (!zkController.getZkClient().isClosed() && zkController.isConnected()) {
+              zkController.publish(cd, Replica.State.DOWN);
+            }
           } catch (Exception e1) {
-            log.error("", e1);
+            exp.addSuppressed(e1);
           }
-          SolrException.log(log, "", e);
+          throw exp;
         }
       } finally {
         MDCLoggingContext.clear();
       }
     };
 
-    if (zkController != null) {
-      if (background) {
-        coreZkRegister.execute(r);
-      } else {
-        MDCLoggingContext.setCore(core);
-        try {
-          r.run();
-        } finally {
-          MDCLoggingContext.clear();
-        }
-      }
+    MDCLoggingContext.setCore(core);
+    try {
+      r.run();
+    } finally {
+      MDCLoggingContext.clear();
     }
+
   }
   
   public ZkController getZkController() {
     return zkController;
   }
-
+  
+  @Override
   public void close() {
-    
-    try {
-      if (zkController != null) {
-        zkController.close();
-      }
-    } finally {
-      try {
-        if (zkServer != null) {
-          zkServer.stop();
-        }
-      } finally {
-        ExecutorUtil.shutdownAndAwaitTermination(coreZkRegister);
-      }
+    try (DW closer = new DW(this)) {
+      closer.add("ZkContainer", zkController, zkServer);
     }
-    
-  }
-
-  public ExecutorService getCoreZkRegisterExecutorService() {
-    return coreZkRegister;
   }
 }

@@ -34,6 +34,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -297,17 +298,9 @@ public class ZkMaintenanceUtils {
           return FileVisitResult.CONTINUE;
         }
         String zkNode = createZkNodeName(zkPath, rootPath, file);
-        try {
-          // if the path exists (and presumably we're uploading data to it) just set its data
-          if (file.toFile().getName().equals(ZKNODE_DATA_FILE) && zkClient.exists(zkNode, true)) {
-            zkClient.setData(zkNode, file.toFile(), true);
-          } else {
-            zkClient.makePath(zkNode, file.toFile(), false, true);
-          }
-        } catch (KeeperException | InterruptedException e) {
-          throw new IOException("Error uploading file " + file.toString() + " to zookeeper path " + zkNode,
-              SolrZkClient.checkInterrupted(e));
-        }
+
+        zkClient.mkdirs(zkNode, file.toFile());
+
         return FileVisitResult.CONTINUE;
       }
 

@@ -26,6 +26,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -109,7 +110,7 @@ public class SyncStrategy {
           shardId, peerSyncOnlyWithActive);
       success = result.isSuccess();
     } catch (Exception e) {
-      SolrException.log(log, "Sync Failed", e);
+      throw new DW.Exp(e);
     }
     try {
       if (isClosed) {
@@ -128,7 +129,7 @@ public class SyncStrategy {
       }
       
     } catch (Exception e) {
-      SolrException.log(log, "Sync Failed", e);
+      throw new DW.Exp(e);
     }
     
     return result == null ? PeerSync.PeerSyncResult.failure() : result;
@@ -192,7 +193,7 @@ public class SyncStrategy {
         requestSync(node.getBaseUrl(), node.getCoreUrl(), zkLeader.getCoreUrl(), node.getCoreName(), nUpdates);
         
       } catch (Exception e) {
-        SolrException.log(log, "Error syncing replica to leader", e);
+        throw new DW.Exp(e);
       }
     }
     

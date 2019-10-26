@@ -16,6 +16,60 @@
  */
 package org.apache.solr.cloud.api.collections;
 
+import static org.apache.solr.client.solrj.cloud.autoscaling.Policy.POLICY;
+import static org.apache.solr.common.cloud.DocCollection.SNITCH;
+import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.CORE_NODE_NAME_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.ELECTION_NODE_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.PROPERTY_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.PROPERTY_VALUE_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.REJOIN_AT_HEAD_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.REPLICA_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.SHARD_ID_PROP;
+import static org.apache.solr.common.params.CollectionAdminParams.COLLECTION;
+import static org.apache.solr.common.params.CollectionAdminParams.COLOCATED_WITH;
+import static org.apache.solr.common.params.CollectionAdminParams.WITH_COLLECTION;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICAPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDROLE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ALIASPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.BACKUP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.BALANCESHARDUNIQUE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATEALIAS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATESHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATESNAPSHOT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEALIAS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETENODE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEREPLICAPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETESHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETESNAPSHOT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MAINTAINROUTEDALIAS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MIGRATE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MIGRATESTATEFORMAT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOCK_COLL_TASK;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOCK_REPLICA_TASK;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOCK_SHARD_TASK;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MODIFYCOLLECTION;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOVEREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.OVERSEERSTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REBALANCELEADERS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REINDEXCOLLECTION;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REMOVEROLE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RENAME;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REPLACENODE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RESTORE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.SPLITSHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.UTILIZENODE;
+import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
+import static org.apache.solr.common.params.CommonParams.NAME;
+import static org.apache.solr.common.util.Utils.makeMap;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -31,8 +85,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -53,6 +107,7 @@ import org.apache.solr.cloud.OverseerSolrResponse;
 import org.apache.solr.cloud.OverseerTaskProcessor;
 import org.apache.solr.cloud.Stats;
 import org.apache.solr.cloud.ZkController;
+import org.apache.solr.cloud.ZkController.NotInClusterStateException;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.SolrException;
@@ -67,10 +122,12 @@ import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
@@ -86,31 +143,12 @@ import org.apache.solr.handler.component.ShardRequest;
 import org.apache.solr.handler.component.ShardResponse;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.util.DefaultSolrThreadFactory;
-import org.apache.solr.util.RTimer;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.client.solrj.cloud.autoscaling.Policy.POLICY;
-import static org.apache.solr.common.cloud.DocCollection.SNITCH;
-import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.CORE_NODE_NAME_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.ELECTION_NODE_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.PROPERTY_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.PROPERTY_VALUE_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.REJOIN_AT_HEAD_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.REPLICA_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.SHARD_ID_PROP;
-import static org.apache.solr.common.params.CollectionAdminParams.COLLECTION;
-import static org.apache.solr.common.params.CollectionAdminParams.COLOCATED_WITH;
-import static org.apache.solr.common.params.CollectionAdminParams.WITH_COLLECTION;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.*;
-import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
-import static org.apache.solr.common.params.CommonParams.NAME;
-import static org.apache.solr.common.util.Utils.makeMap;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * A {@link OverseerMessageHandler} that handles Collections API related
@@ -271,6 +309,8 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     } catch (Exception e) {
       log.error("processMessage(ZkNodeProps=" + message + ", String=" + operation + ")", e);
 
+      DW.propegateInterrupt(e);
+      
       String collName = message.getStr("collection");
       if (collName == null) collName = message.getStr(NAME);
 
@@ -432,6 +472,9 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     Map<String, Object> m = new HashMap<>();
     m.put(Overseer.QUEUE_OPERATION, BALANCESHARDUNIQUE.toLower());
     m.putAll(message.getProperties());
+    if (log.isDebugEnabled()) {
+      log.debug("send message to state update queue {}", m);
+    }
     overseer.offerStateUpdate(Utils.toJSON(m));
 
     if (log.isDebugEnabled()) {
@@ -538,6 +581,9 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
         ZkStateReader.COLLECTION_PROP, collectionName,
         ZkStateReader.CORE_NODE_NAME_PROP, replicaName,
         ZkStateReader.BASE_URL_PROP, replica.getStr(ZkStateReader.BASE_URL_PROP));
+    if (log.isDebugEnabled()) {
+      log.debug("send message to state update queue {}", m);
+    }
     overseer.offerStateUpdate(Utils.toJSON(m));
 
     if (log.isDebugEnabled()) {
@@ -615,6 +661,9 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
         // Actually queue the migration command.
         firstLoop = false;
         ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, MIGRATESTATEFORMAT.toLower(), COLLECTION_PROP, collectionName);
+        if (log.isDebugEnabled()) {
+          log.debug("send message to state update queue {}", m);
+        }
         overseer.offerStateUpdate(Utils.toJSON(m));
       }
       timeout.sleep(100);
@@ -633,7 +682,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       processResponse(results, null, coreUrl, updateResponse, slice, Collections.emptySet());
     } catch (Exception e) {
       log.error("commit(NamedList=" + results + ", String=" + slice + ", Replica=" + parentShardLeader + ")", e);
-
+      DW.propegateInterrupt(e);
       processResponse(results, e, coreUrl, updateResponse, slice, Collections.emptySet());
       throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to call distrib softCommit on: " + coreUrl, e);
     }
@@ -665,67 +714,53 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   }
 
   String waitForCoreNodeName(String collectionName, String msgNodeName, String msgCore) {
-    if (log.isDebugEnabled()) {
-      log.debug("waitForCoreNodeName(String collectionName={}, String msgNodeName={}, String msgCore={}) - start", collectionName, msgNodeName, msgCore);
-    }
-
-    int retryCount = 320;
-    while (retryCount-- > 0) {
-      final DocCollection docCollection = zkStateReader.getClusterState().getCollectionOrNull(collectionName);
-      if (docCollection != null && docCollection.getSlicesMap() != null) {
-        Map<String,Slice> slicesMap = docCollection.getSlicesMap();
+    AtomicReference<String> errorMessage = new AtomicReference<>();
+    AtomicReference<String> coreNodeName = new AtomicReference<>();
+    try {
+      zkStateReader.waitForState(collectionName, 320, TimeUnit.SECONDS, (n, c) -> {
+        if (c == null)
+          return false;
+        final Map<String,Slice> slicesMap = c.getSlicesMap();
         for (Slice slice : slicesMap.values()) {
           for (Replica replica : slice.getReplicas()) {
-            // TODO: for really large clusters, we could 'index' on this
 
             String nodeName = replica.getStr(ZkStateReader.NODE_NAME_PROP);
             String core = replica.getStr(ZkStateReader.CORE_NAME_PROP);
 
-            if (nodeName.equals(msgNodeName) && core.equals(msgCore)) {
-              String returnString = replica.getName();
-              if (log.isDebugEnabled()) {
-                log.debug("waitForCoreNodeName(String, String, String) - end");
-              }
-              return returnString;
+            if (msgNodeName.equals(nodeName) && core.equals(msgCore)) {
+              coreNodeName.set(replica.getName());
+              return true;
             }
           }
         }
-      }
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        log.error("waitForCoreNodeName(String=" + collectionName + ", String=" + msgNodeName + ", String=" + msgCore + ")", e);
-
-        Thread.currentThread().interrupt();
-      }
+        return false;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      String error = errorMessage.get();
+      if (error == null)
+        error = "Timeout waiting for collection state.";
+      throw new NotInClusterStateException(ErrorCode.SERVER_ERROR, error);
     }
-    throw new SolrException(ErrorCode.SERVER_ERROR, "Could not find coreNodeName");
+    
+    return coreNodeName.get();
   }
 
-  ClusterState waitForNewShard(String collectionName, String sliceName) throws KeeperException, InterruptedException {
+  void waitForNewShard(String collectionName, String sliceName) throws KeeperException, InterruptedException {
     log.debug("Waiting for slice {} of collection {} to be available", sliceName, collectionName);
-    RTimer timer = new RTimer();
-    int retryCount = 320;
-    while (retryCount-- > 0) {
-      ClusterState clusterState = zkStateReader.getClusterState();
-      DocCollection collection = clusterState.getCollection(collectionName);
-
-      if (collection == null) {
-        throw new SolrException(ErrorCode.SERVER_ERROR,
-            "Unable to find collection: " + collectionName + " in clusterstate");
-      }
-      Slice slice = collection.getSlice(sliceName);
-      if (slice != null) {
-        log.debug("Waited for {}ms for slice {} of collection {} to be available",
-            timer.getTime(), sliceName, collectionName);
-        return clusterState;
-      }
-      Thread.sleep(1000);
+    try {
+      zkStateReader.waitForState(collectionName, 320, TimeUnit.SECONDS, (n, c) -> {
+        if (c == null)
+          return false;
+        Slice slice = c.getSlice(sliceName);
+        if (slice != null) {
+          return true;
+        }
+        return false;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      String error = "Timeout waiting for new shard.";
+      throw new NotInClusterStateException(ErrorCode.SERVER_ERROR, error);
     }
-    throw new SolrException(ErrorCode.SERVER_ERROR,
-        "Could not find new slice " + sliceName + " in collection " + collectionName
-            + " even after waiting for " + timer.getTime() + "ms"
-    );
   }
 
   DocRouter.Range intersect(DocRouter.Range a, DocRouter.Range b) {
@@ -738,11 +773,17 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
         log.debug("intersect(DocRouter.Range, DocRouter.Range) - end");
       }
       return null;
-    } else if (a.isSubsetOf(b))
+    } else if (a.isSubsetOf(b)) {
+      if (log.isDebugEnabled()) {
+        log.debug("intersect(DocRouter.Range, DocRouter.Range) - end");
+      }
       return a;
-    else if (b.isSubsetOf(a))
+    } else if (b.isSubsetOf(a)) {
+      if (log.isDebugEnabled()) {
+        log.debug("intersect(DocRouter.Range, DocRouter.Range) - end");
+      }
       return b;
-    else if (b.includes(a.max)) {
+    } else if (b.includes(a.max)) {
       DocRouter.Range returnRange = new DocRouter.Range(b.min, a.max);
       if (log.isDebugEnabled()) {
         log.debug("intersect(DocRouter.Range, DocRouter.Range) - end");
@@ -811,6 +852,9 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       reloadCollection(null, new ZkNodeProps(NAME, collectionName), results);
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("send message to state update queue {}", message);
+    }
     overseer.offerStateUpdate(Utils.toJSON(message));
     
     try {
@@ -835,8 +879,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       });
     } catch (TimeoutException | InterruptedException e) {
       log.error("modifyCollection(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", e);
-
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Could not modify collection " + message);
+      throw new DW.Exp("Could not modify collection " + message, e);
     }
 
     // if switching to/from read-only mode reload the collection
@@ -862,42 +905,43 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   }
 
   Map<String, Replica> waitToSeeReplicasInState(String collectionName, Collection<String> coreNames) throws InterruptedException {
-    if (log.isDebugEnabled()) {
-      log.debug("waitToSeeReplicasInState(String collectionName={}, Collection<String> coreNames={}) - start", collectionName, coreNames);
-    }
-
-    assert coreNames.size() > 0;
-    Map<String, Replica> result = new HashMap<>();
-    TimeOut timeout = new TimeOut(Integer.getInteger("solr.waitToSeeReplicasInStateTimeoutSeconds", 120), TimeUnit.SECONDS, timeSource); // could be a big cluster
-    while (true) {
-      DocCollection coll = zkStateReader.getClusterState().getCollection(collectionName);
-      for (String coreName : coreNames) {
-        if (result.containsKey(coreName)) continue;
-        for (Slice slice : coll.getSlices()) {
-          for (Replica replica : slice.getReplicas()) {
-            if (coreName.equals(replica.getStr(ZkStateReader.CORE_NAME_PROP))) {
-              result.put(coreName, replica);
-              break;
+    AtomicReference<Map<String, Replica>> result = new AtomicReference<>();
+    AtomicReference<String> errorMessage = new AtomicReference<>();
+    try {
+      zkStateReader.waitForState(collectionName, 30, TimeUnit.SECONDS, (n, c) -> {
+        if (c == null)
+          return false;
+        Map<String, Replica> r = new HashMap<>();
+        for (String coreName : coreNames) {
+          if (r.containsKey(coreName)) continue;
+          for (Slice slice : c.getSlices()) {
+            for (Replica replica : slice.getReplicas()) {
+              if (coreName.equals(replica.getStr(ZkStateReader.CORE_NAME_PROP))) {
+                r.put(coreName, replica);
+                break;
+              }
             }
           }
         }
-      }
-
-      if (result.size() == coreNames.size()) {
-        if (log.isDebugEnabled()) {
-          log.debug("waitToSeeReplicasInState(String, Collection<String>) - end");
+        
+        if (r.size() == coreNames.size()) {
+          result.set(r);
+          return true;
+        } else {
+          errorMessage.set("Timed out waiting to see all replicas: " + coreNames + " in cluster state. Last state: " + c);
+          return false;
         }
-        return result;
-      } else {
-        log.debug("Expecting {} cores but found {}", coreNames, result);
-      }
-      if (timeout.hasTimedOut()) {
-        throw new SolrException(ErrorCode.SERVER_ERROR, "Timed out waiting to see all replicas: " + coreNames + " in cluster state. Last state: " + coll);
-      }
 
-      Thread.sleep(100);
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      String error = errorMessage.get();
+      if (error == null)
+        error = "Timeout waiting for collection state.";
+      throw new SolrException(ErrorCode.SERVER_ERROR, error);
     }
+    return result.get();
   }
+
 
   List<ZkNodeProps> addReplica(ClusterState clusterState, ZkNodeProps message, NamedList results, Runnable onComplete)
       throws Exception {
@@ -947,9 +991,10 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       }
     } else {
       if(isLegacyCloud){
-        log.warn("Could not obtain config name");
+        log.warn("Could not obtain config name={}", configName);
       } else {
-        throw new SolrException(ErrorCode.BAD_REQUEST,"Unable to get config name");
+        log.error("Unable to get config name");
+        throw new SolrException(ErrorCode.BAD_REQUEST,"Unable to get config name=" + configName);
       }
     }
 

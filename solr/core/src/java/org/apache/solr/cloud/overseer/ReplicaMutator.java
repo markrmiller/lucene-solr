@@ -43,6 +43,7 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.TestInjection;
 import org.slf4j.Logger;
@@ -446,9 +447,8 @@ public class ReplicaMutator {
                   isLeaderSame = false;
                 }
               } catch (Exception e) {
-                log.warn("Error occurred while checking if parent shard node is still live with the same zk session id. " +
+                throw new DW.Exp("Error occurred while checking if parent shard node is still live with the same zk session id. " +
                     "We cannot switch shard states at this time.", e);
-                return collection; // we aren't going to make any changes right now
               }
             }
 
@@ -482,8 +482,7 @@ public class ReplicaMutator {
             try {
               SplitShardCmd.unlockForSplit(cloudManager, collection.getName(), parentSliceName);
             } catch (Exception e) {
-              log.warn("Failed to unlock shard after " + (isLeaderSame ? "" : "un") + "successful split: {} / {}",
-                  collection.getName(), parentSliceName);
+              throw new DW.Exp("Failed to unlock shard after " + (isLeaderSame ? "" : "un") + "successful split: {} / {}", e);
             }
             ZkNodeProps m = new ZkNodeProps(propMap);
             return new SliceMutator(cloudManager).updateShardState(prevState, m).collection;

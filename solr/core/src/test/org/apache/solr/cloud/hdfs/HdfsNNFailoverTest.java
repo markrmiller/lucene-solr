@@ -56,15 +56,15 @@ public class HdfsNNFailoverTest extends BasicDistributedZkTest {
     }
   }
   
-  @Override
-  protected String getDataDir(String dataDir) throws IOException {
-    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
-  }
+//  @Override
+//  protected String getDataDir(String dataDir) throws IOException {
+//    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
+//  }
   
   public HdfsNNFailoverTest() {
     super();
     sliceCount = 1;
-    fixShardCount(TEST_NIGHTLY ? 7 : random().nextInt(2) + 1);
+   // fixShardCount(TEST_NIGHTLY ? 7 : random().nextInt(2) + 1);
   }
 
   protected String getSolrXml() {
@@ -73,9 +73,9 @@ public class HdfsNNFailoverTest extends BasicDistributedZkTest {
 
   @Test
   public void test() throws Exception {
-    createCollection(COLLECTION, "conf1", 1, 1, 1);
+  //  createCollection(COLLECTION, "conf1", 1, 1, 1);
     
-    waitForRecoveriesToFinish(COLLECTION, false);
+  //  waitForRecoveriesToFinish(COLLECTION, false);
     
     // TODO:  SOLR-7360 Enable HDFS NameNode failover testing. 
 //    dfsCluster.transitionToStandby(0);

@@ -43,6 +43,7 @@ import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectCache;
 import org.apache.solr.common.util.TimeSource;
@@ -76,7 +77,7 @@ public class SolrClientCloudManager implements SolrCloudManager {
   @Override
   public void close() {
     isClosed = true;
-    IOUtils.closeQuietly(objectCache);
+    DW.close(objectCache);
   }
 
   @Override

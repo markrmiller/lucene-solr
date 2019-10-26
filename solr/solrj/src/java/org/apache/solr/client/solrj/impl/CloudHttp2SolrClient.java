@@ -25,6 +25,8 @@ import java.util.Optional;
 
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 
 /**
  * SolrJ client class to communicate with SolrCloud using Http2SolrClient.
@@ -46,6 +48,7 @@ public class CloudHttp2SolrClient  extends BaseCloudSolrClient {
   private final LBHttp2SolrClient lbClient;
   private Http2SolrClient myClient;
   private final boolean clientIsInternal;
+  private ZkStateReader zkStateReader;
 
   /**
    * Create a new client object that connects to Zookeeper and is always aware
@@ -64,12 +67,14 @@ public class CloudHttp2SolrClient  extends BaseCloudSolrClient {
         throw new IllegalArgumentException("Both zkHost(s) & solrUrl(s) have been specified. Only specify one.");
       }
       if (builder.zkHosts != null) {
-        this.stateProvider = new ZkClientClusterStateProvider(builder.zkHosts, builder.zkChroot);
+        this.zkStateReader = new ZkStateReader(Builder.buildZkHostString(builder.zkHosts, builder.zkChroot), 40000, 15000);
+        this.zkStateReader.createClusterStateWatchersAndUpdate();
+        this.stateProvider = new ZkClientClusterStateProvider(zkStateReader);
       } else if (builder.solrUrls != null && !builder.solrUrls.isEmpty()) {
         try {
           this.stateProvider = new Http2ClusterStateProvider(builder.solrUrls, builder.httpClient);
         } catch (Exception e) {
-          throw new RuntimeException("Couldn't initialize a HttpClusterStateProvider (is/are the "
+          throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
               + "Solr server(s), "  + builder.solrUrls + ", down?)", e);
         }
       } else {
@@ -210,27 +215,58 @@ public class CloudHttp2SolrClient  extends BaseCloudSolrClient {
       this.httpClient = httpClient;
       return this;
     }
+    
+    
+    static String buildZkHostString(Collection<String> zkHosts, String chroot) {
+      if (zkHosts == null || zkHosts.isEmpty()) {
+        throw new IllegalArgumentException("Cannot create CloudSearchClient without valid ZooKeeper host; none specified!");
+      }
+
+      StringBuilder zkBuilder = new StringBuilder();
+      int lastIndexValue = zkHosts.size() - 1;
+      int i = 0;
+      for (String zkHost : zkHosts) {
+        zkBuilder.append(zkHost);
+        if (i < lastIndexValue) {
+          zkBuilder.append(",");
+        }
+        i++;
+      }
+      if (chroot != null) {
+        if (chroot.startsWith("/")) {
+          zkBuilder.append(chroot);
+        } else {
+          throw new IllegalArgumentException(
+              "The chroot must start with a forward slash.");
+        }
+      }
+
+      /* Log the constructed connection string and then initialize. */
+      final String zkHostString = zkBuilder.toString();
+      return zkHostString;
+    }
 
     /**
      * Create a {@link CloudHttp2SolrClient} based on the provided configuration.
      */
     public CloudHttp2SolrClient build() {
+      CloudHttp2SolrClient cloudClient = new CloudHttp2SolrClient(this);
       if (stateProvider == null) {
         if (!zkHosts.isEmpty()) {
-          stateProvider = new ZkClientClusterStateProvider(zkHosts, zkChroot);
+          stateProvider = new ZkClientClusterStateProvider(cloudClient.getZkStateReader());
         }
         else if (!this.solrUrls.isEmpty()) {
           try {
             stateProvider = new Http2ClusterStateProvider(solrUrls, httpClient);
           } catch (Exception e) {
-            throw new RuntimeException("Couldn't initialize a HttpClusterStateProvider (is/are the "
+            throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
                 + "Solr server(s), "  + solrUrls + ", down?)", e);
           }
         } else {
           throw new IllegalArgumentException("Both zkHosts and solrUrl cannot be null.");
         }
       }
-      return new CloudHttp2SolrClient(this);
+      return cloudClient;
     }
 
   }

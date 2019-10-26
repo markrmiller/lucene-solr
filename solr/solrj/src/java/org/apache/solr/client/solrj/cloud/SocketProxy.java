@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocketFactory;
 
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.DW.Exp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -195,7 +197,7 @@ public class SocketProxy {
       serverSocket.bind(new InetSocketAddress(proxyUrl.getPort()));
       doOpen();
     } catch (Exception e) {
-      log.debug("exception on reopen url:" + getUrl(), e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -230,7 +232,7 @@ public class SocketProxy {
     try {
       c.close();
     } catch (Exception e) {
-      log.debug("exception on close of: " + c, e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -238,7 +240,7 @@ public class SocketProxy {
     try {
       c.halfClose();
     } catch (Exception e) {
-      log.debug("exception on half close of: " + c, e);
+      throw new DW.Exp(e);
     }
   }
 
@@ -373,19 +375,26 @@ public class SocketProxy {
               out.write(buf, 0, len);
           }
         } catch (Exception e) {
-          log.debug("read/write failed, reason: " + e.getLocalizedMessage());
+          Exp exp = new DW.Exp(e);
           try {
             if (!receiveSocket.isClosed()) {
               // for halfClose, on read/write failure if we close the
               // remote end will see a close at the same time.
               close();
             }
-          } catch (Exception ignore) {}
+          } catch (Exception e1) {
+            DW.propegateInterrupt(e1);
+            exp.addSuppressed(e1);
+          } 
+          
+          throw exp;
+          
         } finally {
           if (in != null) {
             try {
               in.close();
             } catch (Exception exc) {
+              DW.propegateInterrupt(exc);
               log.debug(exc+" when closing InputStream on socket: "+src);
             }
           }
@@ -393,6 +402,7 @@ public class SocketProxy {
             try {
               out.close();
             } catch (Exception exc) {
+              DW.propegateInterrupt(exc);
               log.debug(exc+" when closing OutputStream on socket: "+destination);
             }
           }
@@ -440,7 +450,7 @@ public class SocketProxy {
           } catch (SocketTimeoutException expected) {}
         }
       } catch (Exception e) {
-        log.debug("acceptor: finished for reason: " + e.getLocalizedMessage());
+        DW.propegateInterrupt(e);
       }
     }
 

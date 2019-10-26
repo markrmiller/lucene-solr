@@ -88,7 +88,7 @@ public class SolrXmlInZkTest extends SolrTestCaseJ4 {
     props.setProperty("solr.test.sys.prop1", "propone");
     props.setProperty("solr.test.sys.prop2", "proptwo");
 
-    cfg = SolrDispatchFilter.loadNodeConfig(solrHome, props);
+    cfg = SolrDispatchFilter.loadNodeConfig(solrHome, props, null);
     log.info("####SETUP_END " + getTestName());
   }
 

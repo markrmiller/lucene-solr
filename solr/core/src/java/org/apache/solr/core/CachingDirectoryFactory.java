@@ -36,7 +36,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockFactory;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.TimeOut;
@@ -177,7 +177,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           }
           assert val.refCnt.get()  == 0 : val.refCnt;
         } catch (Exception e) {
-          throw new SW.Exp("Error closing directory", e);
+          throw new DW.Exp("Error closing directory", e);
         }
       }
 
@@ -192,14 +192,14 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
             try {
               cl = closeCacheValue(v);
             } catch (Throwable e) {
-              throw new SW.Exp("Error closing directory", e);
+              throw new DW.Exp("Error closing directory", e);
             }
             if (cl) {
               closedDirs.add(v);
             }
           }
         } catch (Exception e) {
-          throw new SW.Exp("Error closing directory", e);
+          throw new DW.Exp("Error closing directory", e);
         }
       }
 
@@ -208,7 +208,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         try {
           removeDirectory(val);
         } catch (Exception e) {
-          throw new SW.Exp("Error removing directory", e);
+          throw new DW.Exp("Error removing directory", e);
         }
       }
 
@@ -236,7 +236,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           try {
             listener.preClose();
           } catch (Exception e) {
-            throw new SW.Exp(e);
+            throw new DW.Exp(e);
           }
         }
       }
@@ -264,7 +264,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
       }
 
     } catch (Exception e) {
-      throw new SW.Exp("Exception releasing directory", e);
+      throw new DW.Exp("Exception releasing directory", e);
     }
 
     boolean cl = false;
@@ -272,7 +272,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
       try {
         close(val);
       } catch (Exception e) {
-        log.error("Exception closing", e);
+        throw new DW.Exp("Exception closing", e);
       }
       if (val == cacheValue) {
         cl = true;
@@ -286,14 +286,14 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           try {
             removeDirectory(val);
           } catch (Exception e) {
-            throw new SW.Exp("Error removing directory " + val.path + " before core close", e);
+            throw new DW.Exp("Error removing directory " + val.path + " before core close", e);
           }
         } else {
           removeEntries.add(val);
         }
       }
     } catch (Exception e) {
-      log.error("Exception removing directory", e);
+      throw new DW.Exp("Exception releasing directory", e);
     }
 
     if (listeners != null) {
@@ -301,7 +301,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         try {
           listener.postClose();
         } catch (Exception e) {
-          throw new SW.Exp("Error executing postClose for directory", e);
+          throw new DW.Exp("Error executing postClose for directory", e);
         }
       }
     }
@@ -320,7 +320,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
       }
       assert ObjectReleaseTracker.release(val.directory);
     } catch (Exception e) {
-      throw new SW.Exp("Error closing directory", e);
+      throw new DW.Exp("Error closing directory", e);
     }
   }
 
@@ -371,7 +371,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           success = true;
         } finally {
           if (!success) {
-            IOUtils.closeQuietly(directory);
+            DW.close(directory);
           }
         }
       } else {

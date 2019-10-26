@@ -40,6 +40,10 @@ dependencies {
   implementation ('org.eclipse.jetty:jetty-util')
   implementation ('org.eclipse.jetty:jetty-http')
   
+  implementation ('org.apache.curator:curator-framework') { transitive = false } // brings in a lot we don't use
+  implementation ('org.apache.curator:curator-client') { transitive = false } // brings in a lot we don't use
+  runtimeOnly ('org.apache.curator:curator-recipes') { transitive = false } // brings in a lot we don't use
+  
   testImplementation ('org.eclipse.jetty:jetty-servlet')
   testImplementation ('io.dropwizard.metrics:metrics-core')
   testImplementation ('org.restlet.jee:org.restlet')

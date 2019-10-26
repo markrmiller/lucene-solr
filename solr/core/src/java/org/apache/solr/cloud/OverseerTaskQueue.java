@@ -32,6 +32,8 @@ import com.codahale.metrics.Timer;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.Pair;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -46,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * Methods specific to this subclass ignore superclass internal state and hit ZK directly.
  * This is inefficient!  But the API on this class is kind of muddy..
  */
+@SolrThreadSafe
 public class OverseerTaskQueue extends ZkDistributedQueue {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -66,9 +69,10 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
     shuttingDown.set(true);
     while (pendingResponses.get() > 0) {
       try {
-        Thread.sleep(50);
+        Thread.sleep(250);
       } catch (InterruptedException e) {
-        log.error("Interrupted while waiting for overseer queue to drain before shutdown!");
+        throw new DW.Exp("Exception while waiting for overseer queue to drain before shutdown!", e);
+        
       }
     }
   }
@@ -294,7 +298,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
    */
   public String getTailId() throws KeeperException, InterruptedException {
     // TODO: could we use getChildren here?  Unsure what freshness guarantee the caller needs.
-    TreeSet<String> orderedChildren = fetchZkChildren(null);
+    TreeSet<String> orderedChildren = fetchZkChildren();
 
     for (String headNode : orderedChildren.descendingSet())
       if (headNode != null) {

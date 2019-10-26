@@ -49,6 +49,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.StrUtils;
@@ -158,7 +159,7 @@ public class XMLLoader extends ContentStreamLoader {
       } catch(TransformerException te) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, te.getMessage(), te);
       } finally {
-        IOUtils.closeQuietly(is);
+        DW.close(is);
       }
       // second step: feed the intermediate DOM tree into StAX parser:
       try {
@@ -180,7 +181,7 @@ public class XMLLoader extends ContentStreamLoader {
           // determined by the XML parser, the content-type is only used as a hint!
           log.trace("body", new String(body, (charset == null) ?
             ContentStreamBase.DEFAULT_CHARSET : charset));
-          IOUtils.closeQuietly(is);
+          DW.close(is);
           is = new ByteArrayInputStream(body);
         }
         parser = (charset == null) ?
@@ -190,7 +191,7 @@ public class XMLLoader extends ContentStreamLoader {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e.getMessage(), e);
       } finally {
         if (parser != null) parser.close();
-        IOUtils.closeQuietly(is);
+        DW.close(is);
       }
     }
   }

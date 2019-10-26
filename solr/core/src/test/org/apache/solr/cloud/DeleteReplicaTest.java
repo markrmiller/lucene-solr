@@ -344,7 +344,6 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
           while (!timeOut.hasTimedOut()) {
             try {
               ZkStateReader stateReader = replica1Jetty.getCoreContainer().getZkController().getZkStateReader();
-              stateReader.forceUpdateCollection(collectionName);
               Slice shard = stateReader.getClusterState().getCollection(collectionName).getSlice("shard1");
               if (shard.getReplicas().size() == 1) {
                 replicaDeleted = true;

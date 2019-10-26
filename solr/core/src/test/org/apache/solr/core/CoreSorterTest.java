@@ -34,8 +34,6 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreSorter.CountsForEachShard;
-import org.apache.solr.util.MockCoreContainer;
-
 import static java.util.stream.Collectors.toList;
 import static org.apache.solr.core.CoreSorter.getShardName;
 import static org.mockito.Mockito.*;
@@ -192,18 +190,18 @@ public class CoreSorterTest extends SolrTestCaseJ4 {
           }
         }
       }
-
-      for (Map.Entry<ReplicaInfo, String> e : replicaPositions.entrySet()) {
-        if (e.getValue().equals(myNodeName)) {
-          myCores.add(e.getKey().getCloudDescriptor());
-          localCores.add(new MockCoreContainer.MockCoreDescriptor() {
-            @Override
-            public CloudDescriptor getCloudDescriptor() {
-              return e.getKey().getCloudDescriptor();
-            }
-          });
-        }
-      }
+// nocommit
+//      for (Map.Entry<ReplicaInfo, String> e : replicaPositions.entrySet()) {
+//        if (e.getValue().equals(myNodeName)) {
+//          myCores.add(e.getKey().getCloudDescriptor());
+//          localCores.add(new MockCoreContainer.MockCoreDescriptor() {
+//            @Override
+//            public CloudDescriptor getCloudDescriptor() {
+//              return e.getKey().getCloudDescriptor();
+//            }
+//          });
+//        }
+//      }
     }
 
     @Override

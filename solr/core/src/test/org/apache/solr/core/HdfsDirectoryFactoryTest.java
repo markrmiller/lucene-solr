@@ -19,12 +19,14 @@ package org.apache.solr.core;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 
 import com.carrotsearch.randomizedtesting.generators.RandomStrings;
@@ -47,7 +49,6 @@ import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.store.hdfs.HdfsLocalityReporter;
 import org.apache.solr.util.BadHdfsThreadsFilter;
-import org.apache.solr.util.MockCoreContainer.MockCoreDescriptor;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -87,7 +88,7 @@ public class HdfsDirectoryFactoryTest extends SolrTestCaseJ4 {
       // test sys prop config
       System.setProperty(HdfsDirectoryFactory.HDFS_HOME, HdfsTestUtil.getURI(dfsCluster) + "/solr1");
       hdfsFactory.init(new NamedList<>());
-      String dataHome = hdfsFactory.getDataHome(new MockCoreDescriptor());
+      String dataHome = hdfsFactory.getDataHome(new CoreDescriptor("", Paths.get("."), new Properties(), true));
 
       assertTrue(dataHome.endsWith("/solr1/mock/data"));
 
@@ -97,14 +98,14 @@ public class HdfsDirectoryFactoryTest extends SolrTestCaseJ4 {
       NamedList<Object> nl = new NamedList<>();
       nl.add(HdfsDirectoryFactory.HDFS_HOME, HdfsTestUtil.getURI(dfsCluster) + "/solr2");
       hdfsFactory.init(nl);
-      dataHome = hdfsFactory.getDataHome(new MockCoreDescriptor());
+      dataHome = hdfsFactory.getDataHome(new CoreDescriptor("", Paths.get("."), new Properties(), true));
 
       assertTrue(dataHome.endsWith("/solr2/mock/data"));
 
       // test sys prop and init args config - init args wins
       System.setProperty(HdfsDirectoryFactory.HDFS_HOME, HdfsTestUtil.getURI(dfsCluster) + "/solr1");
       hdfsFactory.init(nl);
-      dataHome = hdfsFactory.getDataHome(new MockCoreDescriptor());
+      dataHome = hdfsFactory.getDataHome(new CoreDescriptor("", Paths.get("."), new Properties(), true));
 
       assertTrue(dataHome.endsWith("/solr2/mock/data"));
 
@@ -152,7 +153,7 @@ public class HdfsDirectoryFactoryTest extends SolrTestCaseJ4 {
     try (HdfsDirectoryFactory hdfsFactory = new HdfsDirectoryFactory()) {
       System.setProperty(HdfsDirectoryFactory.HDFS_HOME, HdfsTestUtil.getURI(dfsCluster) + "/solr1");
       hdfsFactory.init(new NamedList<>());
-      String dataHome = hdfsFactory.getDataHome(new MockCoreDescriptor());
+      String dataHome = hdfsFactory.getDataHome(new CoreDescriptor("", Paths.get("."), new Properties(), true));
       assertTrue(dataHome.endsWith("/solr1/mock/data"));
       System.clearProperty(HdfsDirectoryFactory.HDFS_HOME);
 

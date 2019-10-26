@@ -76,6 +76,10 @@ public class OrderedExecutor implements Executor {
       throw e;
     }
   }
+  
+  public void shutdown() {
+    delegate.shutdown();
+  }
 
   public void shutdownAndAwaitTermination() {
     ExecutorUtil.shutdownAndAwaitTermination(delegate);

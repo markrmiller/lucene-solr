@@ -22,7 +22,7 @@ import java.lang.invoke.MethodHandles;
 
 import com.codahale.metrics.MetricRegistry;
 import org.apache.solr.cloud.CloudDescriptor;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
@@ -148,7 +148,7 @@ public class SolrCoreMetricManager implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    try (SW closer = new SW(this)) {
+    try (DW closer = new DW(this)) {
 
       closer.add("CloseReporters", () -> {metricManager.closeReporters(getRegistryName(), solrMetricsContext.tag); return "reporters";}, () -> {
         if (getLeaderRegistryName() != null) metricManager.closeReporters(getLeaderRegistryName(), solrMetricsContext.tag);

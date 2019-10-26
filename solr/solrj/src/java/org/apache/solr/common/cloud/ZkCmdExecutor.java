@@ -16,15 +16,20 @@
  */
 package org.apache.solr.common.cloud;
 
-import org.apache.solr.common.AlreadyClosedException;
+import java.lang.invoke.MethodHandles;
+
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ZkCmdExecutor {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   private long retryDelay = 1500L; // 1 second would match timeout, so 500 ms over for padding
   private int retryCount;
   private double timeouts;
@@ -46,44 +51,6 @@ public class ZkCmdExecutor {
     timeouts = timeoutms / 1000.0;
     this.retryCount = Math.round(0.5f * ((float)Math.sqrt(8.0f * timeouts + 1.0f) - 1.0f)) + 1;
     this.isClosed = isClosed;
-  }
-  
-  public long getRetryDelay() {
-    return retryDelay;
-  }
-  
-  public void setRetryDelay(long retryDelay) {
-    this.retryDelay = retryDelay;
-  }
-  
-
-  /**
-   * Perform the given operation, retrying if the connection fails
-   */
-  @SuppressWarnings("unchecked")
-  public <T> T retryOperation(ZkOperation operation)
-      throws KeeperException, InterruptedException {
-    KeeperException exception = null;
-    for (int i = 0; i < retryCount; i++) {
-      try {
-        if (i > 0 && isClosed()) {
-          throw new AlreadyClosedException();
-        }
-        return (T) operation.execute();
-      } catch (KeeperException.ConnectionLossException e) {
-        if (exception == null) {
-          exception = e;
-        }
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.currentThread().interrupt();
-          throw new InterruptedException();
-        }
-        if (i != retryCount -1) {
-          retryDelay(i);
-        }
-      }
-    }
-    throw exception;
   }
   
   private boolean isClosed() {
@@ -117,7 +84,7 @@ public class ZkCmdExecutor {
         // it's okay if another beats us creating the node
       }
     } catch (Exception e1) {
-      throw new SW.Exp(e1);
+      throw new DW.Exp(e1);
     }
   }
   

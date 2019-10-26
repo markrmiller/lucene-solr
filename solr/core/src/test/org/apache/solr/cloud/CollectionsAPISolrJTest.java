@@ -693,7 +693,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     solrClient.add(docs);
 
     Replica leader
-        = solrClient.getZkStateReader().getLeaderRetry(collectionName, "shard1", DEFAULT_TIMEOUT);
+        = solrClient.getZkStateReader().getLeaderRetry(collectionName, "shard1");
 
     final AtomicReference<Long> coreStartTime = new AtomicReference<>(getCoreStatus(leader).getCoreStartTime().getTime());
 

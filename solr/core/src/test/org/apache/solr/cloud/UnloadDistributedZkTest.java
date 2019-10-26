@@ -172,8 +172,6 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
         .setCreateNodeSet(jetty1.getNodeName())
         .process(cloudClient).getStatus());
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-    
-    zkStateReader.forceUpdateCollection("unloadcollection");
 
     int slices = zkStateReader.getClusterState().getCollection("unloadcollection").getSlices().size();
     assertEquals(1, slices);
@@ -185,7 +183,6 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
         .setCoreName("unloadcollection_shard1_replica2")
         .setNode(cluster.getJettySolrRunner(1).getNodeName())
         .process(cloudClient).isSuccess());
-    zkStateReader.forceUpdateCollection("unloadcollection");
     slices = zkStateReader.getClusterState().getCollection("unloadcollection").getSlices().size();
     assertEquals(1, slices);
     
@@ -247,7 +244,7 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
 //    printLayout();
     
     int tries = 50;
-    while (leaderProps.getCoreUrl().equals(zkStateReader.getLeaderUrl("unloadcollection", "shard1", 15000))) {
+    while (leaderProps.getCoreUrl().equals(zkStateReader.getLeaderUrl("unloadcollection", "shard1"))) {
       Thread.sleep(100);
       if (tries-- == 0) {
         fail("Leader never changed");
@@ -255,7 +252,7 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
     }
 
     // ensure there is a leader
-    zkStateReader.getLeaderRetry("unloadcollection", "shard1", 15000);
+    zkStateReader.getLeaderRetry("unloadcollection", "shard1");
 
     try (HttpSolrClient addClient = getHttpSolrClient(cluster.getJettySolrRunner(1).getBaseUrl() + "/unloadcollection_shard1_replica2", 30000, 90000)) {
 
@@ -284,14 +281,14 @@ public class UnloadDistributedZkTest extends SolrCloudBridgeTestCase {
       collectionClient.request(unloadCmd);
     }
     tries = 50;
-    while (leaderProps.getCoreUrl().equals(zkStateReader.getLeaderUrl("unloadcollection", "shard1", 15000))) {
+    while (leaderProps.getCoreUrl().equals(zkStateReader.getLeaderUrl("unloadcollection", "shard1"))) {
       Thread.sleep(100);
       if (tries-- == 0) {
         fail("Leader never changed");
       }
     }
 
-    zkStateReader.getLeaderRetry("unloadcollection", "shard1", 15000);
+    zkStateReader.getLeaderRetry("unloadcollection", "shard1");
 
     // set this back
     DirectUpdateHandler2.commitOnClose = true;

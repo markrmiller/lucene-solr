@@ -30,6 +30,8 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
+
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.core.SolrResourceLoader;
@@ -133,8 +135,8 @@ public class SolrExporter {
     requestExecutor.shutdownNow();
     metricCollectorExecutor.shutdownNow();
 
-    IOUtils.closeQuietly(metricsCollector);
-    IOUtils.closeQuietly(solrScraper);
+    DW.close(metricsCollector);
+    DW.close(solrScraper);
 
     defaultRegistry.unregister(this.prometheusCollector);
   }

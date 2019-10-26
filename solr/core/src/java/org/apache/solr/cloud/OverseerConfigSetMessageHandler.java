@@ -36,6 +36,8 @@ import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ConfigSetParams;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.DW.Exp;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.ConfigSetProperties;
@@ -117,6 +119,7 @@ public class OverseerConfigSetMessageHandler implements OverseerMessageHandler {
               + operation);
       }
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       String configSetName = message.getStr(NAME);
 
       if (configSetName == null) {
@@ -326,19 +329,23 @@ public class OverseerConfigSetMessageHandler implements OverseerMessageHandler {
         }
       }
     } catch (Exception e) {
+      Exp exp = new DW.Exp(e);
       // copying the config dir or writing the properties file may have failed.
       // we should delete the ConfigSet because it may be invalid,
-      // assuming we actually wrote something.  E.g. could be
+      // assuming we actually wrote something. E.g. could be
       // the entire baseConfig set with the old properties, including immutable,
       // that would make it impossible for the user to delete.
       try {
         if (configManager.configExists(configSetName) && copiedToZkPaths.size() > 0) {
           deleteConfigSet(configSetName, true);
         }
-      } catch (IOException ioe) {
-        log.error("Error while trying to delete partially created ConfigSet", ioe);
+      } catch (Exception e2) {
+        DW.propegateInterrupt(e2);
+        exp.addSuppressed(e2);
       }
-      throw e;
+
+      throw exp;
+
     }
   }
 

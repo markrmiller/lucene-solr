@@ -51,10 +51,9 @@ import org.apache.solr.client.solrj.request.CollectionAdminRequest.RequestStatus
 import org.apache.solr.client.solrj.response.RequestStatusState;
 import org.apache.solr.cloud.Stats;
 import org.apache.solr.common.AlreadyClosedException;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.util.DefaultSolrThreadFactory;
@@ -114,7 +113,7 @@ public class ScheduledTriggers implements Closeable {
    */
   private final ExecutorService actionExecutor;
 
-  private boolean isClosed = false;
+  private volatile boolean isClosed = false;
 
   private final AtomicBoolean hasPendingActions = new AtomicBoolean(false);
 
@@ -134,9 +133,7 @@ public class ScheduledTriggers implements Closeable {
 
   private final TriggerListeners listeners;
 
-  private final List<TriggerListener> additionalListeners = new ArrayList<>();
-
-  private AutoScalingConfig autoScalingConfig;
+  private volatile AutoScalingConfig autoScalingConfig;
 
   public ScheduledTriggers(SolrResourceLoader loader, SolrCloudManager cloudManager) {
     scheduledThreadPoolExecutor = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(DEFAULT_TRIGGER_CORE_POOL_SIZE,
@@ -211,7 +208,7 @@ public class ScheduledTriggers implements Closeable {
    * @param newTrigger the trigger to be managed
    * @throws AlreadyClosedException if this class has already been closed
    */
-  public synchronized void add(AutoScaling.Trigger newTrigger) throws Exception {
+  public void add(AutoScaling.Trigger newTrigger) throws Exception {
     if (isClosed) {
       throw new AlreadyClosedException("ScheduledTriggers has been closed and cannot be used anymore");
     }
@@ -237,7 +234,7 @@ public class ScheduledTriggers implements Closeable {
         // the trigger wasn't actually modified so we do nothing
         return;
       }
-      IOUtils.closeQuietly(old);
+      DW.close(old);
       newTrigger.restoreState(old.trigger);
       triggerWrapper.setReplay(false);
       scheduledTriggerWrappers.replace(newTrigger.getName(), triggerWrapper);
@@ -382,7 +379,7 @@ public class ScheduledTriggers implements Closeable {
    * Pauses all scheduled trigger invocations without interrupting any that are in progress
    * @lucene.internal
    */
-  public synchronized void pauseTriggers()  {
+  public void pauseTriggers()  {
     if (log.isDebugEnabled()) {
       log.debug("Pausing all triggers: {}", scheduledTriggerWrappers.keySet());
     }
@@ -454,16 +451,8 @@ public class ScheduledTriggers implements Closeable {
           }
         }
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Thread interrupted", e);
     } catch (Exception e) {
-      if (cloudManager.isClosed())  {
-        throw new AlreadyClosedException("The Solr instance has been shutdown");
-      }
-      // we catch but don't rethrow because a failure to wait for pending tasks
-      // should not keep the actions from executing
-      log.error("Unexpected exception while waiting for pending tasks to finish", e);
+      throw new DW.Exp("Unexpected exception while waiting for pending tasks to finish", e);
     }
   }
 
@@ -471,7 +460,7 @@ public class ScheduledTriggers implements Closeable {
    * Remove and stop all triggers. Also cleans up any leftover
    * state / events in ZK.
    */
-  public synchronized void removeAll() {
+  public void removeAll() {
     getScheduledTriggerNames().forEach(t -> {
       log.info("-- removing trigger: " + t);
       remove(t);
@@ -484,9 +473,9 @@ public class ScheduledTriggers implements Closeable {
    *
    * @param triggerName the name of the trigger to be removed
    */
-  public synchronized void remove(String triggerName) {
+  public void remove(String triggerName) {
     TriggerWrapper removed = scheduledTriggerWrappers.remove(triggerName);
-    IOUtils.closeQuietly(removed);
+    DW.close(removed);
     removeTriggerZKData(triggerName);
   }
 
@@ -527,14 +516,13 @@ public class ScheduledTriggers implements Closeable {
   
   @Override
   public void close() throws IOException {
-    synchronized (this) {
-      // mark that we are closed
-      isClosed = true;
-      for (TriggerWrapper triggerWrapper : scheduledTriggerWrappers.values()) {
-        IOUtils.closeQuietly(triggerWrapper);
-      }
-      scheduledTriggerWrappers.clear();
-    }
+    if (isClosed) return;
+    // mark that we are closed
+    isClosed = true;
+    scheduledTriggerWrappers.forEach((k, v) -> DW.close(v));
+
+    scheduledTriggerWrappers.clear();
+
     // shutdown and interrupt all running tasks because there's no longer any
     // guarantee about cluster state
     log.debug("Shutting down scheduled thread pool executor now");
@@ -606,7 +594,7 @@ public class ScheduledTriggers implements Closeable {
     @Override
     public void run() {
       if (isClosed) {
-        throw new AlreadyClosedException("ScheduledTrigger " + trigger.getName() + " has been closed.");
+        return;
       }
       // fire a trigger only if an action is not pending
       // note this is not fool proof e.g. it does not prevent an action being executed while a trigger
@@ -668,7 +656,7 @@ public class ScheduledTriggers implements Closeable {
       if (scheduledFuture != null) {
         scheduledFuture.cancel(true);
       }
-      IOUtils.closeQuietly(trigger);
+      DW.close(trigger);
     }
   }
 
@@ -790,7 +778,7 @@ public class ScheduledTriggers implements Closeable {
                 listenersPerName.put(config.name, listener);
               } catch (Exception e) {
                 log.warn("Error initializing TriggerListener " + config, e);
-                IOUtils.closeQuietly(listener);
+                DW.close(listener);
                 listener = null;
               }
             }
@@ -834,7 +822,7 @@ public class ScheduledTriggers implements Closeable {
       try {
         listenersPerStage.clear();
         for (TriggerListener listener : listenersPerName.values()) {
-          IOUtils.closeQuietly(listener);
+          DW.close(listener);
         }
         listenersPerName.clear();
       } finally {

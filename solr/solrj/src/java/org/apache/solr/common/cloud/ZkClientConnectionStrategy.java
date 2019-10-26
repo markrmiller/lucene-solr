@@ -22,8 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkCredentialsProvider.ZkCredentials;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.Watcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +52,7 @@ public abstract class ZkClientConnectionStrategy {
       try {
         listener.disconnected();
       } catch (Exception e) {
-        SolrException.log(log, "", e);
+        throw new DW.Exp(e);
       }
     }
   }
@@ -62,7 +62,7 @@ public abstract class ZkClientConnectionStrategy {
       try {
         listener.connected();
       } catch (Exception e) {
-        SolrException.log(log, "", e);
+        throw new DW.Exp(e);
       }
     }
   }
@@ -106,6 +106,10 @@ public abstract class ZkClientConnectionStrategy {
 
   protected SolrZooKeeper createSolrZooKeeper(final String serverAddress, final int zkClientTimeout,
       final Watcher watcher) throws IOException {
+
+    log.info("createSolrZooKeeper(String serverAddress={}, int zkClientTimeout={}, Watcher watcher={}) - start", serverAddress, zkClientTimeout, watcher);
+    
+
     SolrZooKeeper result = new SolrZooKeeper(serverAddress, zkClientTimeout, watcher);
 
     zkCredentialsToAddAutomaticallyUsed = true;
@@ -113,6 +117,9 @@ public abstract class ZkClientConnectionStrategy {
       result.addAuthInfo(zkCredentials.getScheme(), zkCredentials.getAuth());
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("createSolrZooKeeper(String, int, Watcher) - end");
+    }
     return result;
   }
 

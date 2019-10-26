@@ -304,7 +304,6 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
     TimeUnit.MILLISECONDS.sleep(1000);
     // in both cases, the collection should have default to the core name
-    cluster.getSolrClient().getZkStateReader().forceUpdateCollection("noconfig");
     assertFalse(CollectionAdminRequest.listCollections(cluster.getSolrClient()).contains("noconfig"));
   }
 
@@ -429,8 +428,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     
     // TODO: we should not need this...beast test well when trying to fix
     Thread.sleep(1000);
-    
-    cluster.getSolrClient().getZkStateReader().forciblyRefreshAllClusterStateSlow();
+
 
     new UpdateRequest()
         .add("id", "6")
@@ -469,7 +467,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
       ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();
       // make sure we have leaders for each shard
       for (int z = 1; z < createRequests[j].getNumShards(); z++) {
-        zkStateReader.getLeaderRetry(collectionName, "shard" + z, 10000);
+        zkStateReader.getLeaderRetry(collectionName, "shard" + z);
       }      // make sure we again have leaders for each shard
     }
   }

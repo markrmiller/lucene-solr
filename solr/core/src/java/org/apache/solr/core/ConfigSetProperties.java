@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,7 @@ public class ConfigSetProperties {
     try {
       return readFromInputStream(reader);
     } finally {
-      IOUtils.closeQuietly(reader);
+      DW.close(reader);
     }
   }
 
@@ -72,9 +73,9 @@ public class ConfigSetProperties {
       }
       return new NamedList((Map) object);
     } catch (Exception ex) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to load ConfigSet properties", ex);
+      throw new DW.Exp("Unable to load ConfigSet properties", ex);
     } finally {
-      IOUtils.closeQuietly(reader);
+      DW.close(reader);
     }
   }
 }

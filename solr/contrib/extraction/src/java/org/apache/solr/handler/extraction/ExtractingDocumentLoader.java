@@ -26,6 +26,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
@@ -250,7 +251,7 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
       } catch (SAXException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       } finally {
-        IOUtils.closeQuietly(inputStream);
+        DW.close(inputStream);
       }
     } else {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Stream type of " + streamType + " didn't match any known parsers.  Please supply the " + ExtractingParams.STREAM_TYPE + " parameter.");

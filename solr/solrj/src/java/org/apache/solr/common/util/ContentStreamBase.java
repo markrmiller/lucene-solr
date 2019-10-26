@@ -38,6 +38,7 @@ import java.util.zip.GZIPInputStream;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
+import org.apache.solr.common.patterns.DW;
 
 /**
  * Three concrete implementations for ContentStream - one for File/URL/String
@@ -107,8 +108,7 @@ public abstract class ContentStreamBase implements ContentStream
         type = ContentType.APPLICATION_JSON.getMimeType();
       }
     } catch (Exception ex) {
-      // This code just eats, the exception and leaves
-      // the contentType untouched.
+      throw new DW.Exp(ex);
     }
     return type;
   }

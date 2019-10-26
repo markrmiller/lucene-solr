@@ -79,6 +79,7 @@ import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -567,7 +568,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
     // make sure we have a leader for each shard
     for (int i = 1; i <= sliceCount; i++) {
-      zkStateReader.getLeaderRetry(DEFAULT_COLLECTION, "shard" + i, 10000);
+      zkStateReader.getLeaderRetry(DEFAULT_COLLECTION, "shard" + i);
     }
 
     if (sliceCount > 0) {
@@ -819,7 +820,6 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   
   protected void updateMappingsFromZk(List<JettySolrRunner> jettys, List<SolrClient> clients, boolean allowOverSharding) throws Exception {
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-    zkStateReader.forceUpdateCollection(DEFAULT_COLLECTION);
     cloudJettys.clear();
     shardToJetty.clear();
 
@@ -1717,23 +1717,23 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
     
     customThreadPool.submit(() -> Collections.singleton(commonCloudSolrClient).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
     
     customThreadPool.submit(() -> Collections.singleton(controlClient).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
     
     customThreadPool.submit(() -> coreClients.parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
 
     customThreadPool.submit(() -> Collections.singletonList(controlClientCloud).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
 
     customThreadPool.submit(() -> Collections.singletonList(cloudClient).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
 
     ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);
@@ -2102,7 +2102,6 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     Map<String,Replica> notLeaders = new HashMap<>();
 
     ZkStateReader zkr = cloudClient.getZkStateReader();
-    zkr.forceUpdateCollection(testCollectionName); // force the state to be fresh
 
     ClusterState cs = zkr.getClusterState();
     Collection<Slice> slices = cs.getCollection(testCollectionName).getActiveSlices();
@@ -2167,7 +2166,6 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
   }
 
   protected String printClusterStateInfo(String collection) throws Exception {
-    cloudClient.getZkStateReader().forceUpdateCollection(collection);
     String cs = null;
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     if (collection != null) {
@@ -2222,7 +2220,6 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     log.info("## Collecting extra Replica.Type information of the cluster");
     zkStateReader.updateLiveNodes();
     StringBuilder builder = new StringBuilder();
-    zkStateReader.forceUpdateCollection(collectionName);
     DocCollection collection = zkStateReader.getClusterState().getCollection(collectionName);
     for(Slice s:collection.getSlices()) {
       Replica leader = s.getLeader();
@@ -2242,7 +2239,6 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
 
   protected void waitForReplicationFromReplicas(String collectionName, ZkStateReader zkStateReader, TimeOut timeout) throws KeeperException, InterruptedException, IOException {
     log.info("waitForReplicationFromReplicas: {}", collectionName);
-    zkStateReader.forceUpdateCollection(collectionName);
     DocCollection collection = zkStateReader.getClusterState().getCollection(collectionName);
     Map<String, CoreContainer> containers = new HashMap<>();
     for (JettySolrRunner runner:jettys) {
@@ -2252,7 +2248,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
       containers.put(runner.getNodeName(), runner.getCoreContainer());
     }
     for(Slice s:collection.getSlices()) {
-      Replica leader = zkStateReader.getLeaderRetry(collectionName, s.getName(), (int)timeout.timeLeft(TimeUnit.MILLISECONDS));
+      Replica leader = zkStateReader.getLeaderRetry(collectionName, s.getName());
       long leaderIndexVersion = -1;
       while (!timeout.hasTimedOut()) {
         leaderIndexVersion = getIndexVersion(leader);

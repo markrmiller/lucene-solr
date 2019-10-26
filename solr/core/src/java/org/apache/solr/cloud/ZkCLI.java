@@ -42,6 +42,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.cloud.ClusterProperties;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.util.CLIO;
 import org.apache.zookeeper.CreateMode;
@@ -313,7 +314,7 @@ public class ZkCLI implements CLIO {
               zkClient.create(path, IOUtils.toByteArray(is), CreateMode.PERSISTENT, true);
             }
           } finally {
-            IOUtils.closeQuietly(is);
+            DW.close(is);
           }
 
         } else if (line.getOptionValue(CMD).equalsIgnoreCase(GET)) {

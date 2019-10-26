@@ -43,7 +43,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(17)
+    configureCluster(2)
         .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
         .configure();
   }
@@ -58,7 +58,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @After
   public void deleteCollections() throws Exception {
-    cluster.deleteAllCollections();
+  //  cluster.deleteAllCollections();
   }
 
   @Test

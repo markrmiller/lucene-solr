@@ -23,6 +23,7 @@ import java.io.StringWriter;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.charfilter.HTMLStripCharFilter;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
@@ -74,7 +75,7 @@ public final class HTMLStripFieldUpdateProcessorFactory extends FieldMutatingUpd
           // we tried and failed
           return s;
         } finally {
-          IOUtils.closeQuietly(in);
+          DW.close(in);
         }
       }
       return src;

@@ -38,7 +38,7 @@ import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
@@ -167,11 +167,11 @@ public class ExecutePlanAction extends TriggerActionBase {
           });
           counter++;
         } catch (Exception e) {
-          throw new SW.Exp(e);
+          throw new DW.Exp(e);
         }
       }
     } catch (Exception e) {
-      throw new SW.Exp(e);
+      throw new DW.Exp(e);
     }
   }
 

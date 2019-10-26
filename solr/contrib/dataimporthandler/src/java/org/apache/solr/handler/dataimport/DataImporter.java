@@ -18,6 +18,7 @@ package org.apache.solr.handler.dataimport;
 
 import org.apache.solr.common.EmptyEntityResolver;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.util.SystemIdResolver;
@@ -222,7 +223,7 @@ public class DataImporter {
         document = builder.parse(configFile);
       } finally {
         // some XML parsers are broken and don't close the byte stream (but they should according to spec)
-        IOUtils.closeQuietly(configFile.getByteStream());
+        DW.close(configFile.getByteStream());
       }
 
       dihcfg = readFromXml(document);

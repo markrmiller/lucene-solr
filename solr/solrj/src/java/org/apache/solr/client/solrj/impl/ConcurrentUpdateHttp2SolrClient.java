@@ -38,6 +38,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -263,8 +264,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
                   }
                 }
               } catch (Exception exc) {
-                // don't want to fail to report error if parsing the response fails
-                log.warn("Failed to parse error response from " + basePath + " due to: " + exc);
+                throw new DW.Exp("Failed to parse error response from " + basePath, exc);
               } finally {
                 solrExc = new HttpSolrClient.RemoteSolrException(basePath , statusCode, msg.toString(), null);
                 if (metadata != null) {
@@ -281,6 +281,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
             try {
               consumeFully(rspBody);
             } catch (Exception e) {
+              DW.propegateInterrupt(e);
               log.error("Error consuming and closing http response stream.", e);
             }
             notifyQueueAndRunnersIfEmptyQueue();

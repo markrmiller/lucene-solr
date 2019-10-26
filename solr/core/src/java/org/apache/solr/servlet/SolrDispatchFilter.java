@@ -16,6 +16,27 @@
  */
 package org.apache.solr.servlet;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.invoke.MethodHandles;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ReadListener;
@@ -30,44 +51,27 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.invoke.MethodHandles;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import com.codahale.metrics.jvm.ClassLoadingGaugeSet;
-import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
-import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
-import com.codahale.metrics.jvm.ThreadStatesGaugeSet;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.SpanContext;
-import io.opentracing.Tracer;
-import io.opentracing.tag.Tags;
 import org.apache.commons.io.FileCleaningTracker;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.http.client.HttpClient;
 import org.apache.lucene.util.Version;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.DefaultConnectionStrategy;
+import org.apache.solr.common.cloud.DefaultZkACLProvider;
+import org.apache.solr.common.cloud.DefaultZkCredentialsProvider;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkACLProvider;
+import org.apache.solr.common.cloud.ZkCredentialsProvider;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.CorePropertiesLocator;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoBean;
@@ -79,17 +83,27 @@ import org.apache.solr.metrics.OperatingSystemMetricSet;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricProducer;
 import org.apache.solr.security.AuditEvent;
+import org.apache.solr.security.AuditEvent.EventType;
 import org.apache.solr.security.AuthenticationPlugin;
 import org.apache.solr.security.PKIAuthenticationPlugin;
 import org.apache.solr.security.PublicKeyHandler;
 import org.apache.solr.util.SolrFileCleaningTracker;
-import org.apache.solr.util.tracing.GlobalTracer;
 import org.apache.solr.util.StartupLoggingUtils;
 import org.apache.solr.util.configuration.SSLConfigurationsFactory;
+import org.apache.solr.util.tracing.GlobalTracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.security.AuditEvent.EventType;
+import com.codahale.metrics.jvm.ClassLoadingGaugeSet;
+import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
+import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
+import com.codahale.metrics.jvm.ThreadStatesGaugeSet;
+
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.SpanContext;
+import io.opentracing.Tracer;
+import io.opentracing.tag.Tags;
 
 /**
  * This filter looks at the incoming URL maps them to handlers defined in solrconfig.xml
@@ -102,16 +116,16 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   protected volatile CoreContainer cores;
   protected final CountDownLatch init = new CountDownLatch(1);
 
-  protected String abortErrorMessage = null;
+  protected volatile String abortErrorMessage = null;
   //TODO using Http2Client
-  protected HttpClient httpClient;
-  private ArrayList<Pattern> excludePatterns;
+  protected volatile HttpClient httpClient;
+  private volatile List<Pattern> excludePatterns;
   
   private boolean isV2Enabled = !"true".equals(System.getProperty("disable.v2.api", "false"));
 
   private final String metricTag = SolrMetricProducer.getUniqueMetricTag(this, null);
-  private SolrMetricManager metricManager;
-  private String registryName;
+  private volatile SolrMetricManager metricManager;
+  private volatile String registryName;
   private volatile boolean closeOnDestroy = true;
 
   /**
@@ -146,7 +160,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   {
     SSLConfigurationsFactory.current().init();
     log.trace("SolrDispatchFilter.init(): {}", this.getClass().getClassLoader());
-    CoreContainer coresInit = null;
+
     try{
 
     SolrRequestParsers.fileCleaningTracker = new SolrFileCleaningTracker();
@@ -167,10 +181,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     String exclude = config.getInitParameter("excludePatterns");
     if(exclude != null) {
       String[] excludeArray = exclude.split(",");
-      excludePatterns = new ArrayList<>();
+      List<Pattern> exPatterns = new ArrayList<>();
       for (String element : excludeArray) {
-        excludePatterns.add(Pattern.compile(element));
+        exPatterns.add(Pattern.compile(element));
       }
+      excludePatterns = Collections.unmodifiableList(exPatterns);
     }
     try {
       Properties extraProperties = (Properties) config.getServletContext().getAttribute(PROPERTIES_ATTRIBUTE);
@@ -179,10 +194,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
       String solrHome = (String) config.getServletContext().getAttribute(SOLRHOME_ATTRIBUTE);
       final Path solrHomePath = solrHome == null ? SolrResourceLoader.locateSolrHome() : Paths.get(solrHome);
-      coresInit = createCoreContainer(solrHomePath, extraProperties);
+      cores = createCoreContainer(solrHomePath, extraProperties);
+      cores.load();
       SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
-      this.httpClient = coresInit.getUpdateShardHandler().getDefaultHttpClient();
-      setupJvmMetrics(coresInit);
+      this.httpClient = cores.getUpdateShardHandler().getDefaultHttpClient();
+      setupJvmMetrics(cores);
       log.debug("user.dir=" + System.getProperty("user.dir"));
     }
     catch( Throwable t ) {
@@ -196,7 +212,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     }finally{
       log.trace("SolrDispatchFilter.init() done");
-      this.cores = coresInit; // crucially final assignment 
       init.countDown();
     }
   }
@@ -257,9 +272,24 @@ public class SolrDispatchFilter extends BaseSolrFilter {
    * @return a CoreContainer to hold this server's cores
    */
   protected CoreContainer createCoreContainer(Path solrHome, Properties extraProperties) {
-    NodeConfig nodeConfig = loadNodeConfig(solrHome, extraProperties);
-    final CoreContainer coreContainer = new CoreContainer(nodeConfig, extraProperties, true);
-    coreContainer.load();
+    String zkHost = System.getProperty("zkHost");
+    SolrZkClient zkClient = null;
+    if (!StringUtils.isEmpty(zkHost)) {
+      int startUpZkTimeOut = Integer.getInteger("waitForZk", 30);
+      startUpZkTimeOut *= 1000;
+      log.info("Using connectString={}", zkHost);
+      // nocommit
+      RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+      CuratorFramework client = CuratorFrameworkFactory.newClient(zkHost, retryPolicy);
+      client.start();
+
+
+      zkClient = new SolrZkClient(client);
+    }
+    NodeConfig nodeConfig = loadNodeConfig(solrHome, extraProperties, zkClient);
+    final CoreContainer coreContainer = new CoreContainer(nodeConfig, extraProperties,
+        new CorePropertiesLocator(nodeConfig.getCoreRootDirectory()), true, zkClient);
+
     return coreContainer;
   }
 
@@ -268,7 +298,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
    * This may also be used by custom filters to load relevant configuration.
    * @return the NodeConfig
    */
-  public static NodeConfig loadNodeConfig(Path solrHome, Properties nodeProperties) {
+  public static NodeConfig loadNodeConfig(Path solrHome, Properties nodeProperties, SolrZkClient zkClient) {
     NodeConfig cfg = null;
     try (SolrResourceLoader loader = new SolrResourceLoader(solrHome, SolrDispatchFilter.class.getClassLoader(), nodeProperties)) {
       if (!StringUtils.isEmpty(System.getProperty("solr.solrxml.location"))) {
@@ -276,11 +306,10 @@ public class SolrDispatchFilter extends BaseSolrFilter {
             "Will automatically load solr.xml from ZooKeeper if it exists");
       }
 
-      String zkHost = System.getProperty("zkHost");
-      if (!StringUtils.isEmpty(zkHost)) {
-        int startUpZkTimeOut = Integer.getInteger("waitForZk", 30);
-        startUpZkTimeOut *= 1000;
-        try (SolrZkClient zkClient = new SolrZkClient(zkHost, startUpZkTimeOut)) {
+      if (zkClient != null) {
+        zkClient.printLayout();
+        
+        try {
           if (zkClient.exists("/solr.xml", true)) {
             log.info("solr.xml found in ZooKeeper. Loading...");
             byte[] data = zkClient.getData("/solr.xml", null, null, true);

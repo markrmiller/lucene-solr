@@ -39,6 +39,7 @@ import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -243,7 +244,7 @@ public class TestRestoreCore extends SolrJettyTestBase {
       }
       stream.close();
     } finally {
-      IOUtils.closeQuietly(stream);
+      DW.close(stream);
     }
     return false;
   }

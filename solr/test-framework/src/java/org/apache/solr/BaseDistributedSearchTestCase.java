@@ -61,6 +61,7 @@ import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -416,7 +417,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
     
     customThreadPool.submit(() -> Collections.singleton(controlClient).parallelStream().forEach(c -> {
-      IOUtils.closeQuietly(c);
+      DW.close(c);
     }));
 
     customThreadPool.submit(() -> {
@@ -430,7 +431,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     });
 
     for (SolrClient client : clients) {
-      customThreadPool.submit(() ->  IOUtils.closeQuietly(client));
+      customThreadPool.submit(() ->  DW.close(client));
     }
     
     for (JettySolrRunner jetty : jettys) {

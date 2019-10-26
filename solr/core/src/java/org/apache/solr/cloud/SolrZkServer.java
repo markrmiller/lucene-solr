@@ -17,6 +17,7 @@
 package org.apache.solr.cloud;
 
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.quorum.QuorumPeer;
@@ -122,8 +123,7 @@ public class SolrZkServer {
           }
           log.info("ZooKeeper Server exited.");
         } catch (Exception e) {
-          log.error("ZooKeeper Server ERROR", e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+          throw new DW.Exp(e);
         }
       }
     };
@@ -136,11 +136,8 @@ public class SolrZkServer {
 
     zkThread.setDaemon(true);
     zkThread.start();
-    try {
-      Thread.sleep(500); // pause for ZooKeeper to start
-    } catch (Exception e) {
-      log.error("STARTING ZOOKEEPER", e);
-    }
+    
+    // nocommit
   }
 
   public void stop() {

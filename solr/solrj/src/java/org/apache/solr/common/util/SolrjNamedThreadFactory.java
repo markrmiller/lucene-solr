@@ -24,26 +24,29 @@ public class SolrjNamedThreadFactory implements ThreadFactory {
   private final ThreadGroup group;
   private final AtomicInteger threadNumber = new AtomicInteger(1);
   private final String prefix;
+  private final boolean daemon;
+  private final int priority;
 
   public SolrjNamedThreadFactory(String namePrefix) {
+    this(namePrefix, false, Thread.NORM_PRIORITY);
+  }
+
+  public SolrjNamedThreadFactory(String namePrefix, boolean daemon, int priority) {
       SecurityManager s = System.getSecurityManager();
       group = (s != null)? s.getThreadGroup() :
                            Thread.currentThread().getThreadGroup();
       prefix = namePrefix + "-" +
                     poolNumber.getAndIncrement() +
                    "-thread-";
+      this.daemon = daemon;
+      this.priority = priority;
   }
 
   @Override
   public Thread newThread(Runnable r) {
-      Thread t = new Thread(group, r,
-                            prefix + threadNumber.getAndIncrement(),
-                            0);
-
-      t.setDaemon(false);
-      
-      if (t.getPriority() != Thread.NORM_PRIORITY)
-          t.setPriority(Thread.NORM_PRIORITY);
-      return t;
+    Thread t = new Thread(group, r, prefix + threadNumber.getAndIncrement(), 0);
+    t.setDaemon(daemon);
+    t.setPriority(priority);
+    return t;
   }
 }

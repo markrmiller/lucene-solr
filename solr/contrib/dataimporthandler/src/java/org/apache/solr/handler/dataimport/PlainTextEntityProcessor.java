@@ -20,6 +20,7 @@ import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVE
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
 import static org.apache.solr.handler.dataimport.XPathEntityProcessor.URL;
 import org.apache.commons.io.IOUtils;
+import org.apache.solr.common.patterns.DW;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -61,7 +62,7 @@ public class PlainTextEntityProcessor extends EntityProcessorBase {
       try {
         len = r.read(buf);
       } catch (IOException e) {
-        IOUtils.closeQuietly(r);
+        DW.close(r);
         wrapAndThrow(SEVERE, e, "Exception reading url : " + url);
       }
       if (len <= 0) break;
@@ -70,7 +71,7 @@ public class PlainTextEntityProcessor extends EntityProcessorBase {
     Map<String, Object> row = new HashMap<>();
     row.put(PLAIN_TEXT, sw.toString());
     ended = true;
-    IOUtils.closeQuietly(r);
+    DW.close(r);
     return row;
   }
 

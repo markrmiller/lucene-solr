@@ -33,6 +33,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.prometheus.PrometheusExporterTestBase;
 import org.apache.solr.prometheus.utils.Helpers;
 import org.junit.After;
@@ -54,7 +55,7 @@ public class SolrExporterTestBase extends PrometheusExporterTestBase {
     if (solrExporter != null) {
       solrExporter.stop();
     }
-    IOUtils.closeQuietly(httpClient);
+    DW.close(httpClient);
     super.tearDown();
   }
 

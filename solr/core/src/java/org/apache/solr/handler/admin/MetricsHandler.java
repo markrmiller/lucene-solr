@@ -355,4 +355,8 @@ public class MetricsHandler extends RequestHandlerBase implements PermissionName
       return (name, metric) -> klass == null || klass.isInstance(metric);
     }
   }
+
+  public CoreContainer getCc() {
+    return cc;
+  }
 }

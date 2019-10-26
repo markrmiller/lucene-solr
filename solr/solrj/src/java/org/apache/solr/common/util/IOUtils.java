@@ -25,29 +25,5 @@ import org.slf4j.LoggerFactory;
 public class IOUtils {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  public static void closeQuietly(Closeable closeable) {
-    try {
-      if (closeable != null) {
-        closeable.close();
-      }
-    } catch (Throwable t) {
-      log.error("Error while closing", t);
-      if (t instanceof Error) {
-        throw (Error) t;
-      }
-    }
-  }
 
-  public static void closeQuietly(AutoCloseable closeable) {
-    try {
-      if (closeable != null) {
-        closeable.close();
-      }
-    } catch (Throwable t) {
-      log.error("Error while closing", t);
-      if (t instanceof Error) {
-        throw (Error) t;
-      }
-    }
-  }
 }

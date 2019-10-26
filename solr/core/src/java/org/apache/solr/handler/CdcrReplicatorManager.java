@@ -43,6 +43,7 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -142,14 +143,14 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
 
     this.scheduler.shutdown();
     if (bootstrapExecutor != null)  {
-      IOUtils.closeQuietly(bootstrapStatusRunnable);
+      DW.close(bootstrapStatusRunnable);
       ExecutorUtil.shutdownAndAwaitTermination(bootstrapExecutor);
     }
     this.closeLogReaders();
     Callable callable = core.getSolrCoreState().getCdcrBootstrapCallable();
     if (callable != null)  {
       CdcrRequestHandler.BootstrapCallable bootstrapCallable = (CdcrRequestHandler.BootstrapCallable) callable;
-      IOUtils.closeQuietly(bootstrapCallable);
+      DW.close(bootstrapCallable);
     }
   }
 
@@ -220,7 +221,7 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
   void shutdown() {
     this.scheduler.shutdown();
     if (bootstrapExecutor != null)  {
-      IOUtils.closeQuietly(bootstrapStatusRunnable);
+      DW.close(bootstrapStatusRunnable);
       ExecutorUtil.shutdownAndAwaitTermination(bootstrapExecutor);
     }
     for (CdcrReplicatorState state : replicatorStates) {
@@ -253,7 +254,7 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
     public void close() throws IOException {
       closed = true;
       try {
-        Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard, 30000); // assume same shard exists on target
+        Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard); // assume same shard exists on target
         String leaderCoreUrl = leader.getCoreUrl();
         HttpClient httpClient = state.getClient().getLbClient().getHttpClient();
         try (HttpSolrClient client = new HttpSolrClient.Builder(leaderCoreUrl).withHttpClient(httpClient).build()) {
@@ -349,7 +350,7 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
     }
 
     private BootstrapStatus sendBootstrapCommand() throws InterruptedException {
-      Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard, 30000); // assume same shard exists on target
+      Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard); // assume same shard exists on target
       String leaderCoreUrl = leader.getCoreUrl();
       HttpClient httpClient = state.getClient().getLbClient().getHttpClient();
       try (HttpSolrClient client = new HttpSolrClient.Builder(leaderCoreUrl).withHttpClient(httpClient).build()) {
@@ -371,7 +372,7 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
 
     private BootstrapStatus getBoostrapStatus() throws InterruptedException {
       try {
-        Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard, 30000); // assume same shard exists on target
+        Replica leader = state.getClient().getZkStateReader().getLeaderRetry(targetCollection, shard); // assume same shard exists on target
         String leaderCoreUrl = leader.getCoreUrl();
         HttpClient httpClient = state.getClient().getLbClient().getHttpClient();
         try (HttpSolrClient client = new HttpSolrClient.Builder(leaderCoreUrl).withHttpClient(httpClient).build()) {

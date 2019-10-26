@@ -199,7 +199,7 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
               // do nothing
               return null;
             }
-          });
+          }, null);
       try {
         String configName = zkController.getZkStateReader().readConfigName(COLLECTION_NAME);
         assertEquals(configName, actualConfigName);
@@ -235,7 +235,7 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
             // do nothing
             return null;
           }
-        });
+        }, null);
       } catch (IllegalArgumentException e) {
         fail("ZkController did not normalize host name correctly");
       } finally {
@@ -295,7 +295,7 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
             // do nothing
             return null;
           }
-        });
+        }, null);
 
         zkController.getZkClient().makePath(ZkStateReader.getCollectionPathRoot(collectionName), new byte[0], CreateMode.PERSISTENT, true);
 
@@ -322,7 +322,6 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
         propMap.put(ZkStateReader.STATE_PROP, "down");
         zkController.getOverseerJobQueue().offer(Utils.toJSON(propMap));
 
-        zkController.getZkStateReader().forciblyRefreshAllClusterStateSlow();
 
         long now = System.nanoTime();
         long timeout = now + TimeUnit.NANOSECONDS.convert(5, TimeUnit.SECONDS);

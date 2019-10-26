@@ -41,7 +41,6 @@ import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.cloud.Overseer.LeaderStatus;
 import org.apache.solr.cloud.OverseerTaskQueue.QueueEvent;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
 import org.apache.solr.common.cloud.Aliases;
@@ -152,11 +151,6 @@ public class OverseerCollectionConfigSetProcessorTest extends SolrTestCaseJ4 {
         DistributedMap completedMap,
         DistributedMap failureMap) {
       super(zkStateReader, myId, shardHandlerFactory, adminPath, new Stats(), overseer, new OverseerNodePrioritizer(zkStateReader, overseer.getStateUpdateQueue(), adminPath, shardHandlerFactory, null), workQueue, runningMap, completedMap, failureMap);
-    }
-    
-    @Override
-    protected LeaderStatus amILeader() {
-      return LeaderStatus.YES;
     }
     
   }

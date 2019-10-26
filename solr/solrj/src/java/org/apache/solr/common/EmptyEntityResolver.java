@@ -25,6 +25,7 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLResolver;
 
 import org.apache.commons.io.input.ClosedInputStream;
+import org.apache.solr.common.patterns.DW;
 
 /**
  * This class provides several singletons of entity resolvers used by
@@ -59,7 +60,7 @@ public final class EmptyEntityResolver {
     try {
       saxFactory.setFeature(feature, enabled);
     } catch (Exception ex) {
-      // ignore
+      throw new DW.Exp(ex);
     }
   }
   
@@ -78,7 +79,7 @@ public final class EmptyEntityResolver {
     try {
       inputFactory.setProperty(key, value);
     } catch (Exception ex) {
-      // ignore
+      throw new DW.Exp(ex);
     }
   }
   

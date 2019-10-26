@@ -37,6 +37,7 @@ import org.apache.solr.client.solrj.cloud.autoscaling.TriggerEventType;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CloudConfig;
@@ -104,8 +105,8 @@ public class OverseerTriggerThread implements Runnable, SolrCloseable {
     } finally {
       updateLock.unlock();
     }
-    IOUtils.closeQuietly(triggerFactory);
-    IOUtils.closeQuietly(scheduledTriggers);
+    DW.close(triggerFactory);
+    DW.close(scheduledTriggers);
     log.debug("OverseerTriggerThread has been closed explicitly");
   }
 

@@ -55,6 +55,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -398,11 +399,6 @@ public class CdcrRequestHandler extends RequestHandlerBase implements SolrCoreAw
   private void handleCollectionCheckpointAction(SolrQueryRequest req, SolrQueryResponse rsp)
       throws IOException, SolrServerException {
     ZkController zkController = core.getCoreContainer().getZkController();
-    try {
-      zkController.getZkStateReader().forceUpdateCollection(collection);
-    } catch (Exception e) {
-      log.warn("Error when updating cluster state", e);
-    }
     ClusterState cstate = zkController.getClusterState();
     DocCollection docCollection = cstate.getCollectionOrNull(collection);
     Collection<Slice> shards = docCollection == null? null : docCollection.getActiveSlices();
@@ -683,7 +679,7 @@ public class CdcrRequestHandler extends RequestHandlerBase implements SolrCoreAw
 
   private void handleCancelBootstrap(SolrQueryRequest req, SolrQueryResponse rsp) {
     BootstrapCallable callable = (BootstrapCallable)core.getSolrCoreState().getCdcrBootstrapCallable();
-    IOUtils.closeQuietly(callable);
+    DW.close(callable);
     rsp.add(RESPONSE_STATUS, "cancelled");
   }
 

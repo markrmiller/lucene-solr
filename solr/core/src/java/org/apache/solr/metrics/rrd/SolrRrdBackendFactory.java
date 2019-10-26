@@ -44,6 +44,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.TimeSource;
@@ -302,7 +303,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
     for (Iterator<SolrRrdBackend> it = backends.values().iterator(); it.hasNext(); ) {
       SolrRrdBackend backend = it.next();
       it.remove();
-      IOUtils.closeQuietly(backend);
+      DW.close(backend);
     }
     if (!persistent) {
       return;
@@ -324,7 +325,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
   public void remove(String path) throws IOException {
     SolrRrdBackend backend = backends.remove(path);
     if (backend != null) {
-      IOUtils.closeQuietly(backend);
+      DW.close(backend);
     }
     if (!persistent) {
       return;
@@ -451,7 +452,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
     }
     log.debug("Closing " + hashCode());
     closed = true;
-    backends.forEach((p, b) -> IOUtils.closeQuietly(b));
+    backends.forEach((p, b) -> DW.close(b));
     backends.clear();
     syncService.shutdownNow();
     syncService = null;

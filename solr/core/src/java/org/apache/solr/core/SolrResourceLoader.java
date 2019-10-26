@@ -36,9 +36,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -66,7 +68,7 @@ import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.handler.component.ShardHandlerFactory;
@@ -208,7 +210,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
    *
    * @param urls    the URLs of files to add
    */
-  void addToClassLoader(List<URL> urls) {
+  final void addToClassLoader(List<URL> urls) {
     URLClassLoader newLoader = addURLsToClassLoader(classLoader, urls);
     if (newLoader != classLoader) {
       this.classLoader = newLoader;
@@ -247,7 +249,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
    * This method must be called after {@link #addToClassLoader(List)}
    * and before using this ResourceLoader.
    */
-  void reloadLuceneSPI() {
+  final void reloadLuceneSPI() {
     // Codecs:
     PostingsFormat.reloadPostingsFormats(this.classLoader);
     DocValuesFormat.reloadDocValuesFormats(this.classLoader);
@@ -725,7 +727,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new SW.Exp(e);
+          throw new DW.Exp(e);
         }
       }
 
@@ -754,7 +756,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new SW.Exp(e);
+          throw new DW.Exp(e);
         } 
       }
       
@@ -786,7 +788,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new SW.Exp(e);
+          throw new DW.Exp(e);
         } 
       }
       
@@ -983,7 +985,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
           throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, msg);
         }
       }
-      try (OutputStream out = new FileOutputStream(confFile);) {
+      try (OutputStream out = Files.newOutputStream(confFile.toPath(), StandardOpenOption.CREATE)) {
         out.write(content);
       }
       log.info("Written confile " + resourceName);

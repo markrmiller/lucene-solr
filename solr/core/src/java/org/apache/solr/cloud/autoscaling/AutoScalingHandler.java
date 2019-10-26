@@ -52,6 +52,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.AutoScalingParams;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.StrUtils;
@@ -506,7 +507,7 @@ public class AutoScalingHandler extends RequestHandlerBase implements Permission
       return currentConfig;
     } finally {
       if (listener != null) {
-        IOUtils.closeQuietly(listener);
+        DW.close(listener);
       }
     }
 
@@ -584,7 +585,7 @@ public class AutoScalingHandler extends RequestHandlerBase implements Permission
       return currentConfig;
     } finally {
       if (t != null) {
-        IOUtils.closeQuietly(t);
+        DW.close(t);
       }
     }
     currentConfig = currentConfig.withTriggerConfig(trigger);

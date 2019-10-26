@@ -142,8 +142,6 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
         .processAndWait(client, MAX_TIMEOUT_SECONDS);
     assertSame("CreateShard did not complete", RequestStatusState.COMPLETED, state);
 
-    client.getZkStateReader().forceUpdateCollection(collection);
-    
     //Add a doc to shard2 to make sure shard2 was created properly
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", numDocs + 1);
@@ -206,7 +204,6 @@ public class CollectionsAPIAsyncDistributedZkTest extends SolrCloudTestCase {
         break;
       }
     }
-    client.getZkStateReader().forceUpdateCollection(collection);
     
     shard1 = client.getZkStateReader().getClusterState().getCollection(collection).getSlice("shard1");
     String replicaName = shard1.getReplicas().iterator().next().getName();
