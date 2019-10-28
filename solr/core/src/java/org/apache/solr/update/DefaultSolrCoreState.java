@@ -336,7 +336,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
               recoveryThrottle.minimumWaitBetweenActions();
               recoveryThrottle.markAttemptingAction();
               
-              recoveryStrat = recoveryStrategyBuilder.create(cc, cd, DefaultSolrCoreState.this);
+              recoveryStrat = recoveryStrategyBuilder.create(cc, cc.getZkController(), cc.getZkController().getZkStateReader());
+              recoveryStrat.setCoreDescriptor(cd);
+              recoveryStrat.setRecoveryListener( DefaultSolrCoreState.this);
               recoveryStrat.setRecoveringAfterStartup(recoveringAfterStartup);
               Future<?> future = cc.getUpdateShardHandler().getRecoveryExecutor().submit(recoveryStrat);
               try {

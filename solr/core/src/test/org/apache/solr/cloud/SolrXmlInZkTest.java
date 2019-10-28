@@ -25,6 +25,7 @@ import java.util.Properties;
 import com.carrotsearch.randomizedtesting.rules.SystemPropertiesRestoreRule;
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrResources.SolrResources;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -88,7 +89,7 @@ public class SolrXmlInZkTest extends SolrTestCaseJ4 {
     props.setProperty("solr.test.sys.prop1", "propone");
     props.setProperty("solr.test.sys.prop2", "proptwo");
 
-    cfg = SolrDispatchFilter.loadNodeConfig(solrHome, props, null);
+    cfg = SolrResources.loadNodeConfig(solrHome, props, null);
     log.info("####SETUP_END " + getTestName());
   }
 

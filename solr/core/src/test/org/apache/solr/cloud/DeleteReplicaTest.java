@@ -256,7 +256,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
         ZkStateReader.CORE_NODE_NAME_PROP, replica.getName(),
         ZkStateReader.BASE_URL_PROP, replica.getBaseUrl());
 
-    cluster.getOpenOverseer().getStateUpdateQueue().offer(Utils.toJSON(m));
+    cluster.getOpenOverseer().offerStateUpdate(m);
 
     waitForState("Timeout waiting for replica get deleted", collectionName,
         (liveNodes, collectionState) -> collectionState.getSlice("shard1").getReplicas().size() == 2);
@@ -337,7 +337,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
               ZkStateReader.COLLECTION_PROP, collectionName,
               ZkStateReader.CORE_NODE_NAME_PROP, replica1.getName(),
               ZkStateReader.BASE_URL_PROP, replica1.getBaseUrl());
-          cluster.getOpenOverseer().getStateUpdateQueue().offer(Utils.toJSON(m));
+          cluster.getOpenOverseer().offerStateUpdate(m);
 
           boolean replicaDeleted = false;
           TimeOut timeOut = new TimeOut(20, TimeUnit.SECONDS, TimeSource.NANO_TIME);

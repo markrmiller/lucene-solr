@@ -17,7 +17,11 @@
 
 package org.apache.solr.client.solrj.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.lang.ref.WeakReference;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
@@ -26,6 +30,7 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -59,6 +64,8 @@ import org.slf4j.MDC;
 import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
 
 public abstract class LBSolrClient extends SolrClient {
+  
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
   private static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(404, 403, 503, 500));
@@ -85,7 +92,7 @@ public abstract class LBSolrClient extends SolrClient {
   protected volatile ResponseParser parser;
   protected volatile RequestWriter requestWriter;
 
-  protected Set<String> queryParams = new HashSet<>();
+  protected volatile Set<String> queryParams = Collections.unmodifiableSet(new HashSet<>());
 
   static {
     solrQuery.setRows(0);
@@ -204,13 +211,29 @@ public abstract class LBSolrClient extends SolrClient {
   }
 
   protected void updateAliveList() {
+    if (log.isDebugEnabled()) {
+      log.debug("updateAliveList() - start");
+    }
+
     synchronized (aliveServers) {
       aliveServerList = aliveServers.values().toArray(new ServerWrapper[0]);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("updateAliveList() - end");
     }
   }
 
   protected ServerWrapper createServerWrapper(String baseUrl) {
-    return new ServerWrapper(baseUrl);
+    if (log.isDebugEnabled()) {
+      log.debug("createServerWrapper(String baseUrl={}) - start", baseUrl);
+    }
+
+    ServerWrapper returnServerWrapper = new ServerWrapper(baseUrl);
+    if (log.isDebugEnabled()) {
+      log.debug("createServerWrapper(String) - end");
+    }
+    return returnServerWrapper;
   }
 
   public Set<String> getQueryParams() {
@@ -222,15 +245,42 @@ public abstract class LBSolrClient extends SolrClient {
    * @param queryParams set of param keys to only send via the query string
    */
   public void setQueryParams(Set<String> queryParams) {
-    this.queryParams = queryParams;
+    if (log.isDebugEnabled()) {
+      log.debug("setQueryParams(Set<String> queryParams={}) - start", queryParams);
+    }
+
+    this.queryParams = Collections.unmodifiableSet(queryParams);
+
+    if (log.isDebugEnabled()) {
+      log.debug("setQueryParams(Set<String>) - end");
+    }
   }
   public void addQueryParams(String queryOnlyParam) {
-    this.queryParams.add(queryOnlyParam) ;
+    if (log.isDebugEnabled()) {
+      log.debug("addQueryParams(String queryOnlyParam={}) - start", queryOnlyParam);
+    }
+
+    HashSet<String> newSet = new HashSet<String>(this.queryParams);
+    newSet.add(queryOnlyParam);
+
+    this.queryParams = newSet;
+
+    if (log.isDebugEnabled()) {
+      log.debug("addQueryParams(String) - end");
+    }
   }
 
   public static String normalize(String server) {
+    if (log.isDebugEnabled()) {
+      log.debug("normalize(String server={}) - start", server);
+    }
+
     if (server.endsWith("/"))
       server = server.substring(0, server.length() - 1);
+
+    if (log.isDebugEnabled()) {
+      log.debug("normalize(String) - end");
+    }
     return server;
   }
 
@@ -253,6 +303,14 @@ public abstract class LBSolrClient extends SolrClient {
    * @throws IOException If there is a low-level I/O error.
    */
   public Rsp request(Req req) throws SolrServerException, IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("request(Req req={}) - start", req);
+    }
+    
+    if (req.getServers().size() == 0) {
+      throw new IllegalArgumentException("Must specify at least one server to make the request to");
+    }
+
     Rsp rsp = new Rsp();
     Exception ex = null;
     boolean isNonRetryable = req.request instanceof IsUpdateRequest || ADMIN_PATHS.contains(req.request.getPath());
@@ -296,6 +354,9 @@ public abstract class LBSolrClient extends SolrClient {
         ++numServersTried;
         ex = doRequest(serverStr, req, rsp, isNonRetryable, false);
         if (ex == null) {
+          if (log.isDebugEnabled()) {
+            log.debug("request(Req) - end");
+          }
           return rsp; // SUCCESS
         }
       } finally {
@@ -319,6 +380,9 @@ public abstract class LBSolrClient extends SolrClient {
           ++numServersTried;
           ex = doRequest(wrapper.baseUrl, req, rsp, isNonRetryable, true);
           if (ex == null) {
+            if (log.isDebugEnabled()) {
+              log.debug("request(Req) - end");
+            }
             return rsp; // SUCCESS
           }
         } finally {
@@ -330,6 +394,9 @@ public abstract class LBSolrClient extends SolrClient {
 
     final String solrServerExceptionMessage;
     if (timeAllowedExceeded) {
+      if (log.isDebugEnabled()) {
+        log.debug("Time allowed to handle this request exceeded");
+      }
       solrServerExceptionMessage = "Time allowed to handle this request exceeded";
     } else {
       if (numServersToTry != null && numServersTried > numServersToTry.intValue()) {
@@ -343,6 +410,7 @@ public abstract class LBSolrClient extends SolrClient {
     if (ex == null) {
       throw new SolrServerException(solrServerExceptionMessage);
     } else {
+      log.error("Exception encountered", ex);
       throw new SolrServerException(solrServerExceptionMessage+":" + zombieServers.keySet(), ex);
     }
   }
@@ -351,17 +419,36 @@ public abstract class LBSolrClient extends SolrClient {
    * @return time allowed in nanos, returns -1 if no time_allowed is specified.
    */
   private long getTimeAllowedInNanos(final SolrRequest req) {
+    if (log.isDebugEnabled()) {
+      log.debug("getTimeAllowedInNanos(SolrRequest req={}) - start", req);
+    }
+
     SolrParams reqParams = req.getParams();
-    return reqParams == null ? -1 :
-        TimeUnit.NANOSECONDS.convert(reqParams.getInt(CommonParams.TIME_ALLOWED, -1), TimeUnit.MILLISECONDS);
+    long returnlong = reqParams == null ? -1 : TimeUnit.NANOSECONDS.convert(reqParams.getInt(CommonParams.TIME_ALLOWED, -1), TimeUnit.MILLISECONDS);
+    if (log.isDebugEnabled()) {
+      log.debug("getTimeAllowedInNanos(SolrRequest) - end return=" + returnlong);
+    }
+    return returnlong;
   }
 
   private boolean isTimeExceeded(long timeAllowedNano, long timeOutTime) {
-    return timeAllowedNano > 0 && System.nanoTime() > timeOutTime;
+    if (log.isDebugEnabled()) {
+      log.debug("isTimeExceeded(long timeAllowedNano={}, long timeOutTime={}) - start", timeAllowedNano, timeOutTime);
+    }
+
+    boolean returnboolean = timeAllowedNano > 0 && System.nanoTime() > timeOutTime;
+    if (log.isDebugEnabled()) {
+      log.debug("isTimeExceeded(long, long) - end return={}", returnboolean);
+    }
+    return returnboolean;
   }
 
   protected Exception doRequest(String baseUrl, Req req, Rsp rsp, boolean isNonRetryable,
                                 boolean isZombie) throws SolrServerException, IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doRequest(String baseUrl={}, Req req={}, Rsp rsp={}, boolean isNonRetryable={}, boolean isZombie={}) - start", baseUrl, req, rsp, isNonRetryable, isZombie);
+    }
+
     Exception ex = null;
     try {
       rsp.server = baseUrl;
@@ -373,6 +460,8 @@ public abstract class LBSolrClient extends SolrClient {
     } catch (HttpSolrClient.RemoteExecutionException e){
       throw e;
     } catch(SolrException e) {
+      log.error("doRequest(String=" + baseUrl + ", Req=" + req + ", Rsp=" + rsp + ", boolean=" + isNonRetryable + ", boolean=" + isZombie + ")", e);
+
       // we retry on 404 or 403 or 503 or 500
       // unless it's an update - then we only retry on connect exception
       if (!isNonRetryable && RETRY_CODES.contains(e.code())) {
@@ -385,18 +474,24 @@ public abstract class LBSolrClient extends SolrClient {
         throw e;
       }
     } catch (SocketException e) {
+      log.error("doRequest(String=" + baseUrl + ", Req=" + req + ", Rsp=" + rsp + ", boolean=" + isNonRetryable + ", boolean=" + isZombie + ")", e);
+
       if (!isNonRetryable || e instanceof ConnectException) {
         ex = (!isZombie) ? addZombie(baseUrl, e) : e;
       } else {
         throw e;
       }
     } catch (SocketTimeoutException e) {
+      log.error("doRequest(String=" + baseUrl + ", Req=" + req + ", Rsp=" + rsp + ", boolean=" + isNonRetryable + ", boolean=" + isZombie + ")", e);
+
       if (!isNonRetryable) {
         ex = (!isZombie) ? addZombie(baseUrl, e) : e;
       } else {
         throw e;
       }
     } catch (SolrServerException e) {
+      log.error("doRequest(String=" + baseUrl + ", Req=" + req + ", Rsp=" + rsp + ", boolean=" + isNonRetryable + ", boolean=" + isZombie + ")", e);
+
       Throwable rootCause = e.getRootCause();
       if (!isNonRetryable && rootCause instanceof IOException) {
         ex = (!isZombie) ? addZombie(baseUrl, e) : e;
@@ -406,20 +501,33 @@ public abstract class LBSolrClient extends SolrClient {
         throw e;
       }
     } catch (Exception e) {
+      log.error("doRequest(String=" + baseUrl + ", Req=" + req + ", Rsp=" + rsp + ", boolean=" + isNonRetryable + ", boolean=" + isZombie + ")", e);
+
       DW.propegateInterrupt(e);
       throw new SolrServerException(e);
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("doRequest(String, Req, Rsp, boolean, boolean) - end");
+    }
     return ex;
   }
 
   protected abstract SolrClient getClient(String baseUrl);
 
   private Exception addZombie(String serverStr, Exception e) {
+    if (log.isDebugEnabled()) {
+      log.debug("addZombie(String serverStr={}, Exception e={}) - start", serverStr, e);
+    }
+
     ServerWrapper wrapper = createServerWrapper(serverStr);
     wrapper.standard = false;
     zombieServers.put(serverStr, wrapper);
     startAliveCheckExecutor();
+
+    if (log.isDebugEnabled()) {
+      log.debug("addZombie(String, Exception) - end");
+    }
     return e;
   }
 
@@ -430,14 +538,26 @@ public abstract class LBSolrClient extends SolrClient {
    * @param interval time in milliseconds
    */
   public void setAliveCheckInterval(int interval) {
+    if (log.isDebugEnabled()) {
+      log.debug("setAliveCheckInterval(int interval={}) - start", interval);
+    }
+
     if (interval <= 0) {
       throw new IllegalArgumentException("Alive check interval must be " +
           "positive, specified value = " + interval);
     }
     this.interval = interval;
+
+    if (log.isDebugEnabled()) {
+      log.debug("setAliveCheckInterval(int) - end");
+    }
   }
 
   private void startAliveCheckExecutor() {
+    if (log.isDebugEnabled()) {
+      log.debug("startAliveCheckExecutor() - start");
+    }
+
     // double-checked locking, but it's OK because we don't *do* anything with aliveCheckExecutor
     // if it's not null.
     if (aliveCheckExecutor == null) {
@@ -451,9 +571,20 @@ public abstract class LBSolrClient extends SolrClient {
         }
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("startAliveCheckExecutor() - end");
+    }
   }
 
   private static Runnable getAliveCheckRunner(final WeakReference<LBSolrClient> lbRef) {
+    if (log.isDebugEnabled()) {
+      log.debug("getAliveCheckRunner(WeakReference<LBSolrClient> lbRef={}) - start", lbRef);
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getAliveCheckRunner(WeakReference<LBSolrClient>) - end");
+    }
     return () -> {
       LBSolrClient lb = lbRef.get();
       if (lb != null && lb.zombieServers != null) {
@@ -495,6 +626,10 @@ public abstract class LBSolrClient extends SolrClient {
   }
 
   private void checkAZombieServer(ServerWrapper zombieServer) {
+    if (log.isDebugEnabled()) {
+      log.debug("checkAZombieServer(ServerWrapper zombieServer={}) - start", zombieServer);
+    }
+
     try {
       QueryRequest queryRequest = new QueryRequest(solrQuery);
       queryRequest.setBasePath(zombieServer.baseUrl);
@@ -515,6 +650,8 @@ public abstract class LBSolrClient extends SolrClient {
         }
       }
     } catch (Exception e) {
+      log.error("checkAZombieServer(ServerWrapper=" + zombieServer + ")", e);
+
       DW.propegateInterrupt(e);
       //Expected. The server is still down.
       zombieServer.failedPings++;
@@ -525,34 +662,68 @@ public abstract class LBSolrClient extends SolrClient {
         zombieServers.remove(zombieServer.getBaseUrl());
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("checkAZombieServer(ServerWrapper) - end");
+    }
   }
 
   private ServerWrapper removeFromAlive(String key) {
+    if (log.isDebugEnabled()) {
+      log.debug("removeFromAlive(String key={}) - start", key);
+    }
+
     synchronized (aliveServers) {
       ServerWrapper wrapper = aliveServers.remove(key);
       if (wrapper != null)
         updateAliveList();
+
+      if (log.isDebugEnabled()) {
+        log.debug("removeFromAlive(String) - end");
+      }
       return wrapper;
     }
   }
 
 
   private void addToAlive(ServerWrapper wrapper) {
+    if (log.isDebugEnabled()) {
+      log.debug("addToAlive(ServerWrapper wrapper={}) - start", wrapper);
+    }
+
     synchronized (aliveServers) {
       ServerWrapper prev = aliveServers.put(wrapper.getBaseUrl(), wrapper);
       // TODO: warn if there was a previous entry?
       updateAliveList();
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("addToAlive(ServerWrapper) - end");
+    }
   }
 
   public void addSolrServer(String server) throws MalformedURLException {
+    if (log.isDebugEnabled()) {
+      log.debug("addSolrServer(String server={}) - start", server);
+    }
+
     addToAlive(createServerWrapper(server));
+
+    if (log.isDebugEnabled()) {
+      log.debug("addSolrServer(String) - end");
+    }
   }
 
   public String removeSolrServer(String server) {
+    if (log.isDebugEnabled()) {
+      log.debug("removeSolrServer(String server={}) - start", server);
+    }
+
     try {
       server = new URL(server).toExternalForm();
     } catch (MalformedURLException e) {
+      log.error("removeSolrServer(String=" + server + ")", e);
+
       throw new RuntimeException(e);
     }
     if (server.endsWith("/")) {
@@ -563,6 +734,10 @@ public abstract class LBSolrClient extends SolrClient {
     // lists, we could fail to remove it.
     removeFromAlive(server);
     zombieServers.remove(server);
+
+    if (log.isDebugEnabled()) {
+      log.debug("removeSolrServer(String) - end");
+    }
     return null;
   }
 
@@ -581,11 +756,23 @@ public abstract class LBSolrClient extends SolrClient {
   @Override
   public NamedList<Object> request(final SolrRequest request, String collection)
       throws SolrServerException, IOException {
-    return request(request, collection, null);
+    if (log.isDebugEnabled()) {
+      log.debug("request(SolrRequest request={}, String collection={}) - start", request, collection);
+    }
+
+    NamedList<Object> returnNamedList = request(request, collection, null);
+    if (log.isDebugEnabled()) {
+      log.debug("request(SolrRequest, String) - end");
+    }
+    return returnNamedList;
   }
 
   public NamedList<Object> request(final SolrRequest request, String collection,
                                    final Integer numServersToTry) throws SolrServerException, IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("request(SolrRequest request={}, String collection={}, Integer numServersToTry={}) - start", request, collection, numServersToTry);
+    }
+
     Exception ex = null;
     ServerWrapper[] serverList = aliveServerList;
 
@@ -597,7 +784,10 @@ public abstract class LBSolrClient extends SolrClient {
     long timeAllowedNano = getTimeAllowedInNanos(request);
     long timeOutTime = System.nanoTime() + timeAllowedNano;
     for (int attempts=0; attempts<maxTries; attempts++) {
-      if (timeAllowedExceeded = isTimeExceeded(timeAllowedNano, timeOutTime)) {
+      if (timeAllowedNano >= 0 && (timeAllowedExceeded = isTimeExceeded(timeAllowedNano, timeOutTime))) {
+        if (log.isDebugEnabled()) {
+          log.debug("Time allowed exceeded, break");
+        }
         break;
       }
 
@@ -605,11 +795,17 @@ public abstract class LBSolrClient extends SolrClient {
       try {
         ++numServersTried;
         request.setBasePath(wrapper.baseUrl);
-        return getClient(wrapper.getBaseUrl()).request(request, collection);
+        NamedList<Object> returnNamedList = getClient(wrapper.getBaseUrl()).request(request, collection);
+        if (log.isDebugEnabled()) {
+          log.debug("request(SolrRequest, String, Integer) - end");
+        }
+        return returnNamedList;
       } catch (SolrException e) {
         // Server is alive but the request was malformed or invalid
         throw e;
       } catch (SolrServerException e) {
+        log.error("request(SolrRequest=" + request + ", String=" + collection + ", Integer=" + numServersToTry + ")", e);
+
         if (e.getRootCause() instanceof IOException) {
           ex = e;
           moveAliveToDead(wrapper);
@@ -619,6 +815,8 @@ public abstract class LBSolrClient extends SolrClient {
           throw e;
         }
       } catch (Exception e) {
+        log.error("request(SolrRequest=" + request + ", String=" + collection + ", Integer=" + numServersToTry + ")", e);
+
         DW.propegateInterrupt(e);
         throw new SolrServerException(e);
       }
@@ -638,11 +836,17 @@ public abstract class LBSolrClient extends SolrClient {
         // remove from zombie list *before* adding to alive to avoid a race that could lose a server
         zombieServers.remove(wrapper.getBaseUrl());
         addToAlive(wrapper);
+
+        if (log.isDebugEnabled()) {
+          log.debug("request(SolrRequest, String, Integer) - end");
+        }
         return rsp;
       } catch (SolrException e) {
         // Server is alive but the request was malformed or invalid
         throw e;
       } catch (SolrServerException e) {
+        log.error("request(SolrRequest=" + request + ", String=" + collection + ", Integer=" + numServersToTry + ")", e);
+
         if (e.getRootCause() instanceof IOException) {
           ex = e;
           // still dead
@@ -650,6 +854,8 @@ public abstract class LBSolrClient extends SolrClient {
           throw e;
         }
       } catch (Exception e) {
+        log.error("request(SolrRequest=" + request + ", String=" + collection + ", Integer=" + numServersToTry + ")", e);
+
         DW.propegateInterrupt(e);
         throw new SolrServerException(e);
       }
@@ -684,25 +890,49 @@ public abstract class LBSolrClient extends SolrClient {
    * @return the picked server
    */
   protected ServerWrapper pickServer(ServerWrapper[] aliveServerList, SolrRequest request) {
+    if (log.isDebugEnabled()) {
+      log.debug("pickServer(ServerWrapper[] aliveServerList={}, SolrRequest request={}) - start", aliveServerList, request);
+    }
+
     int count = counter.incrementAndGet() & Integer.MAX_VALUE;
-    return aliveServerList[count % aliveServerList.length];
+    ServerWrapper returnServerWrapper = aliveServerList[count % aliveServerList.length];
+    if (log.isDebugEnabled()) {
+      log.debug("pickServer(ServerWrapper[], SolrRequest) - end");
+    }
+    return returnServerWrapper;
   }
 
   private void moveAliveToDead(ServerWrapper wrapper) {
+    if (log.isDebugEnabled()) {
+      log.debug("moveAliveToDead(ServerWrapper wrapper={}) - start", wrapper);
+    }
+
     wrapper = removeFromAlive(wrapper.getBaseUrl());
     if (wrapper == null)
       return;  // another thread already detected the failure and removed it
     zombieServers.put(wrapper.getBaseUrl(), wrapper);
     startAliveCheckExecutor();
+
+    if (log.isDebugEnabled()) {
+      log.debug("moveAliveToDead(ServerWrapper) - end");
+    }
   }
 
   @Override
   public void close() {
+    if (log.isDebugEnabled()) {
+      log.debug("close() - start");
+    }
+
     synchronized (this) {
       if (aliveCheckExecutor != null) {
         aliveCheckExecutor.shutdownNow();
         ExecutorUtil.shutdownAndAwaitTermination(aliveCheckExecutor);
       }
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("close() - end");
     }
   }
 }

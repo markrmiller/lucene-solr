@@ -114,12 +114,12 @@ final class OnReconnectDoThis implements OnReconnect {
       }
     }
 
-    zkController.cloudSolrClient = new CloudSolrClient.Builder(new ZkClientClusterStateProvider(zkController.zkStateReader))
-        .withSocketTimeout(30000).withConnectionTimeout(15000)
-        .withHttpClient(zkController.cc.getUpdateShardHandler().getDefaultHttpClient())
-        .withConnectionTimeout(15000).withSocketTimeout(30000).build();
-    zkController.cloudManager = new SolrClientCloudManager(new ZkDistributedQueueFactory(zkController.zkClient), zkController.cloudSolrClient);
-    zkController.cloudManager.getClusterStateProvider().connect();
+//    zkController.cloudSolrClient = new CloudSolrClient.Builder(new ZkClientClusterStateProvider(zkController.zkStateReader))
+//        .withSocketTimeout(30000).withConnectionTimeout(15000)
+//        .withHttpClient(zkController.cc.getUpdateShardHandler().getDefaultHttpClient())
+//        .withConnectionTimeout(15000).withSocketTimeout(30000).build();
+//    zkController.cloudManager = new SolrClientCloudManager(new ZkDistributedQueueFactory(zkController.zkClient), zkController.cloudSolrClient);
+//    zkController.cloudManager.getClusterStateProvider().connect();
 
     // nocommit - use DW
     // notify any other objects that need to know when the session was re-connected

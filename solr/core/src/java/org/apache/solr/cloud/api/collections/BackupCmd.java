@@ -80,7 +80,7 @@ public class BackupCmd implements OverseerCollectionMessageHandler.Cmd {
 
     Instant startTime = Instant.now();
 
-    CoreContainer cc = ocmh.overseer.getCoreContainer();
+    CoreContainer cc = ocmh.cc;
     BackupRepository repository = cc.newBackupRepository(Optional.ofNullable(repo));
     BackupManager backupMgr = new BackupManager(repository, ocmh.zkStateReader);
 
@@ -167,7 +167,7 @@ public class BackupCmd implements OverseerCollectionMessageHandler.Cmd {
     String backupName = request.getStr(NAME);
     String asyncId = request.getStr(ASYNC);
     String repoName = request.getStr(CoreAdminParams.BACKUP_REPOSITORY);
-    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.cc.getUpdateShardHandler().getDefaultHttpClient());
 
     String commitName = request.getStr(CoreAdminParams.COMMIT_NAME);
     Optional<CollectionSnapshotMetaData> snapshotMeta = Optional.empty();

@@ -17,23 +17,26 @@
 
 package org.apache.solr.common.cloud;
 
+import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_DEF;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CollectionAdminParams;
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_DEF;
 
 /**
  * Interact with solr cluster properties
@@ -42,6 +45,7 @@ import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_DEF;
  * read-only eventually-consistent uses, clients should instead call
  * {@link ZkStateReader#getClusterProperty(String, Object)}
  */
+@SolrThreadSafe // TODO: check more
 public class ClusterProperties {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -97,7 +101,9 @@ public class ClusterProperties {
   public Map<String, Object> getClusterProperties() throws IOException {
     try {
       Map<String, Object> properties = (Map<String, Object>) Utils.fromJSON(client.getData(ZkStateReader.CLUSTER_PROPS, null, new Stat(), true));
-      return convertCollectionDefaultsToNestedFormat(properties);
+      Map<String,Object> threadSafeProps = DW.concMapSmallO();
+      threadSafeProps.putAll(properties);
+      return convertCollectionDefaultsToNestedFormat(threadSafeProps);
     } catch (KeeperException.NoNodeException e) {
       return Collections.emptyMap();
     } catch (KeeperException | InterruptedException e) {
@@ -126,7 +132,7 @@ public class ClusterProperties {
     if (properties.containsKey(COLLECTION_DEF)) {
       Map<String, Object> values = (Map<String, Object>) properties.remove(COLLECTION_DEF);
       if (values != null) {
-        properties.putIfAbsent(CollectionAdminParams.DEFAULTS, new LinkedHashMap<>());
+        properties.putIfAbsent(CollectionAdminParams.DEFAULTS, new ConcurrentSkipListMap<>());
         Map<String, Object> defaults = (Map<String, Object>) properties.get(CollectionAdminParams.DEFAULTS);
         defaults.compute(CollectionAdminParams.COLLECTION, (k, v) -> {
           if (v == null) return values;
@@ -137,7 +143,7 @@ public class ClusterProperties {
         });
       } else {
         // explicitly set to null, so set null in the nested format as well
-        properties.putIfAbsent(CollectionAdminParams.DEFAULTS, new LinkedHashMap<>());
+        properties.putIfAbsent(CollectionAdminParams.DEFAULTS, new ConcurrentSkipListMap<>());
         Map<String, Object> defaults = (Map<String, Object>) properties.get(CollectionAdminParams.DEFAULTS);
         defaults.put(CollectionAdminParams.COLLECTION, null);
       }

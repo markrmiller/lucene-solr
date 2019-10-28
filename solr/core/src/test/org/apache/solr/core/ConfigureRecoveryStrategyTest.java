@@ -21,6 +21,7 @@ import java.lang.reflect.Modifier;
 
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.RecoveryStrategy;
+import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -88,9 +89,8 @@ public class ConfigureRecoveryStrategyTest extends SolrTestCaseJ4 {
       this.alternativeBaseUrlProp = alternativeBaseUrlProp;
     }
 
-    public CustomRecoveryStrategy(CoreContainer cc, CoreDescriptor cd,
-        RecoveryStrategy.RecoveryListener recoveryListener) {
-      super(cc, cd, recoveryListener);
+    public CustomRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
+      super(cc, zkController, zkStateReader);
     }
 
     @Override
@@ -103,9 +103,8 @@ public class ConfigureRecoveryStrategyTest extends SolrTestCaseJ4 {
 
   static public class CustomRecoveryStrategyBuilder extends RecoveryStrategy.Builder {
     @Override
-    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, CoreDescriptor cd,
-        RecoveryStrategy.RecoveryListener recoveryListener) {
-      return new CustomRecoveryStrategy(cc, cd, recoveryListener);
+    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
+      return new CustomRecoveryStrategy(cc, zkController, zkStateReader);
     }
   }
 

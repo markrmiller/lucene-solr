@@ -72,7 +72,7 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
     final Map<String, Object> createMsgMap = CollectionsHandler.CollectionOperation.CREATE_OP.execute(
         new LocalSolrQueryRequest(null, createReqParams),
         null,
-        ocmh.overseer.getCoreContainer().getCollectionsHandler());
+        ocmh.cc.getCollectionsHandler());
     createMsgMap.put(Overseer.QUEUE_OPERATION, "create");
 
     NamedList results = new NamedList();
@@ -88,8 +88,7 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
       }
     }
 
-    CollectionsHandler.waitForActiveCollection(createCollName, ocmh.overseer.getCoreContainer(),
-        new OverseerSolrResponse(results));
+    CollectionsHandler.waitForActiveCollection(createCollName, ocmh.cc, 0, 0);
     CollectionProperties collectionProperties = new CollectionProperties(ocmh.zkStateReader.getZkClient());
     collectionProperties.setCollectionProperty(createCollName,ROUTED_ALIAS_NAME_CORE_PROP,aliasName);
     while (!ocmh.zkStateReader.getCollectionProperties(createCollName,1000).containsKey(ROUTED_ALIAS_NAME_CORE_PROP)) {

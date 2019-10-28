@@ -56,12 +56,12 @@ public class UtilizeNodeCmd implements OverseerCollectionMessageHandler.Cmd {
     ocmh.checkRequired(message, NODE);
     String nodeName = message.getStr(NODE);
     String async = message.getStr(ASYNC);
-    AutoScalingConfig autoScalingConfig = ocmh.overseer.getSolrCloudManager().getDistribStateManager().getAutoScalingConfig();
+    AutoScalingConfig autoScalingConfig = ocmh.cc.getZkController().getSolrCloudManager().getDistribStateManager().getAutoScalingConfig();
 
     //first look for any violation that may use this replica
     List<ZkNodeProps> requests = new ArrayList<>();
     //first look for suggestions if any
-    List<Suggester.SuggestionInfo> suggestions = PolicyHelper.getSuggestions(autoScalingConfig, ocmh.overseer.getSolrCloudManager());
+    List<Suggester.SuggestionInfo> suggestions = PolicyHelper.getSuggestions(autoScalingConfig, ocmh.cc.getZkController().getSolrCloudManager());
     for (Suggester.SuggestionInfo suggestionInfo : suggestions) {
       log.info("op: " + suggestionInfo.getOperation());
       String coll = null;
@@ -84,7 +84,7 @@ public class UtilizeNodeCmd implements OverseerCollectionMessageHandler.Cmd {
       }
     }
     executeAll(requests);
-    PolicyHelper.SessionWrapper sessionWrapper = PolicyHelper.getSession(ocmh.overseer.getSolrCloudManager());
+    PolicyHelper.SessionWrapper sessionWrapper = PolicyHelper.getSession(ocmh.cc.getZkController().getSolrCloudManager());
     Policy.Session session = sessionWrapper.get();
     Suggester initialsuggester = session.getSuggester(MOVEREPLICA)
         .hint(Suggester.Hint.TARGET_NODE, nodeName);
@@ -95,7 +95,7 @@ public class UtilizeNodeCmd implements OverseerCollectionMessageHandler.Cmd {
       SolrRequest request = suggester.getSuggestion();
       if (requests.size() > 10) {
         log.info("too_many_suggestions");
-        PolicyHelper.logState(ocmh.overseer.getSolrCloudManager(), initialsuggester);
+        PolicyHelper.logState(ocmh.cc.getZkController().getSolrCloudManager(), initialsuggester);
         break;
       }
       log.info("SUGGESTION: {}", request);
@@ -108,7 +108,7 @@ public class UtilizeNodeCmd implements OverseerCollectionMessageHandler.Cmd {
     }
     log.info("total_suggestions: {}", requests.size());
     if (requests.size() == 0) {
-      PolicyHelper.logState(ocmh.overseer.getSolrCloudManager(), initialsuggester);
+      PolicyHelper.logState(ocmh.cc.getZkController().getSolrCloudManager(), initialsuggester);
     }
     sessionWrapper.returnSession(session);
     try {
@@ -123,7 +123,7 @@ public class UtilizeNodeCmd implements OverseerCollectionMessageHandler.Cmd {
     for (ZkNodeProps props : requests) {
       NamedList result = new NamedList();
       ocmh.commandMap.get(MOVEREPLICA)
-          .call(ocmh.overseer.getSolrCloudManager().getClusterStateProvider().getClusterState(),
+          .call(ocmh.cc.getZkController().getSolrCloudManager().getClusterStateProvider().getClusterState(),
               props,
               result);
     }

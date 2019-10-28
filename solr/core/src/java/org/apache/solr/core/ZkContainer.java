@@ -34,7 +34,6 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
-import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.patterns.DW.Exp;
@@ -82,6 +81,7 @@ public class ZkContainer implements Closeable {
     System.setProperty("zookeeper.jmx.log4j.disable", "true");
 
     if (zkRun != null) {
+      log.info("Starting internal zkServer ...");
       String zkDataHome = System.getProperty("zkServerDataDir", Paths.get(solrHome).resolve("zoo_data").toString());
       String zkConfHome = System.getProperty("zkServerConfDir", solrHome);
       zkServer = new SolrZkServer(stripChroot(zkRun), stripChroot(config.getZkHost()), new File(zkDataHome), zkConfHome, config.getSolrHostPort());
@@ -109,11 +109,11 @@ public class ZkContainer implements Closeable {
         }
         String confDir = System.getProperty("bootstrap_confdir");
         boolean boostrapConf = Boolean.getBoolean("bootstrap_conf");  
-        
-        if(!ZkController.checkChrootPath(zookeeperHost, (confDir!=null) || boostrapConf || zkRunOnly)) {
-          throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-              "A chroot was specified in ZkHost but the znode doesn't exist. " + zookeeperHost);
-        }
+        /// nocommit - these checks for 99% to help 1% are no good
+//        if(!ZkController.checkChrootPath(zookeeperHost, (confDir!=null) || boostrapConf || zkRunOnly)) {
+//          throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
+//              "A chroot was specified in ZkHost but the znode doesn't exist. " + zookeeperHost);
+//        }
         zkController = new ZkController(cc, zookeeperHost, zkClientConnectTimeout, config,
             new CurrentCoreDescriptorProvider() {
 
@@ -135,6 +135,8 @@ public class ZkContainer implements Closeable {
           Thread.sleep(10000);
         }
         
+        
+        // nocommit
         if(confDir != null) {
           Path configPath = Paths.get(confDir);
           if (!Files.isDirectory(configPath))
@@ -158,6 +160,7 @@ public class ZkContainer implements Closeable {
 
     }
     this.zkController = zkController;
+    this.zkController.start();
   }
   
   private String stripChroot(String zkRun) {

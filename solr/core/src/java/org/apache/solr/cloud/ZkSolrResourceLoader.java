@@ -17,7 +17,6 @@
 package org.apache.solr.cloud;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
@@ -25,7 +24,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZooKeeperException;
@@ -33,7 +31,7 @@ import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.SolrResourceNotFoundException;
 import org.apache.solr.schema.ZkIndexSchemaReader;
-import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,56 +79,22 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
    */
   @Override
   public InputStream openResource(String resource) throws IOException {
-    InputStream is;
     String file = (".".equals(resource)) ? configSetZkPath : configSetZkPath + "/" + resource;
-    int maxTries = 10;
-    Exception exception = null;
-    while (maxTries -- > 0) {
-      try {
-        if (zkController.pathExists(file)) {
-          Stat stat = new Stat();
-          byte[] bytes = zkController.getZkClient().getData(file, null, stat, true);
-          return new ZkByteArrayInputStream(bytes, stat);
-        } else {
-          //Path does not exists. We only retry for session expired exceptions.
-          break;
-        }
-      } catch (KeeperException.SessionExpiredException e) {
-        exception = e;
-        if (!zkController.getCoreContainer().isShutDown()) {
-          // Retry in case of session expiry
-          try {
-            Thread.sleep(1000);
-            log.debug("Sleeping for 1s before retrying fetching resource=" + resource);
-          } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Could not load resource=" + resource, ie);
-          }
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Error opening " + file, e);
-      } catch (Exception e) {
-        throw new DW.Exp(e);
-      }
-    }
-
-    if (exception != null) {
-      throw new IOException("We re-tried 10 times but was still unable to fetch resource=" + resource + " from ZK", exception);
-    }
-
     try {
-      // delegate to the class loader (looking into $INSTANCE_DIR/lib jars)
-      is = classLoader.getResourceAsStream(resource.replace(File.separatorChar, '/'));
+        Stat stat = new Stat();
+        byte[] bytes = zkController.getZkClient().getData(file, null, stat, true);
+        if (bytes == null) {
+          throw new SolrResourceNotFoundException("Resource not found resource=" + resource);
+        }
+        return new ZkByteArrayInputStream(bytes, stat);
     } catch (Exception e) {
+      if (e instanceof NoNodeException) {
+        throw new SolrResourceNotFoundException("Resource not foundr esource=" + resource, e);
+      }
+      
       throw new DW.Exp(e);
     }
-    if (is == null) {
-      throw new SolrResourceNotFoundException("Can't find resource '" + resource
-          + "' in classpath or '" + configSetZkPath + "', cwd="
-          + System.getProperty("user.dir"));
-    }
-    return is;
+
   }
 
   public static class ZkByteArrayInputStream extends ByteArrayInputStream{
@@ -159,16 +123,8 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
     List<String> list;
     try {
       list = zkController.getZkClient().getChildren(configSetZkPath, null, true);
-    } catch (InterruptedException e) {
-      // Restore the interrupted status
-      Thread.currentThread().interrupt();
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-          "", e);
-    } catch (KeeperException e) {
-      log.error("", e);
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR,
-          "", e);
+    } catch (Exception e) {
+      throw new DW.Exp(e);
     }
     return list.toArray(new String[0]);
   }

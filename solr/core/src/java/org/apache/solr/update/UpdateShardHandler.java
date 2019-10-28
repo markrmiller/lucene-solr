@@ -259,15 +259,9 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
     recoveryExecutor.shutdown();
 
     try (DW closer = new DW(this)) {
-      Set<Object> objects = new HashSet<>(10);
-      objects.add(updateExecutor);
-      objects.add(recoveryExecutor);
-      objects.add(updateOnlyClient);
-      objects.add(recoveryOnlyClient);
-      objects.add(defaultConnectionManager); 
-      objects.add(recoveryOnlyConnectionManager);
-      
-      closer.add("UpdateShardHandler", objects, () -> {SolrMetricProducer.super.close(); return this;});
+      closer.add("Executors", updateExecutor, recoveryExecutor);
+      closer.add("HttpClients", updateOnlyClient, recoveryOnlyClient);
+      closer.add("ConnectionMgr&MetricsProducer", defaultConnectionManager, recoveryOnlyConnectionManager, () -> {SolrMetricProducer.super.close(); return this;});
     }
   }
 

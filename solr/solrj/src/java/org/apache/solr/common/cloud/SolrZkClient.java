@@ -24,10 +24,14 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -45,14 +50,19 @@ import java.util.regex.Pattern;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
 import org.apache.solr.common.patterns.DW;
@@ -83,13 +93,30 @@ import org.slf4j.LoggerFactory;
  */
 public class SolrZkClient implements Closeable {
 
+  private static final int MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW = 750;
+
   static final String NEWL = System.getProperty("line.separator");
 
   static final int DEFAULT_CLIENT_CONNECT_TIMEOUT = 30000;
+  
+  static final TransformerFactory transformerFactory = TransformerFactory.newInstance();
+  static final Transformer transformer;
+  static {
+    try {
+      transformer = transformerFactory.newTransformer();
+    } catch (TransformerConfigurationException e) {
+      throw new DW.Exp(e);
+    }
+    
+    transformerFactory.setAttribute("indent-number", 2);
+
+    transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+
+  }
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final ConnectionManager connManager;
+  private  ConnectionManager connManager;
 
   private volatile ZooKeeper keeper;
 
@@ -106,7 +133,7 @@ public class SolrZkClient implements Closeable {
   private volatile boolean isClosed = false;
   private final ZkClientConnectionStrategy zkClientConnectionStrategy;
   private final int zkClientTimeout;
-  private final ZkACLProvider zkACLProvider;
+  private  ZkACLProvider zkACLProvider;
   private final String zkServerAddress;
 
   private final IsClosed higherLevelIsClosed;
@@ -117,7 +144,7 @@ public class SolrZkClient implements Closeable {
     return zkClientTimeout;
   }
 
-  // expert: for tests
+  // expert: for tests nocommit - remove
   public SolrZkClient() {
     this.zkServerAddress = null;
     connManager = null;
@@ -225,83 +252,83 @@ public class SolrZkClient implements Closeable {
         return returnboolean;
       }
     });
-    connManager = new ConnectionManager("ZooKeeperConnection Watcher:"
-        + zkServerAddress, this, zkServerAddress, strat, onReconnect, beforeReconnect, new IsClosed() {
-
-          @Override
-          public boolean isClosed() {
-            if (log.isDebugEnabled()) {
-              log.debug("$IsClosed.isClosed() - start");
-            }
-
-            boolean returnboolean = SolrZkClient.this.isClosed();
-            if (log.isDebugEnabled()) {
-              log.debug("$IsClosed.isClosed() - end");
-            }
-            return returnboolean;
-          }
-        });
-
-    try {
-      strat.connect(zkServerAddress, zkClientTimeout, wrapWatcher(connManager),
-          zooKeeper -> {
-            ZooKeeper oldKeeper = keeper;
-            keeper = zooKeeper;
-            try {
-              closeKeeper(oldKeeper);
-            } finally {
-              if (isClosed) {
-                // we may have been closed
-                closeKeeper(SolrZkClient.this.keeper);
-              }
-            }
-          });
-    } catch (Exception e) {
-      log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e);
-
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      connManager.close();
-      if (keeper != null) {
-        try {
-          keeper.close();
-        } catch (InterruptedException e1) {
-          log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e1);
-
-          Thread.currentThread().interrupt();
-        }
-      }
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-    }
-
-    try {
-      connManager.waitForConnected(clientConnectTimeout);
-    } catch (Exception e) {
-      log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e);
-
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      
-      connManager.close();
-      try {
-        keeper.close();
-      } catch (InterruptedException e1) {
-        log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e1);
-
-        Thread.currentThread().interrupt();
-      }
-      zkConnManagerCallbackExecutor.shutdownNow();
-      ExecutorUtil.shutdownAndAwaitTermination(zkConnManagerCallbackExecutor);
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-    }
-    assert ObjectReleaseTracker.track(this);
-    if (zkACLProvider == null) {
-      this.zkACLProvider = createZkACLProvider();
-    } else {
-      this.zkACLProvider = zkACLProvider;
-    }
+//    connManager = new ConnectionManager("ZooKeeperConnection Watcher:"
+//        + zkServerAddress, this, zkServerAddress, strat, onReconnect, beforeReconnect, new IsClosed() {
+//
+//          @Override
+//          public boolean isClosed() {
+//            if (log.isDebugEnabled()) {
+//              log.debug("$IsClosed.isClosed() - start");
+//            }
+//
+//            boolean returnboolean = SolrZkClient.this.isClosed();
+//            if (log.isDebugEnabled()) {
+//              log.debug("$IsClosed.isClosed() - end");
+//            }
+//            return returnboolean;
+//          }
+//        });
+//
+//    try {
+//      strat.connect(zkServerAddress, zkClientTimeout, wrapWatcher(connManager),
+//          zooKeeper -> {
+//            ZooKeeper oldKeeper = keeper;
+//            keeper = zooKeeper;
+//            try {
+//              closeKeeper(oldKeeper);
+//            } finally {
+//              if (isClosed) {
+//                // we may have been closed
+//                closeKeeper(SolrZkClient.this.keeper);
+//              }
+//            }
+//          });
+//    } catch (Exception e) {
+//      log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e);
+//
+//      if (e instanceof InterruptedException) {
+//        Thread.currentThread().interrupt();
+//      }
+//      connManager.close();
+//      if (keeper != null) {
+//        try {
+//          keeper.close();
+//        } catch (InterruptedException e1) {
+//          log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e1);
+//
+//          Thread.currentThread().interrupt();
+//        }
+//      }
+//      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+//    }
+//
+//    try {
+//      connManager.waitForConnected(clientConnectTimeout);
+//    } catch (Exception e) {
+//      log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e);
+//
+//      if (e instanceof InterruptedException) {
+//        Thread.currentThread().interrupt();
+//      }
+//      
+//      connManager.close();
+//      try {
+//        keeper.close();
+//      } catch (InterruptedException e1) {
+//        log.error("SolrZkClient(String=" + zkServerAddress + ", int=" + zkClientTimeout + ", int=" + clientConnectTimeout + ", ZkClientConnectionStrategy=" + strat + ", OnReconnect=" + onReconnect + ", BeforeReconnect=" + beforeReconnect + ", ZkACLProvider=" + zkACLProvider + ", IsClosed=" + higherLevelIsClosed + ")", e1);
+//
+//        Thread.currentThread().interrupt();
+//      }
+//      zkConnManagerCallbackExecutor.shutdownNow();
+//      ExecutorUtil.shutdownAndAwaitTermination(zkConnManagerCallbackExecutor);
+//      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+//    }
+//    assert ObjectReleaseTracker.track(this);
+//    if (zkACLProvider == null) {
+//      this.zkACLProvider = createZkACLProvider();
+//    } else {
+//      this.zkACLProvider = zkACLProvider;
+//    }
   }
 
   public ConnectionManager getConnectionManager() {
@@ -405,21 +432,22 @@ public class SolrZkClient implements Closeable {
    * {@link #getData(String, org.apache.zookeeper.Watcher, org.apache.zookeeper.data.Stat, boolean)}.
    */
   public Watcher wrapWatcher(final Watcher watcher) {
-    if (log.isDebugEnabled()) {
-      log.debug("wrapWatcher(Watcher watcher={}) - start", watcher);
-    }
-
-    if (watcher == null || watcher instanceof ProcessWatchWithExecutor) {
-      if (log.isDebugEnabled()) {
-        log.debug("return (Watcher watcher={}) - start", watcher);
-      }
-      return watcher;
-    }
-    Watcher returnWatcher = new ProcessWatchWithExecutor(watcher);
-    if (log.isDebugEnabled()) {
-      log.debug("wrapWatcher(Watcher) - end");
-    }
-    return returnWatcher;
+//    if (log.isDebugEnabled()) {
+//      log.debug("wrapWatcher(Watcher watcher={}) - start", watcher);
+//    }
+//
+//    if (watcher == null || watcher instanceof ProcessWatchWithExecutor) {
+//      if (log.isDebugEnabled()) {
+//        log.debug("return (Watcher watcher={}) - start", watcher);
+//      }
+//      return watcher;
+//    }
+//    Watcher returnWatcher = new ProcessWatchWithExecutor(watcher);
+//    if (log.isDebugEnabled()) {
+//      log.debug("wrapWatcher(Watcher) - end");
+//    }
+    // nocommit
+    return watcher;
   }
 
   /**
@@ -710,7 +738,7 @@ public class SolrZkClient implements Closeable {
     } else {
       throw new IllegalArgumentException("znode paths must start with /");
     }
-    String[] paths = path.split("/");
+    String[] paths = path.split("\r\n|\r|\n");
     StringBuilder sbPath = new StringBuilder();
     for (int i = 0; i < paths.length; i++) {
       String pathPiece = paths[i];
@@ -804,14 +832,18 @@ public class SolrZkClient implements Closeable {
   public void printLayout(String path, int indent, StringBuilder string) {
 
     byte[] data;
-    Stat stat = null;
+    Stat stat = new Stat();
     List<String> children;
     try {
       data = getData(path, null, stat, true);
 
       children = getChildren(path, null, true);
-
+      Collections.sort(children);
     } catch (KeeperException | InterruptedException e1) {
+      if (e1 instanceof KeeperException.NoNodeException) {
+        // things change ...
+        return;
+      }
       throw new DW.Exp(e1);
     }
     StringBuilder dent = new StringBuilder();
@@ -821,22 +853,22 @@ public class SolrZkClient implements Closeable {
     string.append(dent).append(path).append(" (").append(children.size()).append(")").append(NEWL);
     if (data != null) {
       String dataString = new String(data, StandardCharsets.UTF_8);
-      if ((stat != null && stat.getDataLength() < 850) || path.endsWith("state.json")) {
+      if ((stat != null && stat.getDataLength() < MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW && dataString.split("\\r\\n|\\r|\\n").length < 6) || path.endsWith("state.json")) {
         if (path.endsWith(".xml")) {
           // this is the cluster state in xml format - lets pretty print
-          dataString = prettyPrint(dataString);
+          dataString = prettyPrint(path, dataString);
         }
 
-        string.append(dent).append("DATA (" + (stat != null ? stat.getDataLength() : "?") + ") :\n").append(dent).append("    ")
+        string.append(dent).append("DATA (" + (stat != null ? stat.getDataLength() : "?") + "b) :\n").append(dent).append("    ")
             .append(dataString.replaceAll("\n", "\n" + dent + "    ")).append(NEWL);
       } else {
-        string.append(dent).append("DATA (" + (stat != null ? stat.getDataLength() : "?") + ") : ...supressed...").append(NEWL);
+        string.append(dent).append("DATA (" + (stat != null ? stat.getDataLength() : "?") + "b) : ...supressed...").append(NEWL);
       }
     }
-
+    indent += 1;
     for (String child : children) {
       if (!child.equals("quota")) {
-        printLayout(path + (path.equals("/") ? "" : "/") + child, indent + 1,
+        printLayout(path + (path.equals("/") ? "" : "/") + child, indent,
             string);
       }
     }
@@ -853,28 +885,38 @@ public class SolrZkClient implements Closeable {
     printLayout("/", 0, sb);
     out.println(sb.toString());
   }
-
-  public static String prettyPrint(String input, int indent) {
+  
+  public void printLayoutToFile(Path file) {
+    StringBuilder sb = new StringBuilder();
+    printLayout("/", 0, sb);
     try {
-      Source xmlInput = new StreamSource(new StringReader(input));
-      StringWriter stringWriter = new StringWriter();
-      StreamResult xmlOutput = new StreamResult(stringWriter);
-      TransformerFactory transformerFactory = TransformerFactory.newInstance();
-      transformerFactory.setAttribute("indent-number", indent);
-      Transformer transformer = transformerFactory.newTransformer();
-      transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-      transformer.transform(xmlInput, xmlOutput);
-      String returnString = xmlOutput.getWriter().toString();
-      return returnString;
-    } catch (Exception e) {
-      log.error("prettyPrint(String=" + input + ", int=" + indent + ")", e);
-
+      Files.writeString(file, sb.toString(), StandardOpenOption.CREATE);
+    } catch (IOException e) {
       throw new DW.Exp(e);
     }
   }
+  
+  public static String prettyPrint(String path, String dataString, int indent) {
+    try {
+      Source xmlInput = new StreamSource(new StringReader(dataString));
+      try (StringWriter stringWriter = new StringWriter()) {
+        StreamResult xmlOutput = new StreamResult(stringWriter);
+        try (Writer writer = xmlOutput.getWriter()) {
+          return writer.toString();
+        }
+      } finally {
+        DW.close(((StreamSource) xmlInput).getInputStream());
+      }
+    } catch (Exception e) {
+      log.error("prettyPrint(path={}, dataString={})", dataString, indent, e);
 
-  private static String prettyPrint(String input) {
-    String returnString = prettyPrint(input, 2);
+      DW.propegateInterrupt(e);
+      return "XML Parsing Failure";
+    }
+  }
+
+  private static String prettyPrint(String path, String input) {
+    String returnString = prettyPrint(path, input, 2);
     return returnString;
   }
 
@@ -887,8 +929,8 @@ public class SolrZkClient implements Closeable {
     isClosed = true;
     
     try (DW worker = new DW(this)) {
-      worker.add("SolrZkClientInternals", curator, connManager, keeper);
-      worker.add("ZkClientExecutors", zkCallbackExecutor, zkConnManagerCallbackExecutor);
+      worker.add("SolrZkClientInternals", curator, keeper);
+      worker.add("ZkClientExecutors&ConnMgr", connManager, zkCallbackExecutor, zkConnManagerCallbackExecutor);
     }
 
     assert ObjectReleaseTracker.release(this);
@@ -1246,10 +1288,15 @@ public class SolrZkClient implements Closeable {
     }
   }
 
+  public void mkdirs(String path) {
+    Map<String,byte[]> dataMap = new HashMap<String,byte[]>(1);
+    dataMap.put(path, null);
+    mkDirs(dataMap);
+  }
+  
   public void mkdirs(String path, byte[] bytes) {
     Map<String,byte[]> dataMap = new HashMap<String,byte[]>(1);
     dataMap.put(path, bytes);
-
     mkDirs(dataMap);
   }
   
@@ -1309,13 +1356,17 @@ public class SolrZkClient implements Closeable {
           }, "");
 
     }
-
+    boolean success = false;
     try {
-      latch.await(5, TimeUnit.SECONDS);
+      success = latch.await(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       log.error("mkDirs(String=" + paths + ")", e);
 
       throw new DW.Exp(e);
+    }
+    
+    if (!success) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, "Timeout waiting for operatoins to complete");
     }
 
     if (log.isDebugEnabled()) {
@@ -1326,8 +1377,29 @@ public class SolrZkClient implements Closeable {
   public void mkdirs(String znode, File file) {
     try {
       mkdirs(znode, FileUtils.readFileToByteArray(file));
-    } catch (IOException e) {
+    } catch (Exception e) {
       throw new DW.Exp(e);
     }
+  }
+
+  public CuratorFramework getCurator() {
+    return curator;
+  }
+  
+  
+  public static void main(String[] args) {
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+    CuratorFramework client = CuratorFrameworkFactory.newClient(args[0], retryPolicy);
+    client.start();
+    try {
+      client.blockUntilConnected(10000, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      DW.propegateInterrupt(e);
+    }
+
+    try (SolrZkClient zkClient = new SolrZkClient(client)) {
+      zkClient.printLayoutToStream(System.out);
+    }
+    
   }
 }

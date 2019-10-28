@@ -45,6 +45,12 @@ dependencies {
   implementation project(':solr:solr-solrj')
   
   
+  
+  // https://mvnrepository.com/artifact/com.google.inject/guice
+  implementation ('com.google.inject:guice')
+  // https://mvnrepository.com/artifact/com.google.code.guice/guice-servlet
+  implementation ('com.google.inject.extensions:guice-servlet')
+
   implementation ('org.eclipse.jetty:jetty-servlet')
   implementation ('org.eclipse.jetty.http2:http2-server')
   implementation ('org.eclipse.jetty.http2:http2-common')

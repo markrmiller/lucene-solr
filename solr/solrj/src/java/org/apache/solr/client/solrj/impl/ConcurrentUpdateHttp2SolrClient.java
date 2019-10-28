@@ -23,6 +23,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -264,7 +266,10 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
                   }
                 }
               } catch (Exception exc) {
-                throw new DW.Exp("Failed to parse error response from " + basePath, exc);
+        
+                String result = IOUtils.toString(rspBody, "UTF-8");
+                log.error("Problem parsing response={}", result, exc);
+                throw new DW.Exp("Failed to parse error response from " + basePath + " " + result, exc);
               } finally {
                 solrExc = new HttpSolrClient.RemoteSolrException(basePath , statusCode, msg.toString(), null);
                 if (metadata != null) {
@@ -278,12 +283,6 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
             }
 
           } finally {
-            try {
-              consumeFully(rspBody);
-            } catch (Exception e) {
-              DW.propegateInterrupt(e);
-              log.error("Error consuming and closing http response stream.", e);
-            }
             notifyQueueAndRunnersIfEmptyQueue();
           }
         }
@@ -294,20 +293,6 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
     }
   }
 
-  private void consumeFully(InputStream is) {
-    if (is != null) {
-      try (is) {
-        // make sure the stream is full read
-        is.skip(is.available());
-        while (is.read() != -1) {
-        }
-      } catch (UnsupportedOperationException e) {
-        // nothing to do then
-      } catch (IOException e) {
-        // quiet
-      }
-    }
-  }
 
   private void notifyQueueAndRunnersIfEmptyQueue() {
     if (queue.size() == 0) {

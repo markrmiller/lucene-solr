@@ -128,7 +128,7 @@ public class Http2SolrClient extends SolrClient {
 
   private ResponseParser parser = new BinaryResponseParser();
   private volatile RequestWriter requestWriter = new BinaryRequestWriter();
-  private List<HttpListenerFactory> listenerFactory = new LinkedList<>();
+  private List<HttpListenerFactory> listenerFactory = new LinkedList<>(); // nocommit thread safety
   private AsyncTracker asyncTracker = new AsyncTracker();
   /**
    * The URL of the Solr server.

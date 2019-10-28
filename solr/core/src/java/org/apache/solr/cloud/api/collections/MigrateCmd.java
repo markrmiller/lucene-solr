@@ -161,7 +161,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
     DocRouter.Range keyHashRange = sourceRouter.keyHashRange(splitKey);
 
     ShardHandlerFactory shardHandlerFactory = ocmh.shardHandlerFactory;
-    ShardHandler shardHandler = ((HttpShardHandlerFactory)shardHandlerFactory).getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+    ShardHandler shardHandler = ((HttpShardHandlerFactory)shardHandlerFactory).getShardHandler(ocmh.cc.getUpdateShardHandler().getDefaultHttpClient());
 
     log.info("Hash range for split.key: {} is: {}", splitKey, keyHashRange);
     // intersect source range, keyHashRange and target range
@@ -196,7 +196,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
         "targetCollection", targetCollection.getName(),
         "expireAt", RoutingRule.makeExpiryAt(timeout));
     log.info("Adding routing rule: " + m);
-    ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+    ocmh.solrSeer.sendUpdate(m);
 
     // wait for a while until we see the new rule
     log.info("Waiting to see routing rule updated in clusterstate");
@@ -246,7 +246,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
     Replica tempSourceLeader = zkStateReader.getLeaderRetry(tempSourceCollectionName, tempSourceSlice.getName());
 
     String tempCollectionReplica1 = tempSourceLeader.getCoreName();
-    String coreNodeName = ocmh.waitForCoreNodeName(tempSourceCollectionName,
+    String coreNodeName = ocmh.waitForCoreNodeName(zkStateReader, tempSourceCollectionName,
         sourceLeader.getNodeName(), tempCollectionReplica1);
     // wait for the replicas to be seen as active on temp source leader
     log.info("Asking source leader to wait for: " + tempCollectionReplica1 + " to be alive on: " + sourceLeader.getNodeName());
@@ -285,7 +285,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
     }
     log.info("Creating a replica of temporary collection: {} on the target leader node: {}",
         tempSourceCollectionName, targetLeader.getNodeName());
-    String tempCollectionReplica2 = Assign.buildSolrCoreName(ocmh.overseer.getSolrCloudManager().getDistribStateManager(),
+    String tempCollectionReplica2 = Assign.buildSolrCoreName(ocmh.cc.getZkController().getSolrCloudManager().getDistribStateManager(),
         zkStateReader.getClusterState().getCollection(tempSourceCollectionName), tempSourceSlice.getName(), Replica.Type.NRT);
     props = new HashMap<>();
     props.put(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower());
@@ -310,7 +310,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
       syncRequestTracker.processResponses(results, shardHandler, true, "MIGRATE failed to create replica of " +
         "temporary collection in target leader node.");
     }
-    coreNodeName = ocmh.waitForCoreNodeName(tempSourceCollectionName,
+    coreNodeName = ocmh.waitForCoreNodeName(zkStateReader, tempSourceCollectionName,
         targetLeader.getNodeName(), tempCollectionReplica2);
     // wait for the replicas to be seen as active on temp source leader
     log.info("Asking temp source leader to wait for: " + tempCollectionReplica2 + " to be alive on: " + targetLeader.getNodeName());

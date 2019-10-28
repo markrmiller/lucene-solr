@@ -39,7 +39,8 @@
     <AsyncLogger name="org.apache.solr.hadoop" level="INFO"/>
     <AsyncLogger name="org.eclipse.jetty" level="INFO"/>
     <AsyncLogger name="org.apache.solr.common.patterns.DoSmartWork" level="DEBUG"/>
-     <AsyncLogger name="org.apache.solr.common.util.CloseTimeTracker" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.common.util.CloseTimeTracker" level="DEBUG"/>
+    <AsyncLogger name="org.apache.solr.client.solrj.impl.LBSolrClient" level="DEBUG"/>
 
     <AsyncRoot level="INFO">
       <AppenderRef ref="STDERR"/>

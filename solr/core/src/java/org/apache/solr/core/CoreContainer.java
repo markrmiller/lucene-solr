@@ -41,6 +41,8 @@ import java.util.concurrent.Future;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.inject.Inject;
+
 import org.apache.http.auth.AuthSchemeProvider;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.config.Lookup;
@@ -61,7 +63,6 @@ import org.apache.solr.client.solrj.impl.SolrHttpClientContextBuilder.Credential
 import org.apache.solr.client.solrj.util.SolrIdentifierValidator;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.Overseer;
-import org.apache.solr.cloud.OverseerTaskQueue;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.autoscaling.AutoScalingHandler;
 import org.apache.solr.common.AlreadyClosedException;
@@ -116,14 +117,12 @@ import org.apache.solr.security.HttpClientBuilderPlugin;
 import org.apache.solr.security.PKIAuthenticationPlugin;
 import org.apache.solr.security.PublicKeyHandler;
 import org.apache.solr.security.SecurityPluginHolder;
-import org.apache.solr.update.SolrCoreState;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.solr.util.DefaultSolrThreadFactory;
 import org.apache.solr.util.OrderedExecutor;
 import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.SolrFileCleaningTracker;
 import org.apache.solr.util.stats.MetricUtils;
-import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,6 +161,9 @@ public class CoreContainer {
       this.exception = loadFailure;
     }
   }
+  
+ 
+  @Inject public Map marksMap;
 
   protected final Map<String, CoreLoadFailure> coreInitFailures = new ConcurrentHashMap<>();
 
@@ -202,10 +204,9 @@ public class CoreContainer {
 
   private final BlobRepository blobRepository = new BlobRepository(this);
 
+  
   private volatile PluginBag<SolrRequestHandler> containerHandlers = new PluginBag<>(SolrRequestHandler.class, null);
-
-  private volatile boolean asyncSolrCoreLoad;
-
+  
   protected volatile SecurityConfHandler securityConfHandler;
 
   private volatile SecurityPluginHolder<AuthorizationPlugin> authorizationPlugin;
@@ -331,29 +332,21 @@ public class CoreContainer {
     this(config, properties, new CorePropertiesLocator(config.getCoreRootDirectory()));
   }
 
-  public CoreContainer(NodeConfig config, Properties properties, boolean asyncSolrCoreLoad) {
-    this(config, properties, new CorePropertiesLocator(config.getCoreRootDirectory()), asyncSolrCoreLoad);
-  }
-
   public CoreContainer(NodeConfig config, Properties properties, CoresLocator locator) {
-    this(config, properties, locator, false);
-  }
-
-  public CoreContainer(NodeConfig config, Properties properties, CoresLocator locator, boolean asyncSolrCoreLoad) {
-    this(config, properties, locator, asyncSolrCoreLoad, null);
+    this(config, properties, locator, null);
   }
   
-  public CoreContainer(NodeConfig config, Properties properties, CoresLocator locator, boolean asyncSolrCoreLoad, SolrZkClient zkClient) {
+  @Inject
+  public CoreContainer(NodeConfig config, Properties properties, CoresLocator locator, SolrZkClient zkClient) { // nocommit move things to laod except whats needed for injection
     this.loader = config.getSolrResourceLoader();
     this.solrHome = loader.getInstancePath().toString();
-    containerHandlers.put(PublicKeyHandler.PATH, new PublicKeyHandler());
+    containerHandlers.put(PublicKeyHandler.PATH, new PublicKeyHandler()); // nocommit
     this.cfg = requireNonNull(config);
     if (null != this.cfg.getBooleanQueryMaxClauseCount()) {
       IndexSearcher.setMaxClauseCount(this.cfg.getBooleanQueryMaxClauseCount());
     }
     this.coresLocator = locator;
     this.containerProperties = new Properties(properties);
-    this.asyncSolrCoreLoad = asyncSolrCoreLoad;
     this.replayUpdatesExecutor = new OrderedExecutor(
         cfg.getReplayUpdatesThreads(),
         ExecutorUtil.newMDCAwareCachedThreadPool(
@@ -612,10 +605,15 @@ public class CoreContainer {
   // Initialization / Cleanup
   //-------------------------------------------------------------------
 
+  public void load() {
+    load(false);
+  }
+  
   /**
    * Load the cores defined for this CoreContainer
    */
-  public void load() {
+  public void load(boolean asyncSolrCoreLoad) {
+    log.error("marksmap: {}", marksMap);
     log.debug("Loading cores into CoreContainer [instanceDir={}]", loader.getInstancePath());
 
     // add the sharedLib to the shared resource loader before initializing cfg based plugins
@@ -845,7 +843,7 @@ public class CoreContainer {
     }
 
     if (isZooKeeperAware()) {
-      zkSys.getZkController().checkOverseerDesignate();
+//    //  zkSys.getZkController().checkOverseerDesignate();
       // initialize this handler here when SolrCloudManager is ready
       autoScalingHandler = new AutoScalingHandler(getZkController().getSolrCloudManager(), loader);
       containerHandlers.put(AutoScalingHandler.HANDLER_PATH, autoScalingHandler);
@@ -871,9 +869,8 @@ public class CoreContainer {
     if (isZooKeeperAware()) {
       name = getZkController().getNodeName();
       cloudManager = getZkController().getSolrCloudManager();
-      client = new CloudSolrClient.Builder(Collections.singletonList(getZkController().getZkServerAddress()), Optional.empty())
-          .withSocketTimeout(30000).withConnectionTimeout(15000)
-          .withHttpClient(updateShardHandler.getDefaultHttpClient()).build();
+      client = new CloudSolrClient.Builder(getZkController().getSolrCloudManager().getClusterStateProvider())
+          .withHttpClient(updateShardHandler.getDefaultHttpClient()).build(); // nocommit share httpclient
     } else {
       name = getNodeConfig().getNodeName();
       if (name == null || name.isEmpty()) {
@@ -940,8 +937,8 @@ public class CoreContainer {
 
       ZkController zkController = getZkController();
       if (zkController != null) {
-        OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
-        overseerCollectionQueue.allowOverseerPendingTasksToComplete();
+       // OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
+       // overseerCollectionQueue.allowOverseerPendingTasksToComplete();
       }
       log.info("Shutting down CoreContainer instance=" + System.identityHashCode(this));
 

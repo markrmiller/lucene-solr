@@ -55,13 +55,19 @@ public class ZkNodeProps implements JSONWriter.Writable {
     return new ZkNodeProps(copy);
   }
 
+  public ZkNodeProps plus(ZkNodeProps newVals) {
+    LinkedHashMap<String, Object> copy = new LinkedHashMap<>(propMap);
+    if (newVals.getProperties().isEmpty()) return new ZkNodeProps(copy);
+    copy.putAll(newVals.getProperties());
+    return new ZkNodeProps(copy);
+  }
 
   /**
    * Constructor that populates the from array of Strings in form key1, value1,
    * key2, value2, ..., keyN, valueN
    */
   public ZkNodeProps(String... keyVals) {
-    this( Utils.makeMap((Object[]) keyVals) );
+    this( Utils.makeMap(true, (Object[]) keyVals) );
   }
 
   public static ZkNodeProps fromKeyVals(Object... keyVals)  {
@@ -119,11 +125,16 @@ public class ZkNodeProps implements JSONWriter.Writable {
   }
 
   /**
-   * Get a string property value.
+   * Get an integer property value.
    */
   public Integer getInt(String key, Integer def) {
     Object o = propMap.get(key);
     return o == null ? def : Integer.valueOf(o.toString());
+  }
+  
+  public Integer getInt(String key) {
+    Object o = propMap.get(key);
+    return Integer.valueOf(o.toString());
   }
 
   /**
@@ -169,4 +180,5 @@ public class ZkNodeProps implements JSONWriter.Writable {
   public boolean equals(Object that) {
     return that instanceof ZkNodeProps && ((ZkNodeProps)that).propMap.equals(this.propMap);
   }
+
 }

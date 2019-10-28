@@ -114,6 +114,7 @@ public class ZkStateReader implements SolrCloseable {
   public static final String LIVE_NODES_ZKNODE = "/live_nodes";
   public static final String ALIASES = "/aliases.json";
   public static final String CLUSTER_STATE = "/clusterstate.json";
+  public static final String STATE_JSON = "/state.json";
   public static final String CLUSTER_PROPS = "/clusterprops.json";
   public static final String COLLECTION_PROPS_ZKNODE = "collectionprops.json";
   public static final String REJOIN_AT_HEAD_PROP = "rejoinAtHead";
@@ -975,12 +976,22 @@ public class ZkStateReader implements SolrCloseable {
     try {
       try {
         byte[] data = zkClient.getData(ZkStateReader.CLUSTER_PROPS, clusterPropertiesWatcher, new Stat(), true);
+//        if (data == null) {
+//          this.clusterProperties = Collections.emptyMap();
+//          log.debug("Loaded empty cluster properties");
+//          // set an exists watch, and if the node has been created since the last call,
+//          // read the data again
+//          if (zkClient.exists(ZkStateReader.CLUSTER_PROPS, clusterPropertiesWatcher, true) == null)
+//            return;
+//        }
+        // nocommit
+        
         this.clusterProperties = ClusterProperties
             .convertCollectionDefaultsToNestedFormat((Map<String,Object>) Utils.fromJSON(data));
-        log.debug("Loaded cluster properties: {}", this.clusterProperties);
-
-        for (ClusterPropertiesListener listener : clusterPropertiesListeners) {
-          listener.onChange(getClusterProperties());
+        if (log.isDebugEnabled()) log.debug("Loaded cluster properties: {}", this.clusterProperties);
+        Map<String,Object> props = getClusterProperties();
+        try (DW worker = new DW(this)) {
+          clusterPropertiesListeners.forEach((it) -> it.onChange(props) );
         }
         return;
       } catch (KeeperException.NoNodeException e) {
@@ -992,7 +1003,7 @@ public class ZkStateReader implements SolrCloseable {
           return;
       }
     } catch (Exception e) {
-      throw new DW.Exp("Error reading cluster properties from zookeeper", e);
+      throw new DW.Exp("Error reading cluster properties from zookeeper path=" + ZkStateReader.CLUSTER_PROPS, e);
     }
   }
 
@@ -1413,7 +1424,7 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public static String getCollectionPath(String coll) {
-    return getCollectionPathRoot(coll) + "/state.json";
+    return getCollectionPathRoot(coll) + STATE_JSON;
   }
 
   /**

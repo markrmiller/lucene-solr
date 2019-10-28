@@ -93,11 +93,11 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
 
     String restoreCollectionName = message.getStr(COLLECTION_PROP);
     String backupName = message.getStr(NAME); // of backup
-    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.cc.getUpdateShardHandler().getDefaultHttpClient());
     String asyncId = message.getStr(ASYNC);
     String repo = message.getStr(CoreAdminParams.BACKUP_REPOSITORY);
 
-    CoreContainer cc = ocmh.overseer.getCoreContainer();
+    CoreContainer cc = ocmh.cc;
     BackupRepository repository = cc.newBackupRepository(Optional.ofNullable(repo));
 
     URI location = repository.createURI(message.getStr(CoreAdminParams.BACKUP_LOCATION));
@@ -222,7 +222,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
         propMap.put(shard.getName(), Slice.State.CONSTRUCTION.toString());
       }
       propMap.put(ZkStateReader.COLLECTION_PROP, restoreCollectionName);
-      ocmh.overseer.offerStateUpdate(Utils.toJSON(new ZkNodeProps(propMap)));
+     ocmh.solrSeer.sendUpdate(new ZkNodeProps(propMap));
     }
 
     // TODO how do we leverage the RULE / SNITCH logic in createCollection?
@@ -364,7 +364,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
         for (Slice shard : restoreCollection.getSlices()) {
           propMap.put(shard.getName(), Slice.State.ACTIVE.toString());
         }
-        ocmh.overseer.offerStateUpdate((Utils.toJSON(new ZkNodeProps(propMap))));
+         ocmh.solrSeer.sendUpdate(new ZkNodeProps(propMap));
       }
 
       if (totalReplicasPerShard > 1) {

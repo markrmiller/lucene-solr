@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Aliases;
@@ -60,14 +59,12 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
   static void remoteInvoke(CollectionsHandler collHandler, String aliasName, String targetCol)
       throws Exception {
     final String operation = CollectionParams.CollectionAction.MAINTAINROUTEDALIAS.toLower();
-    Map<String, Object> msg = new HashMap<>();
+    Map<String,Object> msg = new HashMap<>();
     msg.put(Overseer.QUEUE_OPERATION, operation);
     msg.put(CollectionParams.NAME, aliasName);
     msg.put(MaintainRoutedAliasCmd.ROUTED_ALIAS_TARGET_COL, targetCol);
-    final SolrResponse rsp = collHandler.sendToOCPQueue(new ZkNodeProps(msg));
-    if (rsp.getException() != null) {
-      throw rsp.getException();
-    }
+    collHandler.sendToOCPQueue(new ZkNodeProps(msg));
+
   }
 
   void addCollectionToAlias(String aliasName, ZkStateReader.AliasesManager aliasesManager, String createCollName) {
@@ -175,6 +172,6 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
         (Runnable) () -> removeCollectionFromAlias(aliasName, aliasesManager, action.targetCollection));
     delProps.put(NAME, action.targetCollection);
     ZkNodeProps messageDelete = new ZkNodeProps(delProps);
-    new DeleteCollectionCmd(ocmh).call(clusterState, messageDelete, results);
+    new DeleteCollectionCmd(ocmh.cc, ocmh.adminPath).call(clusterState, messageDelete, results);
   }
 }

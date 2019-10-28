@@ -207,7 +207,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
       List<Map<String, Object>> replicas = new ArrayList<>((repFactor - 1) * 2);
 
       @SuppressWarnings("deprecation")
-      ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+      ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.cc.getUpdateShardHandler().getDefaultHttpClient());
 
 
       if (message.getBool(CommonAdminParams.SPLIT_BY_PREFIX, false)) {
@@ -307,7 +307,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         propMap.put("shard_parent_node", nodeName);
         propMap.put("shard_parent_zk_session", leaderZnodeStat.getEphemeralOwner());
 
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(new ZkNodeProps(propMap)));
+        ocmh.solrSeer.sendUpdate(new ZkNodeProps(propMap));
 
         // wait until we are able to see the new shard in cluster state
         ocmh.waitForNewShard(collectionName, subSlice);
@@ -352,7 +352,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         for (String subShardName : subShardNames) {
           // wait for parent leader to acknowledge the sub-shard core
           log.debug("Asking parent leader to wait for: " + subShardName + " to be alive on: " + nodeName);
-          String coreNodeName = ocmh.waitForCoreNodeName(collectionName, nodeName, subShardName);
+          String coreNodeName = OverseerCollectionMessageHandler.waitForCoreNodeName(zkStateReader, collectionName, nodeName, subShardName); // nocommit
           CoreAdminRequest.WaitForState cmd = new CoreAdminRequest.WaitForState();
           cmd.setCoreName(subShardName);
           cmd.setNodeName(nodeName);
@@ -484,7 +484,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
             ZkStateReader.BASE_URL_PROP, zkStateReader.getBaseUrlForNodeName(subShardNodeName),
             ZkStateReader.NODE_NAME_PROP, subShardNodeName,
             CommonAdminParams.WAIT_FOR_FINAL_STATE, Boolean.toString(waitForFinalState));
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(props));
+        ocmh.solrSeer.sendUpdate(props);
 
         HashMap<String, Object> propMap = new HashMap<>();
         propMap.put(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower());
@@ -526,7 +526,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         }
         propMap.put(ZkStateReader.COLLECTION_PROP, collectionName);
         ZkNodeProps m = new ZkNodeProps(propMap);
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+        ocmh.solrSeer.sendUpdate(m);
 
         if (leaderZnodeStat == null)  {
           // the leader is not live anymore, fail the split!
@@ -554,7 +554,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         }
         propMap.put(ZkStateReader.COLLECTION_PROP, collectionName);
         ZkNodeProps m = new ZkNodeProps(propMap);
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+        ocmh.solrSeer.sendUpdate(m);
       } else {
         log.info("Requesting shard state be set to 'recovery'");
         Map<String, Object> propMap = new HashMap<>();
@@ -564,7 +564,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         }
         propMap.put(ZkStateReader.COLLECTION_PROP, collectionName);
         ZkNodeProps m = new ZkNodeProps(propMap);
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+        ocmh.solrSeer.sendUpdate(m);
       }
 
       t = timings.sub("createCoresForReplicas");
@@ -695,7 +695,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
     if (sendUpdateState) {
       try {
         ZkNodeProps m = new ZkNodeProps(propMap);
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+        ocmh.solrSeer.sendUpdate(m);
       } catch (Exception e) {
         throw new DW.Exp("Cleanup failed after failed split of " + collectionName + "/" + parentShard + ": (slice state changes)", e);
       }

@@ -26,19 +26,27 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.curator.framework.api.transaction.CuratorOp;
+import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
+import org.apache.curator.x.async.AsyncCuratorFramework;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Class to hold  ZK upload/download/move common code. With the advent of the upconfig/downconfig/cp/ls/mv commands
@@ -228,7 +236,7 @@ public class ZkMaintenanceUtils {
   public static void upConfig(SolrZkClient zkClient, Path confPath, String confName) throws IOException {
     ZkConfigManager manager = new ZkConfigManager(zkClient);
 
-    // Try to download the configset
+    // Try to upload the configset
     manager.uploadConfigDir(confPath, confName);
   }
 
@@ -278,12 +286,28 @@ public class ZkMaintenanceUtils {
   
   public static void uploadToZK(SolrZkClient zkClient, final Path fromPath, final String zkPath,
                                 final Pattern filenameExclusions) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("uploadToZK(SolrZkClient zkClient={}, Path fromPath={}, String zkPath={}, Pattern filenameExclusions={}) - start", zkClient, fromPath, zkPath, filenameExclusions);
+    }
 
     String path = fromPath.toString();
     if (path.endsWith("*")) {
       path = path.substring(0, path.length() - 1);
     }
 
+    AsyncCuratorFramework asyncClient = AsyncCuratorFramework.wrap(zkClient.getCurator());
+
+    List<CuratorOp> operations = new ArrayList<>(30);
+    
+   operations.add(asyncClient.transactionOp().create().forPath(zkPath));
+    StringBuilder dirPath = new StringBuilder();
+    dirPath.append(zkPath);
+    try {
+      zkClient.getCurator().create().forPath(zkPath);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    
     final Path rootPath = Paths.get(path);
         
     if (!Files.exists(rootPath))
@@ -299,7 +323,16 @@ public class ZkMaintenanceUtils {
         }
         String zkNode = createZkNodeName(zkPath, rootPath, file);
 
-        zkClient.mkdirs(zkNode, file.toFile());
+       zkClient.mkdirs(zkNode, file.toFile()); 
+        if (log.isDebugEnabled()) {
+          log.debug("uploadToZK(Path fromPath={}, String zkPath={}", file, zkNode);
+        }
+       operations.add(asyncClient.transactionOp().create().forPath(zkNode, FileUtils.readFileToByteArray(file.toFile())));
+//        try {
+//          zkClient.getCurator().create().forPath(zkNode, FileUtils.readFileToByteArray(file.toFile()));
+//        } catch (Exception e) {
+//          throw new RuntimeException(e);
+//        }
 
         return FileVisitResult.CONTINUE;
       }
@@ -308,9 +341,56 @@ public class ZkMaintenanceUtils {
       public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
         if (dir.getFileName().toString().startsWith(".")) return FileVisitResult.SKIP_SUBTREE;
 
+        dirPath.append("/" + dir.getFileName().toString());
+        log.warn("Visit: " + dirPath.toString().replaceAll("/conf\\b", "").replaceAll("/conf/", "/"));
+    //    operations.add(asyncClient.transactionOp().create().forPath("/" + dirPath.toString()));
+        try {
+          zkClient.getCurator().create().forPath(dirPath.toString());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+
         return FileVisitResult.CONTINUE;
       }
     });
+    
+ //CompletableFuture<List<CuratorTransactionResult>> future = asyncClient.transaction().forOperations(operations).toCompletableFuture();
+
+    //zkClient.mkDirs(createPaths);
+    
+    zkClient.printLayout();
+    
+//    boolean timeout = false;
+//    try {
+//      timeout = latch.await(15, TimeUnit.SECONDS);
+//    } catch (InterruptedException e) {
+//      DW.propegateInterrupt(e);
+//    }
+//    if (timeout) throw new SolrException(ErrorCode.SERVER_ERROR, "Timeout waiting for a config set to be uploaded successfully path=" + zkPath);
+//     try {
+//    
+//       try {
+//       List<CuratorTransactionResult> results = future.get();
+//       } catch (ExecutionException e) {
+//         Throwable ex = e.getCause();
+//         log.error("causeerror path={}", ((KeeperException)ex).getPath(), ex);
+////         for (OpResult result : ((KeeperException) ex).getResults()) {
+////           log.error("resultpath: {}", result);
+////         }
+//         throw e;
+//       }
+//       
+//
+//       
+////      /  throw new SolrException(ErrorCode.BAD_REQUEST, "Failed uploading config");
+//      
+//    } catch (InterruptedException | ExecutionException e) {
+//      throw new DW.Exp(e);
+//    }
+    
+    if (log.isDebugEnabled()) {
+      log.debug("uploadToZK(SolrZkClient, Path, String, Pattern) - end");
+    }
   }
 
   private static boolean isEphemeral(SolrZkClient zkClient, String zkPath) throws KeeperException, InterruptedException {
@@ -440,6 +520,10 @@ public class ZkMaintenanceUtils {
 }
 
 class ZkCopier implements ZkMaintenanceUtils.ZkVisitor {
+  /**
+   * Logger for this class
+   */
+  private static final Logger log = LoggerFactory.getLogger(ZkCopier.class);
 
   String source;
   String dest;

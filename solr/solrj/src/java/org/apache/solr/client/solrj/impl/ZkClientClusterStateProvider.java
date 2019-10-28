@@ -38,9 +38,16 @@ public class ZkClientClusterStateProvider implements ClusterStateProvider {
 
   private volatile boolean isClosed = false;
 
+  private boolean closeReader;
+
   public ZkClientClusterStateProvider(ZkStateReader zkStateReader) {
+    this(zkStateReader, false);
+  }
+  
+  public ZkClientClusterStateProvider(ZkStateReader zkStateReader, boolean closeZkStateReader) {
     this.zkStateReader = zkStateReader;
     this.zkHost = zkStateReader.getZkClient().getZkServerAddress();
+    this.closeReader = true;
   }
 
   @Override
@@ -151,8 +158,9 @@ public class ZkClientClusterStateProvider implements ClusterStateProvider {
 
   @Override
   public void close() throws IOException {
-    if (false == isClosed) {
-      isClosed = true;
+    isClosed = true;
+    if (closeReader) {
+      zkStateReader.close();
     }
   }
 

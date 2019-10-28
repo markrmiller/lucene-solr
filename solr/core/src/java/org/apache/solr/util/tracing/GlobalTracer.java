@@ -18,6 +18,8 @@
 package org.apache.solr.util.tracing;
 
 import javax.servlet.http.HttpServletRequest;
+
+import java.io.Closeable;
 import java.util.Random;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -26,7 +28,7 @@ import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.propagation.Format;
 
-public class GlobalTracer {
+public class GlobalTracer implements Closeable {
   private static final Tracer NOOP_TRACER = NoopTracerFactory.create();
   private static final Random RANDOM;
   static {

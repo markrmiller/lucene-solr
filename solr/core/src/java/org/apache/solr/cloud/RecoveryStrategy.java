@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -44,7 +45,6 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.patterns.DW;
@@ -71,6 +71,8 @@ import org.apache.solr.util.plugin.NamedListInitializedPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.inject.Inject;
+
 /**
  * This class may change in future and customisations are not supported between versions in terms of API or back compat
  * behaviour.
@@ -88,25 +90,23 @@ public class RecoveryStrategy implements Runnable, Closeable {
     }
 
     // this should only be used from SolrCoreState
-    public RecoveryStrategy create(CoreContainer cc, CoreDescriptor cd,
-        RecoveryStrategy.RecoveryListener recoveryListener) {
-      final RecoveryStrategy recoveryStrategy = newRecoveryStrategy(cc, cd, recoveryListener);
+    public RecoveryStrategy create(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
+      final RecoveryStrategy recoveryStrategy = newRecoveryStrategy(cc, zkController, zkStateReader);
       SolrPluginUtils.invokeSetters(recoveryStrategy, args);
       return recoveryStrategy;
     }
 
-    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, CoreDescriptor cd,
-        RecoveryStrategy.RecoveryListener recoveryListener) {
-      return new RecoveryStrategy(cc, cd, recoveryListener);
+    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
+      return new RecoveryStrategy(cc, zkController, zkStateReader);
     }
   }
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private int waitForUpdatesWithStaleStatePauseMilliSeconds = Integer
+  private volatile int waitForUpdatesWithStaleStatePauseMilliSeconds = Integer
       .getInteger("solr.cloud.wait-for-updates-with-stale-state-pause", 2500);
-  private int maxRetries = 500;
-  private int startingRecoveryDelayMilliSeconds = Integer
+  private volatile int maxRetries = 500;
+  private volatile int startingRecoveryDelayMilliSeconds = Integer
       .getInteger("solr.cloud.starting-recovery-delay-milli-seconds", 2000);
 
   public static interface RecoveryListener {
@@ -116,30 +116,25 @@ public class RecoveryStrategy implements Runnable, Closeable {
   }
 
   private volatile boolean close = false;
-
-  private RecoveryListener recoveryListener;
-  private ZkController zkController;
-  private String baseUrl;
-  private String coreZkNodeName;
-  private ZkStateReader zkStateReader;
+  private volatile RecoveryListener recoveryListener;
+  private final ZkController zkController;
+  private final String baseUrl;
+  private volatile String coreZkNodeName;
+  private final ZkStateReader zkStateReader;
   private volatile String coreName;
-  private int retries;
+  private AtomicInteger retries = new AtomicInteger(0);
   private boolean recoveringAfterStartup;
-  private CoreContainer cc;
+  private final CoreContainer cc;
   private volatile HttpUriRequest prevSendPreRecoveryHttpUriRequest;
-  private final Replica.Type replicaType;
+  private volatile Replica.Type replicaType;
+  private volatile CoreDescriptor coreDescriptor;
 
-  private CoreDescriptor coreDescriptor;
-
-  protected RecoveryStrategy(CoreContainer cc, CoreDescriptor cd, RecoveryListener recoveryListener) {
+  @Inject
+  public RecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
     this.cc = cc;
-    this.coreName = cd.getName();
-    this.recoveryListener = recoveryListener;
-    zkController = cc.getZkController();
-    zkStateReader = zkController.getZkStateReader();
-    baseUrl = zkController.getBaseUrl();
-    coreZkNodeName = cd.getCloudDescriptor().getCoreNodeName();
-    replicaType = cd.getCloudDescriptor().getReplicaType();
+    this.zkController = zkController;
+    this.zkStateReader = zkStateReader;
+    this.baseUrl = zkController.getBaseUrl();
   }
 
   final public int getWaitForUpdatesWithStaleStatePauseMilliSeconds() {
@@ -435,8 +430,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
           log.error("Recovery failed - trying again... (" + retries + ")");
 
-          retries++;
-          if (retries >= maxRetries) {
+         
+          if ( retries.incrementAndGet() >= maxRetries) {
             SolrException.log(log, "Recovery failed - max retries exceeded (" + retries + ").");
             try {
               recoveryFailed(core, zkController, baseUrl, coreZkNodeName, this.coreDescriptor);
@@ -454,7 +449,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           // If we're at attempt >= 4, there's no point computing pow(2, retries) because the result
           // will always be the minimum of the two (12). Since we sleep at 5 seconds sub-intervals in
           // order to check if we were closed, 12 is chosen as the maximum loopCount (5s * 12 = 1m).
-          int loopCount = retries < 4 ? (int) Math.min(Math.pow(2, retries), 12) : 12;
+          int loopCount =  retries.get() < 4 ? (int) Math.min(Math.pow(2, retries.get()), 12) : 12;
           log.info("Wait [{}] seconds before trying to recover again (attempt={})",
               TimeUnit.MILLISECONDS.toSeconds(loopCount * startingRecoveryDelayMilliSeconds), retries);
           for (int i = 0; i < loopCount; i++) {
@@ -717,8 +712,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
           log.error("Recovery failed - trying again... (" + retries + ")");
 
-          retries++;
-          if (retries >= maxRetries) {
+          if (retries.incrementAndGet() >= maxRetries) {
             SolrException.log(log, "Recovery failed - max retries exceeded (" + retries + ").");
             try {
               recoveryFailed(core, zkController, baseUrl, coreZkNodeName, this.coreDescriptor);
@@ -735,7 +729,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           // Wait an exponential interval between retries, start at 2 seconds and work up to a minute.
           // Since we sleep at 2 seconds sub-intervals in
           // order to check if we were closed, 30 is chosen as the maximum loopCount (2s * 30 = 1m).
-          double loopCount = Math.min(Math.pow(2, retries - 1), 30);
+          double loopCount = Math.min(Math.pow(2, retries.get() - 1), 30);
           log.info("Wait [{}] seconds before trying to recover again (attempt={})",
               loopCount * startingRecoveryDelayMilliSeconds, retries);
           for (int i = 0; i < loopCount; i++) {
@@ -894,5 +888,18 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
       mrr.future.get();
     }
+  }
+
+  public void setRecoveryListener(RecoveryListener recoveryListener) {
+    this.recoveryListener = recoveryListener;
+  }
+
+  public void setReplicaType(Replica.Type replicaType) {
+    this.replicaType = replicaType;
+  }
+
+  public void setCoreDescriptor(CoreDescriptor coreDescriptor) {
+    this.coreDescriptor = coreDescriptor;
+    this.coreName = coreDescriptor.getName();
   }
 }

@@ -77,7 +77,7 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, NRT_REPLICAS + " + " + TLOG_REPLICAS + " must be greater than 0");
     }
 
-    ocmh.overseer.offerStateUpdate(Utils.toJSON(message));
+    ocmh.solrSeer.sendUpdate(message);
     // wait for a while until we see the shard
     // wait for a while until we see the shard and update the local view of the cluster state
     ocmh.waitForNewShard(collectionName, sliceName);
@@ -90,6 +90,8 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
         ZkStateReader.TLOG_REPLICAS, String.valueOf(numTlogReplicas),
         ZkStateReader.PULL_REPLICAS, String.valueOf(numPullReplicas),
         OverseerCollectionMessageHandler.CREATE_NODE_SET, message.getStr(OverseerCollectionMessageHandler.CREATE_NODE_SET),
+        ZkStateReader.NUM_SHARDS_PROP, message.getStr(ZkStateReader.NUM_SHARDS_PROP),
+        "shards", message.getStr("shards"),
         CommonAdminParams.WAIT_FOR_FINAL_STATE, Boolean.toString(waitForFinalState));
 
     Map<String, Object> propertyParams = new HashMap<>();

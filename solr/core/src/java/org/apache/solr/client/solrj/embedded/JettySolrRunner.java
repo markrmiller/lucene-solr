@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,6 +45,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.lucene.util.Constants;
+import org.apache.solr.SolrModule;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
@@ -71,7 +71,6 @@ import org.eclipse.jetty.server.SessionIdManager;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
-import org.eclipse.jetty.server.session.DefaultSessionIdManager;
 import org.eclipse.jetty.server.session.HouseKeeper;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
@@ -79,13 +78,16 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlet.Source;
 import org.eclipse.jetty.util.component.LifeCycle;
-import org.eclipse.jetty.util.component.LifeCycle.Listener;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ReservedThreadExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.servlet.GuiceFilter;
 
 /**
  * Run solr using jetty
@@ -366,6 +368,7 @@ public class JettySolrRunner {
 
   private void init(int port) {
 
+
     QueuedThreadPool qtp = new QueuedThreadPool();
     qtp.setMaxThreads(Integer.getInteger("solr.maxContainerThreads", THREAD_POOL_MAX_THREADS));
     qtp.setLowThreadsThreshold(Integer.getInteger("solr.lowContainerThreadsThreshold", -1)); // we don't use this or connections will get cut
@@ -435,14 +438,18 @@ public class JettySolrRunner {
     connector.setStopTimeout(10000);
     server.setConnectors(new Connector[] {connector});
     server.setSessionIdManager(new NoopSessionManager());
+    
+
 
     HandlerWrapper chain;
     {
       // Initialize the servlets
-      final ServletContextHandler root = new ServletContextHandler(server, config.context,
-          ServletContextHandler.SESSIONS);
+      final ServletContextHandler root = new ServletContextHandler(server, config.context,ServletContextHandler.NO_SESSIONS);
+    //  FilterHolder guiceFilter = new FilterHolder(injector.getInstance(GuiceFilter.class));
+    //  root.addFilter(guiceFilter, "/*", EnumSet.allOf(DispatcherType.class)); // nocommit
 
       server.addLifeCycleListener(new LifeCycle.Listener() {
+
 
         @Override
         public void lifeCycleStopping(LifeCycle arg0) {
@@ -450,40 +457,46 @@ public class JettySolrRunner {
 
         @Override
         public void lifeCycleStopped(LifeCycle arg0) {
+
         }
 
         @Override
         public void lifeCycleStarting(LifeCycle arg0) {
 
+
         }
 
         @Override
         public void lifeCycleStarted(LifeCycle arg0) {
+            jettyPort = getFirstConnectorPort();
+            int port = jettyPort;
+            if (proxyPort != -1) port = proxyPort;
+            nodeProperties.setProperty("hostPort", Integer.toString(port));
+            nodeProperties.setProperty("hostContext", config.context);
+            root.getServletContext().setAttribute(SolrDispatchFilter.SOLRHOME_ATTRIBUTE, solrHome);
+            root.getServletContext().setAttribute(SolrDispatchFilter.PROPERTIES_ATTRIBUTE, nodeProperties);
+            log.info("Jetty properties: {}", nodeProperties);
 
-          jettyPort = getFirstConnectorPort();
-          int port = jettyPort;
-          if (proxyPort != -1) port = proxyPort;
-          nodeProperties.setProperty("hostPort", Integer.toString(port));
-          nodeProperties.setProperty("hostContext", config.context);
+           // root.addFilter( n, "*", EnumSet.of(DispatcherType.REQUEST)); // nocommit maybe async
 
-          root.getServletContext().setAttribute(SolrDispatchFilter.PROPERTIES_ATTRIBUTE, nodeProperties);
-          root.getServletContext().setAttribute(SolrDispatchFilter.SOLRHOME_ATTRIBUTE, solrHome);
+            debugFilter = root.addFilter(DebugFilter.class, "*", EnumSet.of(DispatcherType.REQUEST)); // nocommit
+            extraFilters = new LinkedList<>();
+            for (Map.Entry<Class<? extends Filter>,String> entry : config.extraFilters.entrySet()) {
+              extraFilters.add(root.addFilter(entry.getKey(), entry.getValue(), EnumSet.of(DispatcherType.REQUEST)));
+            }
 
-          log.info("Jetty properties: {}", nodeProperties);
+            for (Map.Entry<ServletHolder,String> entry : config.extraServlets.entrySet()) {
+              root.addServlet(entry.getKey(), entry.getValue());
+            }
+            dispatchFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
+            dispatchFilter.setHeldClass(SolrDispatchFilter.class);
+            dispatchFilter.setInitParameter("excludePatterns", excludePatterns);
+            root.addServlet(Servlet404.class, "/*");
 
-          debugFilter = root.addFilter(DebugFilter.class, "*", EnumSet.of(DispatcherType.REQUEST));
-          extraFilters = new LinkedList<>();
-          for (Map.Entry<Class<? extends Filter>,String> entry : config.extraFilters.entrySet()) {
-            extraFilters.add(root.addFilter(entry.getKey(), entry.getValue(), EnumSet.of(DispatcherType.REQUEST)));
-          }
 
-          for (Map.Entry<ServletHolder,String> entry : config.extraServlets.entrySet()) {
-            root.addServlet(entry.getKey(), entry.getValue());
-          }
-          dispatchFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
-          dispatchFilter.setHeldClass(SolrDispatchFilter.class);
-          dispatchFilter.setInitParameter("excludePatterns", excludePatterns);
-          root.addFilter(dispatchFilter, "*", EnumSet.of(DispatcherType.REQUEST)); // nocommit maybe async
+
+            root.addFilter(dispatchFilter, "*", EnumSet.of(DispatcherType.REQUEST)); // nocommit maybe async
+
         }
 
         @Override
@@ -491,8 +504,6 @@ public class JettySolrRunner {
           System.clearProperty("hostPort");
         }
       });
-      // for some reason, there must be a servlet for this to get applied
-      root.addServlet(Servlet404.class, "/*");
       chain = root;
     }
 
@@ -516,6 +527,8 @@ public class JettySolrRunner {
     gzipHandler.setExcludedAgentPatterns(".*MSIE.6\\.0.*");
     gzipHandler.setIncludedMethods("GET");
 
+    
+    server.setDumpAfterStart(true);
     server.setHandler(gzipHandler);
   }
 

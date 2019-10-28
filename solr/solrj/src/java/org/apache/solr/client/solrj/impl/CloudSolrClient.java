@@ -30,6 +30,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
+import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.patterns.DW;
@@ -291,6 +292,13 @@ public class CloudSolrClient extends BaseCloudSolrClient {
     public Builder(List<String> zkHosts, Optional<String> zkChroot) {
       this.zkHosts = zkHosts;
       if (zkChroot.isPresent()) this.zkChroot = zkChroot.get();
+    }
+
+    public Builder(SolrZkClient zkClient) {
+      ZkStateReader zkStateReader = new ZkStateReader(zkClient);
+      zkStateReader.createClusterStateWatchersAndUpdate();
+      ZkClientClusterStateProvider stateProvider = new ZkClientClusterStateProvider(zkStateReader, true);
+      this.stateProvider = stateProvider;
     }
 
     /**

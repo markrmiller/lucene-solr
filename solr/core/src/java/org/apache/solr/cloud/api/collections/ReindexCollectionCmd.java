@@ -269,7 +269,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
     Exception exc = null;
     boolean createdTarget = false;
     try {
-      solrClientCache = new SolrClientCache(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+      solrClientCache = new SolrClientCache(ocmh.cc.getUpdateShardHandler().getDefaultHttpClient());
       zkHost = ocmh.zkStateReader.getZkClient().getZkServerAddress();
       // set the running flag
       reindexingState.clear();
@@ -381,7 +381,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
           Overseer.QUEUE_OPERATION, CollectionParams.CollectionAction.MODIFYCOLLECTION.toLower(),
           ZkStateReader.COLLECTION_PROP, collection,
           ZkStateReader.READ_ONLY, "true");
-      ocmh.overseer.offerStateUpdate(Utils.toJSON(cmd));
+      ocmh.solrSeer.sendUpdate(cmd);
 
       TestInjection.injectReindexLatch();
 
@@ -488,14 +488,14 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
             Overseer.QUEUE_OPERATION, CollectionParams.CollectionAction.MODIFYCOLLECTION.toLower(),
             ZkStateReader.COLLECTION_PROP, collection,
             ZkStateReader.READ_ONLY, null);
-        ocmh.overseer.offerStateUpdate(Utils.toJSON(props));
+        ocmh.solrSeer.sendUpdate(props);
       }
       // 9. set FINISHED state on the target and clear the state on the source
       ZkNodeProps props = new ZkNodeProps(
           Overseer.QUEUE_OPERATION, CollectionParams.CollectionAction.MODIFYCOLLECTION.toLower(),
           ZkStateReader.COLLECTION_PROP, targetCollection,
           REINDEXING_STATE, State.FINISHED.toLower());
-      ocmh.overseer.offerStateUpdate(Utils.toJSON(props));
+      ocmh.solrSeer.sendUpdate(props);
 
       reindexingState.put(STATE, State.FINISHED.toLower());
       reindexingState.put(PHASE, "done");
@@ -625,7 +625,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
   // XXX operation is implemented - see SOLR-13245. We need to query the actual
   // XXX SolrCore where the daemon is running
   private void waitForDaemon(String daemonName, String daemonUrl, String sourceCollection, String targetCollection, Map<String, Object> reindexingState) throws Exception {
-    HttpClient client = ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient();
+    HttpClient client = ocmh.cc.getUpdateShardHandler().getDefaultHttpClient();
     try (HttpSolrClient solrClient = new HttpSolrClient.Builder()
         .withHttpClient(client)
         .withBaseSolrUrl(daemonUrl).build()) {
@@ -677,7 +677,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
 
   private void killDaemon(String daemonName, String daemonUrl) throws Exception {
     log.debug("-- killing daemon " + daemonName + " at " + daemonUrl);
-    HttpClient client = ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient();
+    HttpClient client = ocmh.cc.getUpdateShardHandler().getDefaultHttpClient();
     try (HttpSolrClient solrClient = new HttpSolrClient.Builder()
         .withHttpClient(client)
         .withBaseSolrUrl(daemonUrl).build()) {
@@ -803,7 +803,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
         Overseer.QUEUE_OPERATION, CollectionParams.CollectionAction.MODIFYCOLLECTION.toLower(),
         ZkStateReader.COLLECTION_PROP, collection,
         ZkStateReader.READ_ONLY, null);
-    ocmh.overseer.offerStateUpdate(Utils.toJSON(props));
+    ocmh.solrSeer.sendUpdate(props);
     removeReindexingState(collection);
   }
 }

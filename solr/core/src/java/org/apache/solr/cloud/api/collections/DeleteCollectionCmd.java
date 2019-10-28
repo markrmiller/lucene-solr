@@ -29,12 +29,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.solr.cloud.Overseer;
+import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
 import org.apache.solr.common.NonExistentCoreException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -43,9 +45,12 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.core.snapshots.SolrSnapshotManager;
 import org.apache.solr.handler.admin.MetricsHistoryHandler;
+import org.apache.solr.handler.component.HttpShardHandlerFactory;
+import org.apache.solr.handler.component.ShardHandler;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -60,12 +65,12 @@ import static org.apache.solr.common.params.CommonParams.NAME;
 
 public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final OverseerCollectionMessageHandler ocmh;
-  private final TimeSource timeSource;
+  private final CoreContainer coreContainer;
+  private String adminPath;
 
-  public DeleteCollectionCmd(OverseerCollectionMessageHandler ocmh) {
-    this.ocmh = ocmh;
-    this.timeSource = ocmh.cloudManager.getTimeSource();
+  public DeleteCollectionCmd(CoreContainer coreContainer, String adminPath) {
+    this.coreContainer = coreContainer;
+    this.adminPath = adminPath;
   }
 
   @Override
@@ -75,7 +80,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       ((Runnable)o).run(); // this will ensure the collection is removed from the alias before it disappears.
     }
     final String extCollection = message.getStr(NAME);
-    ZkStateReader zkStateReader = ocmh.zkStateReader;
+    ZkStateReader zkStateReader = coreContainer.getZkController().getZkStateReader();
 
     if (zkStateReader.aliasesManager != null) { // not a mock ZkStateReader
       zkStateReader.aliasesManager.update(); // aliases may have been stale; get latest from ZK
@@ -114,7 +119,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       }
       // remove collection-level metrics history
       if (deleteHistory) {
-        MetricsHistoryHandler historyHandler = ocmh.overseer.getCoreContainer().getMetricsHistoryHandler();
+        MetricsHistoryHandler historyHandler = coreContainer.getMetricsHistoryHandler();
         if (historyHandler != null) {
           String registry = SolrMetricManager.getRegistryName(SolrInfoBean.Group.collection, collection);
           historyHandler.removeHistory(registry);
@@ -132,7 +137,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       okayExceptions.add(NonExistentCoreException.class.getName());
       ZkNodeProps internalMsg = message.plus(NAME, collection);
 
-      List<Replica> failedReplicas = ocmh.collectionCmd(internalMsg, params, results, null, asyncId, okayExceptions);
+      List<Replica> failedReplicas = collectionCmd(internalMsg, params, results, null, asyncId, okayExceptions);
       for (Replica failedReplica : failedReplicas) {
         boolean isSharedFS = failedReplica.getBool(ZkStateReader.SHARED_STORAGE_PROP, false) && failedReplica.get("dataDir") != null;
         if (isSharedFS) {
@@ -144,14 +149,14 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       }
 
       ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, DELETE.toLower(), NAME, collection);
-      ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
+      coreContainer.getZkController().sendStateUpdate(m);
 
       // wait for a while until we don't see the collection
       zkStateReader.waitForState(collection, 60, TimeUnit.SECONDS, (collectionState) -> collectionState == null);
 
       // we can delete any remaining unique aliases
       if (!aliasReferences.isEmpty()) {
-        ocmh.zkStateReader.aliasesManager.applyModificationAndExportToZk(a -> {
+        coreContainer.getZkController().zkStateReader.aliasesManager.applyModificationAndExportToZk(a -> {
           for (String alias : aliasReferences) {
             a = a.cloneWithCollectionAlias(alias, null);
           }
@@ -195,6 +200,34 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
             + collection, e);
       }
     }
+  }
+  
+  /**
+   * Send request to all replicas of a collection
+   * @return List of replicas which is not live for receiving the request
+   */
+  List<Replica> collectionCmd(ZkNodeProps message, ModifiableSolrParams params,
+                     NamedList<Object> results, Replica.State stateMatcher, String asyncId, Set<String> okayExceptions) {
+    log.info("Executing Collection Cmd={}, asyncId={}", params, asyncId);
+    String collectionName = message.getStr(NAME);
+    @SuppressWarnings("deprecation")
+    ShardHandler shardHandler = ((HttpShardHandlerFactory) coreContainer.getShardHandlerFactory()).getShardHandler(coreContainer.getUpdateShardHandler().getDefaultHttpClient());
+
+    ClusterState clusterState = coreContainer.getZkController().getZkStateReader().getClusterState();
+    DocCollection coll = clusterState.getCollection(collectionName);
+    List<Replica> notLivesReplicas = new ArrayList<>();
+    final ShardRequestTracker shardRequestTracker = new ShardRequestTracker(adminPath, coreContainer,
+        coreContainer.getZkController().getZkStateReader(), asyncId);
+    for (Slice slice : coll.getSlices()) {
+      notLivesReplicas.addAll(shardRequestTracker.sliceCmd(clusterState, params, stateMatcher, slice, shardHandler));
+    }
+
+    shardRequestTracker.processResponses(results, shardHandler, false, null, okayExceptions);
+
+    if (log.isDebugEnabled()) {
+      log.debug("collectionCmd(ZkNodeProps, ModifiableSolrParams, NamedList<Object>, Replica.State, String, Set<String>) - end");
+    }
+    return notLivesReplicas;
   }
 
   // This method returns the single collection aliases to delete, if present, or null

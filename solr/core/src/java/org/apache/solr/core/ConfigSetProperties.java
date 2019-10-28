@@ -16,20 +16,19 @@
  */
 package org.apache.solr.core;
 
+import static org.apache.solr.common.util.Utils.fromJSON;
+
 import java.io.InputStreamReader;
 import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.solr.common.util.Utils.fromJSON;
 
 
 public class ConfigSetProperties {
@@ -42,26 +41,25 @@ public class ConfigSetProperties {
   /**
    * Return the properties associated with the ConfigSet (e.g. immutable)
    *
-   * @param loader the resource loader
-   * @param name   the name of the config set properties file
+   * @param loader
+   *          the resource loader
+   * @param name
+   *          the name of the config set properties file
    * @return the properties in a NamedList
    */
   public static NamedList readFromResourceLoader(SolrResourceLoader loader, String name) {
-    InputStreamReader reader;
-    try {
-      reader = new InputStreamReader(loader.openResource(name), StandardCharsets.UTF_8);
+
+    try (InputStreamReader reader = new InputStreamReader(loader.openResource(name), StandardCharsets.UTF_8)) {
+
+      return readFromInputStream(reader);
+
     } catch (SolrResourceNotFoundException ex) {
-      log.debug("Did not find ConfigSet properties, assuming default properties: " + ex.getMessage());
+      log.info("Did not find ConfigSet properties, assuming default properties");
       return null;
     } catch (Exception ex) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to load reader for ConfigSet properties: " + name, ex);
+      throw new DW.Exp(ex);
     }
 
-    try {
-      return readFromInputStream(reader);
-    } finally {
-      DW.close(reader);
-    }
   }
 
   public static NamedList readFromInputStream(InputStreamReader reader) {
@@ -73,9 +71,7 @@ public class ConfigSetProperties {
       }
       return new NamedList((Map) object);
     } catch (Exception ex) {
-      throw new DW.Exp("Unable to load ConfigSet properties", ex);
-    } finally {
-      DW.close(reader);
+      throw new DW.Exp("Did not find ConfigSet properties", ex);
     }
   }
 }

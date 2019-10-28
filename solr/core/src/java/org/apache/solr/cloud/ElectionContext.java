@@ -277,7 +277,11 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
 
       ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, OverseerAction.LEADER.toLower(),
           ZkStateReader.SHARD_ID_PROP, shardId, ZkStateReader.COLLECTION_PROP, collection);
-      zkController.getOverseer().getStateUpdateQueue().offer(Utils.toJSON(m));
+      try {
+        zkController.getOverseer().offerStateUpdate(m);
+      } catch (Exception e1) {
+        throw new DW.Exp(e1);
+      }
 
       if (isClosed) {
         // Solr is shutting down or the ZooKeeper session expired while waiting for replicas. If the later,
@@ -413,7 +417,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
           assert zkController != null;
           assert zkController.getOverseer() != null;
-          zkController.getOverseer().offerStateUpdate(Utils.toJSON(zkNodes));
+          zkController.getOverseer().offerStateUpdate(zkNodes);
 
           try (SolrCore core = cc.getCore(coreName)) {
             if (core != null) {

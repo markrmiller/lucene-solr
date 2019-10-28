@@ -21,25 +21,33 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Timer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.curator.framework.api.CuratorWatcher;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.util.OrderedExecutor;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Watcher.Event.EventType;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -207,9 +215,21 @@ public class DW implements Closeable {
     }
   }
 
+  public void add(String label, Callable<?> callable) {
+    if (log.isDebugEnabled()) {
+      log.debug("add(String label={}, callable<?> callable={}) - start", label, callable);
+    }
+    WorkUnit workUnit = new WorkUnit(Collections.singletonList(callable), tracker, label);
+    workUnits.add(workUnit);
+
+    if (log.isDebugEnabled()) {
+      log.debug("add(String, callable<?>) - end");
+    }
+  }
+  
   public void add(String label, Callable<?>... callables) {
     if (log.isDebugEnabled()) {
-      log.debug("add(String label={}, Callable<?> callables={}) - start", label, callables);
+      log.debug("add(String label={}, callable<?> callables={}) - start", label, callables);
     }
 
     List<Object> objects = new ArrayList<>();
@@ -239,13 +259,25 @@ public class DW implements Closeable {
     }
   }
 
-  public void add(String label, Object object, Callable Callable) {
+  
+  
+  /**
+   * () -> {
+   *     obj.shutdown();
+   *     return obj;
+   *   });
+   * 
+   * Runs the callable and closes the object in parallel. The object return will
+   * be used for tracking. You can return a String if you prefer.
+   * 
+   */
+  public void add(String label, Object object, Callable callable) {
     if (log.isDebugEnabled()) {
-      log.debug("add(String label={}, Object object={}, Callable Callable={}) - start", label, object, Callable);
+      log.debug("add(String label={}, Object object={}, Callable Callable={}) - start", label, object, callable);
     }
 
     List<Object> objects = new ArrayList<>();
-    objects.add(Callable);
+    objects.add(callable);
 
     gatherObjects(object, objects);
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
@@ -506,6 +538,13 @@ public class DW implements Closeable {
         handled = true;
       }
 
+      if (object instanceof Timer) {
+        ((Timer) object).cancel();
+        
+
+        handled = true;
+      }
+      
       if (!handled) {
         IllegalArgumentException illegal = new IllegalArgumentException(label + " -> I do not know how to close: " + object.getClass().getName());
         exception.set(illegal);
@@ -597,6 +636,38 @@ public class DW implements Closeable {
     if (t instanceof Error) {
       throw (Error) t;
     }
+  }
+  
+  
+  // think about second class
+  public static void waitForExists(SolrZkClient zkClient, String znodePath) {
+
+    CountDownLatch latch = new CountDownLatch(1);
+
+    // nocommit TODO one live node watcher, but above zkstatereader
+    Stat stat = null;
+    try {
+      stat = zkClient.getCurator().checkExists().usingWatcher((CuratorWatcher) event -> {
+
+        log.info("Got event on live node watcher {}", event.toString());
+        if (event.getType() == EventType.NodeCreated) {
+          if (zkClient.getCurator().checkExists().forPath(znodePath) != null) {
+            latch.countDown();
+          }
+        }
+
+      }).forPath(znodePath);
+    } catch (Exception e) {
+      throw new DW.Exp(e);
+    }
+    if (stat == null) {
+      try {
+        latch.await();
+      } catch (InterruptedException e) {
+        DW.propegateInterrupt(e);
+      }
+    }
+
   }
 
 }

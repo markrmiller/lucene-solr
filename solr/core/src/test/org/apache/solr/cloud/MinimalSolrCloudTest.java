@@ -16,7 +16,6 @@
  */
 
 package org.apache.solr.cloud;
-import java.io.File;
 import java.io.IOException;
 
 import org.apache.solr.client.solrj.SolrClient;
@@ -25,9 +24,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
-import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.util.ExternalPaths;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -43,8 +40,11 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    System.setProperty("solr.suppressDefaultConfigBootstrap", "true");
+    
     configureCluster(2)
-        .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
+       // .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
+        .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
 
@@ -53,7 +53,9 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
     solrUrl = cluster.getJettySolrRunner(0).getBaseUrl().toString();
 
     CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 1, 1).setMaxShardsPerNode(100).process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 1, 1);
     CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
   }
 
   @After
@@ -62,7 +64,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
   }
 
   @Test
-  public void testEnsureDocumentsSentToCorrectCollection() throws Exception {
+  public void makeSomeSolrCloud() throws Exception {
     int numTotalDocs = 1000;
     int numExpectedPerCollection = numTotalDocs / 2;
     try (Http2SolrClient http2Client = new Http2SolrClient.Builder().build();

@@ -33,6 +33,7 @@ import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.AutoScalingParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Op;
@@ -58,8 +59,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     try {
       return zkClient.exists(path, true);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
@@ -70,8 +70,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NoNodeException e) {
       throw new NoSuchElementException(path);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
@@ -91,33 +90,20 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NoNodeException e) {
       throw new NoSuchElementException(path);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
   @Override
   public void makePath(String path) throws AlreadyExistsException, IOException, KeeperException, InterruptedException {
-    try {
-      zkClient.makePath(path, true);
-    } catch (KeeperException.NodeExistsException e) {
-      throw new AlreadyExistsException(path);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
-    }
+    zkClient.mkdirs(path);
   }
 
   @Override
-  public void makePath(String path, byte[] data, CreateMode createMode, boolean failOnExists) throws AlreadyExistsException, IOException, KeeperException, InterruptedException {
-    try {
-      zkClient.makePath(path, data, createMode, null, failOnExists, true);
-    } catch (KeeperException.NodeExistsException e) {
-      throw new AlreadyExistsException(path);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
-    }
+  public void makePath(String path, byte[] data, CreateMode createMode, boolean failOnExists)
+      throws AlreadyExistsException, IOException, KeeperException, InterruptedException {
+    assert createMode == CreateMode.PERSISTENT;
+    zkClient.mkdirs(path, data);
   }
 
   @Override
@@ -129,8 +115,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NodeExistsException e) {
       throw new AlreadyExistsException(path);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
@@ -145,8 +130,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(version, path);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
@@ -159,8 +143,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(version, path);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 
@@ -175,8 +158,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(-1, ops.toString());
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new AlreadyClosedException();
+      throw new DW.Exp(e);
     }
   }
 

@@ -31,6 +31,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.recipes.queue.DistributedQueue;
+import org.apache.curator.framework.recipes.queue.QueueBuilder;
+import org.apache.curator.framework.recipes.queue.QueueConsumer;
+import org.apache.curator.framework.recipes.queue.QueueSerializer;
+import org.apache.curator.framework.state.ConnectionState;
 import org.apache.lucene.util.Version;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -64,6 +70,7 @@ import org.apache.solr.common.patterns.DW.Exp;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Pair;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CloudConfig;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -78,6 +85,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.Timer;
+import com.google.protobuf.Extension.MessageType;
 
 /**
  * Cluster leader. Responsible for processing state updates, node assignments, creating/deleting
@@ -110,321 +118,335 @@ public class Overseer implements SolrCloseable {
   public static final int NUM_RESPONSES_TO_STORE = 10000;
   public static final String OVERSEER_ELECT = "/overseer_elect";
 
-  private class ClusterStateUpdater implements Runnable, Closeable {
 
+  
+  private class ClusterStateUpdater implements Closeable {
+    private DistributedQueue<ZkNodeProps> stateUpdateQueue;
     private final ZkStateReader reader;
     private final SolrZkClient zkClient;
     private final String myId;
     //queue where everybody can throw tasks
-    private final ZkDistributedQueue stateUpdateQueue;
+    //private final ZkDistributedQueue stateUpdateQueue;
     //TODO remove in 9.0, we do not push message into this queue anymore
     //Internal queue where overseer stores events that have not yet been published into cloudstate
     //If Overseer dies while extracting the main queue a new overseer will start from this queue
-    private final ZkDistributedQueue workQueue;
+   // private final ZkDistributedQueue workQueue;
 
     private volatile boolean isClosed = false;
 
     public ClusterStateUpdater(final ZkStateReader reader, final String myId, Stats zkStats) {
       this.zkClient = reader.getZkClient();
-      this.stateUpdateQueue = getStateUpdateQueue(zkStats);
-      this.workQueue = getInternalWorkQueue(zkClient, zkStats);
+     // this.stateUpdateQueue = getStateUpdateQueue(zkStats);
+    //  this.workQueue = getInternalWorkQueue(zkClient, zkStats);
+
+      
       this.myId = myId;
       this.reader = reader;
     }
 
     @Override
-    public void run() {
-      if (log.isDebugEnabled()) {
-        log.debug("Overseer run() - start");
-      }
-
-      MDCLoggingContext.setNode(zkController.getNodeName() );
-      
-      
-      try {
-        if (log.isDebugEnabled()) {
-          log.debug("set watch on leader znode");
-        }
-        zkClient.exists(Overseer.OVERSEER_ELECT + "/leader", new Watcher() {
-
-          @Override
-          public void process(WatchedEvent event) {
-            if (EventType.None.equals(event.getType())) {
-              return;
-            }
-            log.info("Overseer leader has changed, closing ...");
-            Overseer.this.close();
-          }} , true);
-      } catch (Exception e1) {
-        throw new DW.Exp(e1);
-      }
-
-      log.info("Starting to work on the main queue : {}", LeaderElector.getNodeName(myId));
-      try {
-        ZkStateWriter zkStateWriter = null;
-        ClusterState clusterState = reader.getClusterState();
-
-        // we write updates in batch, but if an exception is thrown when writing new clusterstate,
-        // we do not sure which message is bad message, therefore we will re-process node one by one
-        int fallbackQueueSize = Integer.MAX_VALUE;
-        ZkDistributedQueue fallbackQueue = workQueue;
-        while (!this.isClosed) {
-          if (zkStateWriter == null) {
-            try {
-              zkStateWriter = new ZkStateWriter(reader, stats);
-
-              // if there were any errors while processing
-              // the state queue, items would have been left in the
-              // work queue so let's process those first
-              byte[] data = fallbackQueue.peek();
-              while (fallbackQueueSize > 0 && data != null)  {
-                final ZkNodeProps message = ZkNodeProps.load(data);
-                log.debug("processMessage: fallbackQueueSize: {}, message = {}", fallbackQueue.getZkStats().getQueueLength(), message);
-                // force flush to ZK after each message because there is no fallback if workQueue items
-                // are removed from workQueue but fail to be written to ZK
-                try {
-                  clusterState = processQueueItem(message, clusterState, zkStateWriter, false, null);
-                } catch (Exception e) {
-                  Exp exp = new DW.Exp(e);
-                  try {
-                    if (isBadMessage(e)) {
-                      log.warn(
-                          "Exception when process message = {}, consider as bad message and poll out from the queue",
-                          message);
-                      fallbackQueue.poll();
-                    }
-                  } catch (Exception e1) {
-                    DW.propegateInterrupt(e1);
-                    exp.addSuppressed(e1);
-                  }
-                    
-                  throw exp;
-                }
-                fallbackQueue.poll(); // poll-ing removes the element we got by peek-ing
-                data = fallbackQueue.peek();
-                fallbackQueueSize--;
-              }
-              // force flush at the end of the loop, if there are no pending updates, this is a no op call
-              clusterState = zkStateWriter.writePendingUpdates();
-              // the workQueue is empty now, use stateUpdateQueue as fallback queue
-              fallbackQueue = stateUpdateQueue;
-              fallbackQueueSize = 0;
-            } catch (KeeperException.SessionExpiredException e) {
-              log.error("run()", e);
-
-              log.warn("Solr cannot talk to ZK, exiting Overseer work queue loop", e);
-              return;
-            } catch (Exception e) {
-              log.error("Exception in Overseer when process message from work queue, retrying", e);
-
-              throw new DW.Exp(e);
-            }
-          }
-
-          LinkedList<Pair<String, byte[]>> queue = null;
-          try {
-            // We do not need to filter any nodes here cause all processed nodes are removed once we flush clusterstate
-            queue = new LinkedList<>(stateUpdateQueue.peekElements(1000, 3000L, (x) -> true));
-          } catch (Exception e) {
-            throw new DW.Exp(e);
-          }
-          try {
-            Set<String> processedNodes = new HashSet<>();
-            while (queue != null && !queue.isEmpty()) {
-              for (Pair<String, byte[]> head : queue) {
-                byte[] data = head.second();
-                final ZkNodeProps message = ZkNodeProps.load(data);
-                log.debug("processMessage: queueSize: {}, message = {} current state version: {}", stateUpdateQueue.getZkStats().getQueueLength(), message, clusterState.getZkClusterStateVersion());
-
-                processedNodes.add(head.first());
-                fallbackQueueSize = processedNodes.size();
-                // The callback always be called on this thread
-                clusterState = processQueueItem(message, clusterState, zkStateWriter, true, () -> {
-                  stateUpdateQueue.remove(processedNodes);
-                  processedNodes.clear();
-                });
-              }
-              if (isClosed) break;
-              // if an event comes in the next 100ms batch it together
-              queue = new LinkedList<>(stateUpdateQueue.peekElements(1000, 100, node -> !processedNodes.contains(node)));
-            }
-            fallbackQueueSize = processedNodes.size();
-            // we should force write all pending updates because the next iteration might sleep until there
-            // are more items in the main queue
-            clusterState = zkStateWriter.writePendingUpdates();
-            // clean work queue
-            stateUpdateQueue.remove(processedNodes);
-            processedNodes.clear();
-          } catch (Exception e) {
-            throw new DW.Exp(e);
-          }
-        }
-      } finally {
-        log.info("Overseer Loop exiting : {}", LeaderElector.getNodeName(myId));
-      }
-
-      if (log.isDebugEnabled()) {
-        log.debug("run() - end");
-      }
+    public void close() throws IOException {
     }
+
+//    @Override
+//    public void run() {
+//      if (log.isDebugEnabled()) {
+//        log.debug("Overseer run() - start");
+//      }
+//
+//      MDCLoggingContext.setNode(zkController.getNodeName());
+//
+//      try {
+//        if (log.isDebugEnabled()) {
+//          log.debug("set watch on leader znode");
+//        }
+//        zkClient.exists(Overseer.OVERSEER_ELECT + "/leader", new Watcher() {
+//
+//          @Override
+//          public void process(WatchedEvent event) {
+//            if (EventType.None.equals(event.getType())) {
+//              return;
+//            }
+//            log.info("Overseer leader has changed, closing ...");
+//            Overseer.this.close();
+//          }
+//        }, true);
+//      } catch (Exception e1) {
+//        throw new DW.Exp(e1);
+//      }
+//
+//      log.info("Starting to work on the main queue : {}", LeaderElector.getNodeName(myId));
+//
+//      ZkStateWriter zkStateWriter = null;
+//      ClusterState clusterState = reader.getClusterState();
+//
+//      // we write updates in batch, but if an exception is thrown when writing new clusterstate,
+//      // we do not sure which message is bad message, therefore we will re-process node one by one
+//      int fallbackQueueSize = Integer.MAX_VALUE;
+//   //   ZkDistributedQueue fallbackQueue = workQueue;
+//      while (!this.isClosed) {
+//        if (zkStateWriter == null) {
+//          try {
+//            zkStateWriter = new ZkStateWriter(reader, stats);
+//            //
+//            // // if there were any errors while processing
+//            // // the state queue, items would have been left in the
+//            // // work queue so let's process those first
+//            // byte[] data = fallbackQueue.peek();
+//            // while (fallbackQueueSize > 0 && data != null) {
+//            // final ZkNodeProps message = ZkNodeProps.load(data);
+//            // log.debug("processMessage: fallbackQueueSize: {}, message = {}",
+//            // fallbackQueue.getZkStats().getQueueLength(), message);
+//            // // force flush to ZK after each message because there is no fallback if workQueue items
+//            // // are removed from workQueue but fail to be written to ZK
+//            // try {
+//            // clusterState = processQueueItem(message, clusterState, zkStateWriter, false, null);
+//            // } catch (Exception e) {
+//            // Exp exp = new DW.Exp(e);
+//            // try {
+//            // if (isBadMessage(e)) {
+//            // log.warn(
+//            // "Exception when process message = {}, consider as bad message and poll out from the queue",
+//            // message);
+//            // fallbackQueue.poll();
+//            // }
+//            // } catch (Exception e1) {
+//            // DW.propegateInterrupt(e1);
+//            // exp.addSuppressed(e1);
+//            // }
+//            //
+//            // throw exp;
+//            // }
+//            // fallbackQueue.poll(); // poll-ing removes the element we got by peek-ing
+//            // data = fallbackQueue.peek();
+//            // fallbackQueueSize--;
+//            // }
+//            // // force flush at the end of the loop, if there are no pending updates, this is a no op call
+//            // clusterState = zkStateWriter.writePendingUpdates();
+//            // // the workQueue is empty now, use stateUpdateQueue as fallback queue
+//            // fallbackQueue = stateUpdateQueue;
+//            // fallbackQueueSize = 0;
+//            // } catch (KeeperException.SessionExpiredException e) {
+//            // log.error("run()", e);
+//            //
+//            // log.warn("Solr cannot talk to ZK, exiting Overseer work queue loop", e);
+//            // return;
+//            // } catch (Exception e) {
+//            // log.error("Exception in Overseer when process message from work queue, retrying", e);
+//            //
+//            // throw new DW.Exp(e);
+//            // }
+//            // }
+//
+//            LinkedList<Pair<String,byte[]>> queue = null;
+//            try {
+//              // We do not need to filter any nodes here cause all processed nodes are removed once we flush
+//              // clusterstate
+//              queue = new LinkedList<>(stateUpdateQueue.peekElements(1000, 3000L, (x) -> true));
+//            } catch (Exception e) {
+//              throw new DW.Exp(e);
+//            }
+//            try {
+//              Set<String> processedNodes = new HashSet<>();
+//              while (queue != null && !queue.isEmpty()) {
+//                for (Pair<String,byte[]> head : queue) {
+//                  byte[] data = head.second();
+//                  final ZkNodeProps message = ZkNodeProps.load(data);
+//                  log.debug("processMessage: queueSize: {}, message = {} current state version: {}",
+//                      stateUpdateQueue.getZkStats().getQueueLength(), message, clusterState.getZkClusterStateVersion());
+//
+//                  processedNodes.add(head.first());
+//                  fallbackQueueSize = processedNodes.size();
+//                  // The callback always be called on this thread
+//                  clusterState = processQueueItem(message, clusterState, zkStateWriter, true, () -> {
+//                    stateUpdateQueue.remove(processedNodes);
+//                    processedNodes.clear();
+//                  });
+//                }
+//                if (isClosed) break;
+//                // if an event comes in the next 100ms batch it together
+//                queue = new LinkedList<>(
+//                    stateUpdateQueue.peekElements(1000, 100, node -> !processedNodes.contains(node)));
+//              }
+//              fallbackQueueSize = processedNodes.size();
+//              // we should force write all pending updates because the next iteration might sleep until there
+//              // are more items in the main queue
+//              clusterState = zkStateWriter.writePendingUpdates();
+//              // clean work queue
+//              stateUpdateQueue.remove(processedNodes);
+//              processedNodes.clear();
+//            } catch (Exception e) {
+//              throw new DW.Exp(e);
+//            }
+//
+//          } finally {
+//            log.info("Overseer Loop exiting : {}", LeaderElector.getNodeName(myId));
+//          }
+//
+//          if (log.isDebugEnabled()) {
+//            log.debug("run() - end");
+//          }
+//        }
+//      }
+//    }
 
     // Return true whenever the exception thrown by ZkStateWriter is correspond
-    // to a invalid state or 'bad' message (in this case, we should remove that message from queue)
-    private boolean isBadMessage(Exception e) {
-      if (log.isDebugEnabled()) {
-        log.debug("isBadMessage(Exception e={}) - start", e);
-      }
+//    // to a invalid state or 'bad' message (in this case, we should remove that message from queue)
+//    private boolean isBadMessage(Exception e) {
+//      if (log.isDebugEnabled()) {
+//        log.debug("isBadMessage(Exception e={}) - start", e);
+//      }
+//
+//      if (e instanceof KeeperException) {
+//        KeeperException ke = (KeeperException) e;
+//        boolean isBadMessage = ke.code() == KeeperException.Code.NONODE || ke.code() == KeeperException.Code.NODEEXISTS;
+//        if (log.isDebugEnabled()) {
+//          log.debug("isBadMessage(Exception)={} - end", isBadMessage);
+//        }
+//        return isBadMessage;
+//      }
+//      if (log.isDebugEnabled()) {
+//        log.debug("isBadMessage(Exception)=false - end");
+//      }
+//      return false;
+//    }
 
-      if (e instanceof KeeperException) {
-        KeeperException ke = (KeeperException) e;
-        boolean isBadMessage = ke.code() == KeeperException.Code.NONODE || ke.code() == KeeperException.Code.NODEEXISTS;
-        if (log.isDebugEnabled()) {
-          log.debug("isBadMessage(Exception)={} - end", isBadMessage);
-        }
-        return isBadMessage;
-      }
-      if (log.isDebugEnabled()) {
-        log.debug("isBadMessage(Exception)=false - end");
-      }
-      return false;
-    }
+//    private ClusterState processQueueItem(ZkNodeProps message, ClusterState clusterState, ZkStateWriter zkStateWriter, boolean enableBatching, ZkStateWriter.ZkWriteCallback callback) throws Exception {
+//      if (log.isDebugEnabled()) {
+//        log.debug("processQueueItem(ZkNodeProps message={}, ClusterState clusterState={}, ZkStateWriter zkStateWriter={}, boolean enableBatching={}, ZkStateWriter.ZkWriteCallback callback={}) - start", message, clusterState, zkStateWriter, enableBatching, callback);
+//      }
+//
+//      final String operation = message.getStr(QUEUE_OPERATION);
+//      if (operation == null) {
+//        throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
+//      }
+//      List<ZkWriteCommand> zkWriteCommands = null;
+//      final Timer.Context timerContext = stats.time(operation);
+//      try {
+//        zkWriteCommands = processMessage(clusterState, message, operation);
+//        stats.success(operation);
+//      } catch (Exception e) {
+//        // generally there is nothing we can do - in most cases, we have
+//        // an issue that will fail again on retry or we cannot communicate with     a
+//        // ZooKeeper in which case another Overseer should take over
+//        // TODO: if ordering for the message is not important, we could
+//        // track retries and put it back on the end of the queue
+//        log.error("Overseer could not process the current clusterstate state update message, skipping the message: " + message, e);
+//        stats.error(operation);
+//        
+//        throw new DW.Exp(e);
+//      } finally {
+//        timerContext.stop();
+//      }
+//      if (zkWriteCommands != null) {
+//        clusterState = zkStateWriter.enqueueUpdate(clusterState, zkWriteCommands, callback);
+//        if (!enableBatching)  {
+//          clusterState = zkStateWriter.writePendingUpdates();
+//        }
+//      }
+//
+//      if (log.isDebugEnabled()) {
+//        log.debug("processQueueItem(ZkNodeProps, ClusterState, ZkStateWriter, boolean, ZkStateWriter.ZkWriteCallback) - end");
+//      }
+//      return clusterState;
+//    }
+//
+//    private List<ZkWriteCommand> processMessage(ClusterState clusterState,
+//        final ZkNodeProps message, final String operation) {
+//      if (log.isDebugEnabled()) {
+//        log.debug("processMessage(ClusterState clusterState={}, ZkNodeProps message={}, String operation={}) - start", clusterState, message, operation);
+//      }
+//
+//      CollectionParams.CollectionAction collectionAction = CollectionParams.CollectionAction.get(operation);
+//      if (collectionAction != null) {
+//        switch (collectionAction) {
+//          case CREATE:
+//            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).createCollection(clusterState, message));
+//          case DELETE:
+//            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).deleteCollection(clusterState, message));
+//          case CREATESHARD:
+//            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).createShard(clusterState, message));
+//          case DELETESHARD:
+//            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).deleteShard(clusterState, message));
+//          case ADDREPLICA:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addReplica(clusterState, message));
+//          case ADDREPLICAPROP:
+//            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).addReplicaProperty(clusterState, message));
+//          case DELETEREPLICAPROP:
+//            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).deleteReplicaProperty(clusterState, message));
+//          case BALANCESHARDUNIQUE:
+//            ExclusiveSliceProperty dProp = new ExclusiveSliceProperty(clusterState, message);
+//            if (dProp.balanceProperty()) {
+//              String collName = message.getStr(ZkStateReader.COLLECTION_PROP);
+//              List<ZkWriteCommand> returnList = Collections.singletonList(new ZkWriteCommand(collName, dProp.getDocCollection()));
+//              if (log.isDebugEnabled()) {
+//                log.debug("processMessage(ClusterState, ZkNodeProps, String) - end");
+//              }
+//              return returnList;
+//            }
+//            break;
+//          case MODIFYCOLLECTION:
+//            CollectionsHandler.verifyRuleParams(zkController.getCoreContainer() ,message.getProperties());
+//            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).modifyCollection(clusterState,message));
+//          case MIGRATESTATEFORMAT:
+//            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).migrateStateFormat(clusterState, message));
+//          default:
+//            throw new RuntimeException("unknown operation:" + operation
+//                + " contents:" + message.getProperties());
+//        }
+//      } else {
+//        OverseerAction overseerAction = OverseerAction.get(operation);
+//        if (overseerAction == null) {
+//          throw new RuntimeException("unknown operation:" + operation + " contents:" + message.getProperties());
+//        }
+//        switch (overseerAction) {
+//          case STATE:
+//            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).setState(clusterState, message));
+//          case LEADER:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).setShardLeader(clusterState, message));
+//          case DELETECORE:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeReplica(clusterState, message));
+//          case ADDROUTINGRULE:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addRoutingRule(clusterState, message));
+//          case REMOVEROUTINGRULE:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeRoutingRule(clusterState, message));
+//          case UPDATESHARDSTATE:
+//            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).updateShardState(clusterState, message));
+//          case QUIT:
+//            if (myId.equals(message.get(ID))) {
+//              log.info("Quit command received {} {}", message, LeaderElector.getNodeName(myId));
+//              overseerCollectionConfigSetProcessor.close();
+//              close();
+//            } else {
+//              log.warn("Overseer received wrong QUIT message {}", message);
+//            }
+//            break;
+//          case DOWNNODE:
+//            return new NodeMutator().downNode(clusterState, message);
+//          default:
+//            throw new RuntimeException("unknown operation:" + operation + " contents:" + message.getProperties());
+//        }
+//      }
+//
+//      List<ZkWriteCommand> returnList = Collections.singletonList(ZkStateWriter.NO_OP);
+//      if (log.isDebugEnabled()) {
+//        log.debug("processMessage(ClusterState, ZkNodeProps, String) - end");
+//      }
+//      return returnList;
+//    }
 
-    private ClusterState processQueueItem(ZkNodeProps message, ClusterState clusterState, ZkStateWriter zkStateWriter, boolean enableBatching, ZkStateWriter.ZkWriteCallback callback) throws Exception {
-      if (log.isDebugEnabled()) {
-        log.debug("processQueueItem(ZkNodeProps message={}, ClusterState clusterState={}, ZkStateWriter zkStateWriter={}, boolean enableBatching={}, ZkStateWriter.ZkWriteCallback callback={}) - start", message, clusterState, zkStateWriter, enableBatching, callback);
-      }
-
-      final String operation = message.getStr(QUEUE_OPERATION);
-      if (operation == null) {
-        throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
-      }
-      List<ZkWriteCommand> zkWriteCommands = null;
-      final Timer.Context timerContext = stats.time(operation);
-      try {
-        zkWriteCommands = processMessage(clusterState, message, operation);
-        stats.success(operation);
-      } catch (Exception e) {
-        // generally there is nothing we can do - in most cases, we have
-        // an issue that will fail again on retry or we cannot communicate with     a
-        // ZooKeeper in which case another Overseer should take over
-        // TODO: if ordering for the message is not important, we could
-        // track retries and put it back on the end of the queue
-        log.error("Overseer could not process the current clusterstate state update message, skipping the message: " + message, e);
-        stats.error(operation);
-        
-        throw new DW.Exp(e);
-      } finally {
-        timerContext.stop();
-      }
-      if (zkWriteCommands != null) {
-        clusterState = zkStateWriter.enqueueUpdate(clusterState, zkWriteCommands, callback);
-        if (!enableBatching)  {
-          clusterState = zkStateWriter.writePendingUpdates();
-        }
-      }
-
-      if (log.isDebugEnabled()) {
-        log.debug("processQueueItem(ZkNodeProps, ClusterState, ZkStateWriter, boolean, ZkStateWriter.ZkWriteCallback) - end");
-      }
-      return clusterState;
-    }
-
-    private List<ZkWriteCommand> processMessage(ClusterState clusterState,
-        final ZkNodeProps message, final String operation) {
-      if (log.isDebugEnabled()) {
-        log.debug("processMessage(ClusterState clusterState={}, ZkNodeProps message={}, String operation={}) - start", clusterState, message, operation);
-      }
-
-      CollectionParams.CollectionAction collectionAction = CollectionParams.CollectionAction.get(operation);
-      if (collectionAction != null) {
-        switch (collectionAction) {
-          case CREATE:
-            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).createCollection(clusterState, message));
-          case DELETE:
-            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).deleteCollection(clusterState, message));
-          case CREATESHARD:
-            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).createShard(clusterState, message));
-          case DELETESHARD:
-            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).deleteShard(clusterState, message));
-          case ADDREPLICA:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addReplica(clusterState, message));
-          case ADDREPLICAPROP:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).addReplicaProperty(clusterState, message));
-          case DELETEREPLICAPROP:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).deleteReplicaProperty(clusterState, message));
-          case BALANCESHARDUNIQUE:
-            ExclusiveSliceProperty dProp = new ExclusiveSliceProperty(clusterState, message);
-            if (dProp.balanceProperty()) {
-              String collName = message.getStr(ZkStateReader.COLLECTION_PROP);
-              List<ZkWriteCommand> returnList = Collections.singletonList(new ZkWriteCommand(collName, dProp.getDocCollection()));
-              if (log.isDebugEnabled()) {
-                log.debug("processMessage(ClusterState, ZkNodeProps, String) - end");
-              }
-              return returnList;
-            }
-            break;
-          case MODIFYCOLLECTION:
-            CollectionsHandler.verifyRuleParams(zkController.getCoreContainer() ,message.getProperties());
-            return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).modifyCollection(clusterState,message));
-          case MIGRATESTATEFORMAT:
-            return Collections.singletonList(new ClusterStateMutator(getSolrCloudManager()).migrateStateFormat(clusterState, message));
-          default:
-            throw new RuntimeException("unknown operation:" + operation
-                + " contents:" + message.getProperties());
-        }
-      } else {
-        OverseerAction overseerAction = OverseerAction.get(operation);
-        if (overseerAction == null) {
-          throw new RuntimeException("unknown operation:" + operation + " contents:" + message.getProperties());
-        }
-        switch (overseerAction) {
-          case STATE:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).setState(clusterState, message));
-          case LEADER:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).setShardLeader(clusterState, message));
-          case DELETECORE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeReplica(clusterState, message));
-          case ADDROUTINGRULE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addRoutingRule(clusterState, message));
-          case REMOVEROUTINGRULE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeRoutingRule(clusterState, message));
-          case UPDATESHARDSTATE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).updateShardState(clusterState, message));
-          case QUIT:
-            if (myId.equals(message.get(ID))) {
-              log.info("Quit command received {} {}", message, LeaderElector.getNodeName(myId));
-              overseerCollectionConfigSetProcessor.close();
-              close();
-            } else {
-              log.warn("Overseer received wrong QUIT message {}", message);
-            }
-            break;
-          case DOWNNODE:
-            return new NodeMutator().downNode(clusterState, message);
-          default:
-            throw new RuntimeException("unknown operation:" + operation + " contents:" + message.getProperties());
-        }
-      }
-
-      List<ZkWriteCommand> returnList = Collections.singletonList(ZkStateWriter.NO_OP);
-      if (log.isDebugEnabled()) {
-        log.debug("processMessage(ClusterState, ZkNodeProps, String) - end");
-      }
-      return returnList;
-    }
-
-    @Override
-    public void close() {
-      if (log.isDebugEnabled()) {
-        log.debug("close() - start");
-      }
-
-      this.isClosed = true;
-
-      if (log.isDebugEnabled()) {
-        log.debug("close() - end");
-      }
-    }
+//    @Override
+//    public void close() {
+//      if (log.isDebugEnabled()) {
+//        log.debug("close() - start");
+//      }
+//
+//      this.isClosed = true;
+//
+//      if (log.isDebugEnabled()) {
+//        log.debug("close() - end");
+//      }
+//    }
 
   }
 
@@ -481,7 +503,7 @@ public class Overseer implements SolrCloseable {
 
   private final String adminPath;
 
-  private volatile OverseerCollectionConfigSetProcessor overseerCollectionConfigSetProcessor;
+ // private volatile OverseerCollectionConfigSetProcessor overseerCollectionConfigSetProcessor;
 
   private volatile ZkController zkController;
 
@@ -491,6 +513,8 @@ public class Overseer implements SolrCloseable {
   private volatile boolean systemCollCompatCheck = true;
 
   private final CloudConfig config;
+
+  private volatile ClusterStateUpdater clusterStateUpdater;
 
   // overseer not responsible for closing reader
   public Overseer(HttpShardHandler shardHandler,
@@ -520,24 +544,26 @@ public class Overseer implements SolrCloseable {
     stats = new Stats();
     log.info("Overseer (id=" + id + ") starting");
     //launch cluster state updater thread
-    ThreadGroup tg = new ThreadGroup("Overseer state updater.");
-    updaterThread = new OverseerThread(tg, new ClusterStateUpdater(reader, id, stats), "OverseerStateUpdate-" + id);
-    updaterThread.setDaemon(true);
+ //   ThreadGroup tg = new ThreadGroup("Overseer state updater.");
+   // updaterThread = new OverseerThread(tg, new ClusterStateUpdater(reader, id, stats), "OverseerStateUpdate-" + id);
+   // updaterThread.setDaemon(true);
 
+    clusterStateUpdater = new ClusterStateUpdater(reader, id, stats);
+    
     ThreadGroup ccTg = new ThreadGroup("Overseer collection creation process.");
 
-    OverseerNodePrioritizer overseerPrioritizer = new OverseerNodePrioritizer(reader, getStateUpdateQueue(), adminPath, shardHandler.getShardHandlerFactory(), updateShardHandler.getDefaultHttpClient());
-    overseerCollectionConfigSetProcessor = new OverseerCollectionConfigSetProcessor(reader, id, shardHandler, adminPath, stats, Overseer.this, overseerPrioritizer);
-    ccThread = new OverseerThread(ccTg, overseerCollectionConfigSetProcessor, "OverseerCollectionConfigSetProcessor-" + id);
-    ccThread.setDaemon(true);
+//    OverseerNodePrioritizer overseerPrioritizer = new OverseerNodePrioritizer(reader, getStateUpdateQueue(), adminPath, shardHandler.getShardHandlerFactory(), updateShardHandler.getDefaultHttpClient());
+//    overseerCollectionConfigSetProcessor = new OverseerCollectionConfigSetProcessor(reader, id, shardHandler, adminPath, stats, Overseer.this, overseerPrioritizer);
+//    ccThread = new OverseerThread(ccTg, overseerCollectionConfigSetProcessor, "OverseerCollectionConfigSetProcessor-" + id);
+//    ccThread.setDaemon(true);
 
     ThreadGroup triggerThreadGroup = new ThreadGroup("Overseer autoscaling triggers");
     OverseerTriggerThread trigger = new OverseerTriggerThread(zkController.getCoreContainer().getResourceLoader(),
         zkController.getSolrCloudManager(), config);
     triggerThread = new OverseerThread(triggerThreadGroup, trigger, "OverseerAutoScalingTriggerThread-" + id);
 
-    updaterThread.start();
-    ccThread.start();
+  //  updaterThread.start();
+   // ccThread.start();
     triggerThread.start();
 
     systemCollectionCompatCheck(new BiConsumer<String, Object>() {
@@ -836,22 +862,20 @@ public class Overseer implements SolrCloseable {
    *
    * @return a {@link ZkDistributedQueue} object
    */
-  ZkDistributedQueue getStateUpdateQueue() {
+  DistributedQueue<ZkNodeProps> getStateUpdateQueue() {
     if (log.isDebugEnabled()) {
       log.debug("getStateUpdateQueue() - start");
     }
 
-    ZkDistributedQueue returnZkDistributedQueue = getStateUpdateQueue(new Stats());
     if (log.isDebugEnabled()) {
       log.debug("getStateUpdateQueue() - end");
     }
-    return returnZkDistributedQueue;
+    return clusterStateUpdater.stateUpdateQueue;
   }
 
   /**
    * The overseer uses the returned queue to read any operations submitted by clients.
    * This method should not be used directly by anyone other than the Overseer itself.
-   * This method will create the /overseer znode in ZooKeeper if it does not exist already.
    *
    * @param zkStats  a {@link Stats} object which tracks statistics for all zookeeper operations performed by this queue
    * @return a {@link ZkDistributedQueue} object
@@ -1084,11 +1108,12 @@ public class Overseer implements SolrCloseable {
     return reader;
   }
 
-  public void offerStateUpdate(byte[] data) throws KeeperException, InterruptedException {
+  public void offerStateUpdate(ZkNodeProps msg) throws Exception {
     if (log.isDebugEnabled()) {
-      log.debug("offerStateUpdate(byte[] data={}) - start", data);
+      log.debug("offerStateUpdate(ZkNodeProps msg={}) - start", msg);
     }
-    getStateUpdateQueue().offer(data);
+    zkController.sendStateUpdate(msg);
+   // getStateUpdateQueue().put(msg);
 
     if (log.isDebugEnabled()) {
       log.debug("offerStateUpdate(byte[]) - end");

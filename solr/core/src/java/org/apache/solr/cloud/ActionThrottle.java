@@ -20,11 +20,14 @@ import java.lang.invoke.MethodHandles;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.TimeSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // this class may be accessed by multiple threads, but only one at a time
+@SolrThreadSafe
 public class ActionThrottle {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
@@ -56,21 +59,44 @@ public class ActionThrottle {
   }
 
   public void reset() {
+    if (log.isDebugEnabled()) {
+      log.debug("reset() - start");
+    }
+
     lastActionStartedAt = null;
+
+    if (log.isDebugEnabled()) {
+      log.debug("reset() - end");
+    }
   }
 
   public void markAttemptingAction() {
+    if (log.isDebugEnabled()) {
+      log.debug("markAttemptingAction() - start");
+    }
+
     lastActionStartedAt = timeSource.getTimeNs();
+
+    if (log.isDebugEnabled()) {
+      log.debug("markAttemptingAction() - end");
+    }
   }
   
   public void minimumWaitBetweenActions() {
+    if (log.isDebugEnabled()) {
+      log.debug("minimumWaitBetweenActions() - start");
+    }
+
     if (lastActionStartedAt == null) {
+      if (log.isDebugEnabled()) {
+        log.debug("minimumWaitBetweenActions() - end");
+      }
       return;
     }
     long diff = timeSource.getTimeNs() - lastActionStartedAt;
     int diffMs = (int) TimeUnit.MILLISECONDS.convert(diff, TimeUnit.NANOSECONDS);
     long minNsBetweenActions = TimeUnit.NANOSECONDS.convert(minMsBetweenActions, TimeUnit.MILLISECONDS);
-    log.debug("The last {} attempt started {}ms ago.", name, diffMs);
+    if (log.isDebugEnabled()) log.debug("The last {} attempt started {}ms ago.", name, diffMs);
     int sleep = 0;
     
     if (diffMs > 0 && diff < minNsBetweenActions) {
@@ -84,8 +110,13 @@ public class ActionThrottle {
       try {
         timeSource.sleep(sleep);
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
+        log.error("minimumWaitBetweenActions()", e);
+        DW.propegateInterrupt(e);
       }
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("minimumWaitBetweenActions() - end");
     }
   }
 
