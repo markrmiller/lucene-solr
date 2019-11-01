@@ -22,11 +22,9 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 
 import org.apache.lucene.index.IndexCommit;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.IndexFetcher;
@@ -42,14 +40,14 @@ import org.slf4j.LoggerFactory;
 public class ReplicateFromLeader implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final CoreContainer cc;
+  private final CoreAccess coreAccess;
   private final String coreName;
 
   private volatile ReplicationHandler replicationProcess;
   private volatile long lastVersion = 0;
 
-  public ReplicateFromLeader(CoreContainer cc, String coreName) {
-    this.cc = cc;
+  public ReplicateFromLeader(CoreAccess coreAccess, String coreName) {
+    this.coreAccess = coreAccess;
     this.coreName = coreName;
   }
 
@@ -59,14 +57,7 @@ public class ReplicateFromLeader implements Closeable {
    * the replication is done
    */
   public void startReplication(boolean switchTransactionLog) throws InterruptedException {
-    try (SolrCore core = cc.getCore(coreName)) {
-      if (core == null) {
-        if (cc.isShutDown()) {
-          return;
-        } else {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "SolrCore not found:" + coreName + " in " + cc.getLoadedCoreNames());
-        }
-      }
+    try (SolrCore core = coreAccess.getCore(coreName)) {
       SolrConfig.UpdateHandlerInfo uinfo = core.getSolrConfig().getUpdateHandlerInfo();
       String pollIntervalStr = "00:00:03";
       if (System.getProperty("jetty.testMode") != null) {

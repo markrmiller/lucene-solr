@@ -18,6 +18,7 @@ package org.apache.solr.core;
 
 import static org.apache.solr.common.util.Utils.fromJSON;
 
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
@@ -30,7 +31,7 @@ import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@SuppressWarnings("rawtypes")
 public class ConfigSetProperties {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -48,14 +49,13 @@ public class ConfigSetProperties {
    * @return the properties in a NamedList
    */
   public static NamedList readFromResourceLoader(SolrResourceLoader loader, String name) {
-
-    try (InputStreamReader reader = new InputStreamReader(loader.openResource(name), StandardCharsets.UTF_8)) {
-
-      return readFromInputStream(reader);
-
+    try (InputStream is = loader.openResource(name)) {
+      try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+        return readFromInputStream(reader);
+      }
     } catch (SolrResourceNotFoundException ex) {
       log.info("Did not find ConfigSet properties, assuming default properties");
-      return null;
+      return new NamedList();
     } catch (Exception ex) {
       throw new DW.Exp(ex);
     }
@@ -65,11 +65,14 @@ public class ConfigSetProperties {
   public static NamedList readFromInputStream(InputStreamReader reader) {
     try {
       Object object = fromJSON(reader);
+      if (object == null) {
+        return new NamedList();
+      }
       if (!(object instanceof Map)) {
         final String objectClass = object == null ? "null" : object.getClass().getName();
         throw new SolrException(ErrorCode.SERVER_ERROR, "Invalid JSON type " + objectClass + ", expected Map");
       }
-      return new NamedList((Map) object);
+      return new NamedList();
     } catch (Exception ex) {
       throw new DW.Exp("Did not find ConfigSet properties", ex);
     }

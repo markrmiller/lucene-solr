@@ -83,8 +83,7 @@ public class SolrRequestParsers
 
   public static final String REQUEST_TIMER_SERVLET_ATTRIBUTE = "org.apache.solr.RequestTimer";
 
-  private final HashMap<String, SolrRequestParser> parsers =
-      new HashMap<>();
+  private final HashMap<String, SolrRequestParser> parsers = new HashMap<>();
   private final boolean enableRemoteStreams;
   private final boolean enableStreamBody;
   private StandardRequestParser standard;
@@ -247,7 +246,7 @@ public class SolrRequestParsers
       @Override
       public List<CommandOperation> getCommands(boolean validateInput) {
         if (httpSolrCall != null) {
-          return httpSolrCall.getCommands(validateInput);
+          return httpSolrCall.getCommands(this, validateInput);
         }
         return super.getCommands(validateInput);
       }

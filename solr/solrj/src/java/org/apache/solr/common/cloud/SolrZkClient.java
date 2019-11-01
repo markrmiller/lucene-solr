@@ -60,6 +60,7 @@ import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.curator.x.async.AsyncCuratorFramework;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -118,7 +119,7 @@ public class SolrZkClient implements Closeable {
 
   private  ConnectionManager connManager;
 
-  private volatile ZooKeeper keeper;
+  private final ZooKeeper keeper;
 
   private final ZkCmdExecutor zkCmdExecutor;
 
@@ -140,6 +141,8 @@ public class SolrZkClient implements Closeable {
 
   private final CuratorFramework curator;
 
+  private final AsyncCuratorFramework asyncCurator;
+
   public int getZkClientTimeout() {
     return zkClientTimeout;
   }
@@ -151,9 +154,11 @@ public class SolrZkClient implements Closeable {
     zkCmdExecutor = null;
     zkClientTimeout = 0;
     this.curator = null;
+    this.asyncCurator = null;
     zkClientConnectionStrategy = null;
     zkACLProvider = null;
     higherLevelIsClosed = null;
+    this.keeper = null;
   }
   
   public SolrZkClient(CuratorFramework curator) {
@@ -164,6 +169,7 @@ public class SolrZkClient implements Closeable {
     higherLevelIsClosed =  null;
 
     this.curator = curator;
+    this.asyncCurator = AsyncCuratorFramework.wrap(curator);
     try {
       this.keeper = this.curator.getZookeeperClient().getZooKeeper();
     } catch (Exception e) {
@@ -231,7 +237,9 @@ public class SolrZkClient implements Closeable {
       strat = new DefaultConnectionStrategy();
     }
     this.curator = null;
+    this.asyncCurator = null;
     this.zkClientConnectionStrategy = strat;
+    this.keeper = null;
 
     if (!strat.hasZkCredentialsToAddAutomatically()) {
       ZkCredentialsProvider zkCredentialsToAddAutomatically = createZkCredentialsToAddAutomatically();
@@ -850,7 +858,7 @@ public class SolrZkClient implements Closeable {
     for (int i = 0; i < indent; i++) {
       dent.append(" ");
     }
-    string.append(dent).append(path).append(" (").append(children.size()).append(")").append(NEWL);
+    string.append(dent).append(path).append(" (c=").append(children.size()).append(",v=" + (stat == null ? "?" : stat.getVersion()) + ")").append(NEWL);
     if (data != null) {
       String dataString = new String(data, StandardCharsets.UTF_8);
       if ((stat != null && stat.getDataLength() < MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW && dataString.split("\\r\\n|\\r|\\n").length < 6) || path.endsWith("state.json")) {
@@ -928,9 +936,8 @@ public class SolrZkClient implements Closeable {
     if (isClosed) return; // it's okay if we over close - same as solrcore
     isClosed = true;
     
-    try (DW worker = new DW(this)) {
-      worker.add("SolrZkClientInternals", curator, keeper);
-      worker.add("ZkClientExecutors&ConnMgr", connManager, zkCallbackExecutor, zkConnManagerCallbackExecutor);
+    try (DW worker = new DW(this, true)) {
+      worker.add("ZkClientExecutors&ConnMgr", connManager, zkCallbackExecutor, zkConnManagerCallbackExecutor, curator);
     }
 
     assert ObjectReleaseTracker.release(this);
@@ -956,21 +963,21 @@ public class SolrZkClient implements Closeable {
    * Allows package private classes to update volatile ZooKeeper.
    */
   void updateKeeper(ZooKeeper keeper) throws InterruptedException {
-    if (log.isDebugEnabled()) {
-      log.debug("updateKeeper(SolrZooKeeper keeper={}) - start", keeper);
-    }
-
-   ZooKeeper oldKeeper = this.keeper;
-   this.keeper = keeper;
-   if (oldKeeper != null) {
-     oldKeeper.close();
-   }
-   // we might have been closed already
-   if (isClosed) this.keeper.close();
-
-    if (log.isDebugEnabled()) {
-      log.debug("updateKeeper(SolrZooKeeper) - end");
-    }
+//    if (log.isDebugEnabled()) {
+//      log.debug("updateKeeper(SolrZooKeeper keeper={}) - start", keeper);
+//    }
+//
+//   ZooKeeper oldKeeper = this.keeper;
+//   this.keeper = keeper;
+//   if (oldKeeper != null) {
+//     oldKeeper.close();
+//   }
+//   // we might have been closed already
+//   if (isClosed) this.keeper.close();
+//
+//    if (log.isDebugEnabled()) {
+//      log.debug("updateKeeper(SolrZooKeeper) - end");
+//    }
   }
 
   public ZooKeeper getSolrZooKeeper() {
@@ -1386,6 +1393,9 @@ public class SolrZkClient implements Closeable {
     return curator;
   }
   
+  public AsyncCuratorFramework getAsynCurator() {
+    return asyncCurator;
+  }
   
   public static void main(String[] args) {
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);

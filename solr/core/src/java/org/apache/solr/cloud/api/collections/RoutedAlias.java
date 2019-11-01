@@ -345,8 +345,8 @@ public abstract class RoutedAlias {
   private CandidateCollection doSynchronous(AddUpdateCommand cmd, CandidateCollection targetCollectionDesc, CoreContainer coreContainer) {
     ensureCollection(targetCollectionDesc.getCreationCollection(), coreContainer); // *should* throw if fails for some reason but...
     ZkController zkController = coreContainer.getZkController();
-    updateParsedCollectionAliases(zkController.zkStateReader, true);
-    List<String> observedCols = zkController.zkStateReader.aliasesManager.getAliases().getCollectionAliasListMap().get(getAliasName());
+    updateParsedCollectionAliases(zkController.getZkStateReader(), true);
+    List<String> observedCols = zkController.getZkStateReader().aliasesManager.getAliases().getCollectionAliasListMap().get(getAliasName());
     if (!observedCols.contains(targetCollectionDesc.creationCollection)) {
       // if collection creation did not occur we've failed. Bail out.
       throw new SolrException(SERVER_ERROR, "After we attempted to create " + targetCollectionDesc.creationCollection + " it did not exist");

@@ -45,8 +45,8 @@ public final class LoadAdminUiServlet extends BaseSolrServlet {
   public void doGet(HttpServletRequest _request,
                     HttpServletResponse _response)
       throws IOException {
-    HttpServletRequest request = SolrDispatchFilter.closeShield(_request, false);
-    HttpServletResponse response = SolrDispatchFilter.closeShield(_response, false);
+    HttpServletRequest request = SolrDispatchFilter.closeShield(_request);
+    HttpServletResponse response = SolrDispatchFilter.closeShield(_response);
     
     response.addHeader("X-Frame-Options", "DENY"); // security: SOLR-7966 - avoid clickjacking for admin interface
 

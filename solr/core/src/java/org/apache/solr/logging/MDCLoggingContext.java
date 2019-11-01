@@ -35,7 +35,7 @@ import org.slf4j.MDC;
 /**
  * Set's per thread context info for logging. Nested calls will use the top level parent for all context. The first
  * caller always owns the context until it calls {@link #clear()}. Always call {@link #setCore(SolrCore)} or
- * {@link #setCoreDescriptor(CoreContainer, CoreDescriptor)} and then {@link #clear()} in a finally block.
+ * {@link #setCoreDescriptor(String, CoreDescriptor)} and then {@link #clear()} in a finally block.
  */
 public class MDCLoggingContext {
   public static final String TRACE_ID = "trace_id";
@@ -115,11 +115,11 @@ public class MDCLoggingContext {
   
   public static void setCore(SolrCore core) {
     if (core != null) {
-      setCoreDescriptor(core.getCoreContainer(), core.getCoreDescriptor());
+      setCoreDescriptor(core.getCoreContainer().getZkController().getNodeName(), core.getCoreDescriptor());
     }
   }
   
-  public static void setCoreDescriptor(CoreContainer coreContainer, CoreDescriptor cd) {
+  public static void setCoreDescriptor(String nodeName, CoreDescriptor cd) {
     if (cd != null) {
       int callDepth = CALL_DEPTH.get();
       CALL_DEPTH.set(callDepth + 1);
@@ -128,11 +128,8 @@ public class MDCLoggingContext {
       }
       
       setCoreName(cd.getName());
-      if (coreContainer != null) {
-        ZkController zkController = coreContainer.getZkController();
-        if (zkController != null) {
-          setNodeName(zkController.getNodeName());
-        }
+      if (nodeName != null) {
+        setNodeName(nodeName);
       }
       
       CloudDescriptor ccd = cd.getCloudDescriptor();

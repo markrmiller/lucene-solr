@@ -127,7 +127,7 @@ public class CloudConfig {
     private static final int DEFAULT_ZK_CLIENT_TIMEOUT = 45000;
     private static final int DEFAULT_LEADER_VOTE_WAIT = 180000;  // 3 minutes
     private static final int DEFAULT_LEADER_CONFLICT_RESOLVE_WAIT = 180000;
-    private static final int DEFAULT_CREATE_COLLECTION_ACTIVE_WAIT = 10;  // 45 seconds
+    private static final int DEFAULT_CREATE_COLLECTION_ACTIVE_WAIT = 10; 
     private static final boolean DEFAULT_CREATE_COLLECTION_CHECK_LEADER_ACTIVE = false;
 
     private static final int DEFAULT_AUTO_REPLICA_FAILOVER_WAIT_AFTER_EXPIRATION = 120000;

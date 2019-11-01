@@ -17,35 +17,21 @@
 package org.apache.solr.cloud;
 
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.common.cloud.*;
-import org.apache.solr.common.params.CollectionParams;
-import org.apache.solr.common.util.Utils;
-import org.apache.solr.core.CloudConfig;
+import org.apache.solr.common.cloud.ClusterProperties;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.SolrXmlConfig;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.solr.update.UpdateShardHandlerConfig;
 import org.apache.solr.util.LogLevel;
-import org.apache.zookeeper.CreateMode;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Test;
-
-import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.SHARD_ID_PROP;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 
 @Slow
 @SolrTestCaseJ4.SuppressSSL
@@ -165,90 +151,92 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
     }
   }
 
-  @Test
-  public void testReadConfigName() throws Exception {
-    Path zkDir = createTempDir("zkData");
-    CoreContainer cc = null;
+ // nocommit 
+//  @Test
+//  public void testReadConfigName() throws Exception {
+//    Path zkDir = createTempDir("zkData");
+//    CoreContainer cc = null;
+//
+//    ZkTestServer server = new ZkTestServer(zkDir);
+//    try {
+//      server.run();
+//
+//      SolrZkClient zkClient = new SolrZkClient(server.getZkAddress(), TIMEOUT);
+//      String actualConfigName = "firstConfig";
+//
+//      zkClient.makePath(ZkConfigManager.CONFIGS_ZKNODE + "/" + actualConfigName, true);
+//      
+//      Map<String,Object> props = new HashMap<>();
+//      props.put("configName", actualConfigName);
+//      ZkNodeProps zkProps = new ZkNodeProps(props);
+//      zkClient.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/"
+//              + COLLECTION_NAME, Utils.toJSON(zkProps),
+//          CreateMode.PERSISTENT, true);
+//
+//      zkClient.close();
+//      
+//      cc = getCoreContainer();
+//
+//      CloudConfig cloudConfig = new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "solr").build();
+//      ZkController zkController = new ZkController(cc, server.getZkAddress(), TIMEOUT, cloudConfig,
+//          new CurrentCoreDescriptorProvider() {
+//            
+//            @Override
+//            public List<CoreDescriptor> getCurrentDescriptors() {
+//              // do nothing
+//              return null;
+//            }
+//          }, null);
+//      try {
+//        String configName = zkController.getZkStateReader().readConfigName(COLLECTION_NAME);
+//        assertEquals(configName, actualConfigName);
+//      } finally {
+//        zkController.close();
+//      }
+//    } finally {
+//      if (cc != null) {
+//        cc.shutdown();
+//      }
+//      server.shutdown();
+//    }
+//
+//  }
 
-    ZkTestServer server = new ZkTestServer(zkDir);
-    try {
-      server.run();
-
-      SolrZkClient zkClient = new SolrZkClient(server.getZkAddress(), TIMEOUT);
-      String actualConfigName = "firstConfig";
-
-      zkClient.makePath(ZkConfigManager.CONFIGS_ZKNODE + "/" + actualConfigName, true);
-      
-      Map<String,Object> props = new HashMap<>();
-      props.put("configName", actualConfigName);
-      ZkNodeProps zkProps = new ZkNodeProps(props);
-      zkClient.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/"
-              + COLLECTION_NAME, Utils.toJSON(zkProps),
-          CreateMode.PERSISTENT, true);
-
-      zkClient.close();
-      
-      cc = getCoreContainer();
-
-      CloudConfig cloudConfig = new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "solr").build();
-      ZkController zkController = new ZkController(cc, server.getZkAddress(), TIMEOUT, cloudConfig,
-          new CurrentCoreDescriptorProvider() {
-            
-            @Override
-            public List<CoreDescriptor> getCurrentDescriptors() {
-              // do nothing
-              return null;
-            }
-          }, null);
-      try {
-        String configName = zkController.getZkStateReader().readConfigName(COLLECTION_NAME);
-        assertEquals(configName, actualConfigName);
-      } finally {
-        zkController.close();
-      }
-    } finally {
-      if (cc != null) {
-        cc.shutdown();
-      }
-      server.shutdown();
-    }
-
-  }
-
-  public void testGetHostName() throws Exception {
-    Path zkDir = createTempDir("zkData");
-    CoreContainer cc = null;
-
-    ZkTestServer server = new ZkTestServer(zkDir);
-    try {
-      server.run();
-
-      cc = getCoreContainer();
-      ZkController zkController = null;
-
-      try {
-        CloudConfig cloudConfig = new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "solr").build();
-        zkController = new ZkController(cc, server.getZkAddress(), TIMEOUT, cloudConfig, new CurrentCoreDescriptorProvider() {
-
-          @Override
-          public List<CoreDescriptor> getCurrentDescriptors() {
-            // do nothing
-            return null;
-          }
-        }, null);
-      } catch (IllegalArgumentException e) {
-        fail("ZkController did not normalize host name correctly");
-      } finally {
-        if (zkController != null)
-          zkController.close();
-      }
-    } finally {
-      if (cc != null) {
-        cc.shutdown();
-      }
-      server.shutdown();
-    }
-  }
+// nocommit  
+//  public void testGetHostName() throws Exception {
+//    Path zkDir = createTempDir("zkData");
+//    CoreContainer cc = null;
+//
+//    ZkTestServer server = new ZkTestServer(zkDir);
+//    try {
+//      server.run();
+//
+//      cc = getCoreContainer();
+//      ZkController zkController = null;
+//
+//      try {
+//        CloudConfig cloudConfig = new CloudConfig.CloudConfigBuilder("127.0.0.1", 8983, "solr").build();
+//        zkController = new ZkController(cc, server.getZkAddress(), TIMEOUT, cloudConfig, new CurrentCoreDescriptorProvider() {
+//
+//          @Override
+//          public List<CoreDescriptor> getCurrentDescriptors() {
+//            // do nothing
+//            return null;
+//          }
+//        }, null);
+//      } catch (IllegalArgumentException e) {
+//        fail("ZkController did not normalize host name correctly");
+//      } finally {
+//        if (zkController != null)
+//          zkController.close();
+//      }
+//    } finally {
+//      if (cc != null) {
+//        cc.shutdown();
+//      }
+//      server.shutdown();
+//    }
+//  }
 
   @Slow
   @LogLevel(value = "org.apache.solr.cloud=DEBUG;org.apache.solr.cloud.overseer=DEBUG")

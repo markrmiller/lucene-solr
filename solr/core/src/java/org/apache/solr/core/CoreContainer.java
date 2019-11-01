@@ -62,12 +62,14 @@ import org.apache.solr.client.solrj.impl.SolrHttpClientContextBuilder.AuthScheme
 import org.apache.solr.client.solrj.impl.SolrHttpClientContextBuilder.CredentialsProviderProvider;
 import org.apache.solr.client.solrj.util.SolrIdentifierValidator;
 import org.apache.solr.cloud.CloudDescriptor;
+import org.apache.solr.cloud.CloudUtil;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.autoscaling.AutoScalingHandler;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Replica.State;
@@ -145,7 +147,7 @@ import static org.apache.solr.security.AuthenticationPlugin.AUTHENTICATION_PLUGI
  * @since solr 1.3
  */
 @SolrThreadSafe
-public class CoreContainer {
+public class CoreContainer implements Closeable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -761,11 +763,11 @@ public class CoreContainer {
       containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().editAPI), Collections.EMPTY_MAP);
       containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().readAPI), Collections.EMPTY_MAP);
     }
-
-    
+ 
     zkSys.initZooKeeper(this, solrHome, cfg.getCloudConfig(), zkClient);
     
-
+    // nocommit dowork
+    
     // setup executor to load cores in parallel
     ExecutorService coreLoadExecutor = MetricUtils.instrumentedExecutorService(
         ExecutorUtil.newMDCAwareFixedThreadPool(
@@ -796,7 +798,7 @@ public class CoreContainer {
             SolrCore core;
             try {
               if (zkSys.getZkController() != null) {
-                zkSys.getZkController().throwErrorIfReplicaReplaced(cd);
+                throwErrorIfReplicaReplaced(cd);
               }
               solrCores.waitAddPendingCoreOps(cd.getName());
               core = createFromDescriptor(cd, false, false);
@@ -933,7 +935,11 @@ public class CoreContainer {
   }
 
   public void shutdown() {
-    try (DW closer = new DW(this)) {
+    if (this.isShutDown) { 
+      throw new AlreadyClosedException();
+    }
+    
+    try (DW closer = new DW(this, true)) {
 
       ZkController zkController = getZkController();
       if (zkController != null) {
@@ -1102,6 +1108,12 @@ public class CoreContainer {
       core.close();
       throw new IllegalStateException("This CoreContainer has been closed");
     }
+    
+    
+    if (isZooKeeperAware()) {
+      throwErrorIfReplicaReplaced(cd);
+    }
+    
     SolrCore old = solrCores.putCore(cd, core);
     /*
      * set both the name of the descriptor and the name of the
@@ -1125,6 +1137,17 @@ public class CoreContainer {
         zkSys.registerInZk(core, skipRecovery);
       }
       return old;
+    }
+  }
+  
+  public void throwErrorIfReplicaReplaced(CoreDescriptor desc) {
+    ClusterState clusterState = getZkController().getZkStateReader().getClusterState();
+    if (clusterState != null) {
+      DocCollection collection = clusterState.getCollectionOrNull(desc
+          .getCloudDescriptor().getCollectionName());
+      if (collection != null) {
+        CloudUtil.checkSharedFSFailoverReplaced(this, desc);
+      }
     }
   }
 
@@ -1257,10 +1280,13 @@ public class CoreContainer {
 
     SolrCore core = null;
     try {
-      MDCLoggingContext.setCoreDescriptor(this, dcore);
+
       SolrIdentifierValidator.validateCoreName(dcore.getName());
       if (zkSys.getZkController() != null) {
         zkSys.getZkController().preRegister(dcore, publishState);
+        getCoresLocator().persist(this, dcore);
+      } else {
+        MDCLoggingContext.setCoreDescriptor(null, dcore);
       }
 
       ConfigSet coreConfig = getConfigSet(dcore);
@@ -1782,7 +1808,7 @@ public class CoreContainer {
     try {
       if (core == null) {
         if (zkSys.getZkController() != null) {
-          zkSys.getZkController().throwErrorIfReplicaReplaced(desc);
+          throwErrorIfReplicaReplaced(desc);
         }
         core = createFromDescriptor(desc, true, false); // This should throw an error if it fails.
       }
@@ -2038,6 +2064,11 @@ public class CoreContainer {
    */
   public void runAsync(Runnable r) {
     coreContainerAsyncTaskExecutor.submit(r);
+  }
+
+  @Override
+  public void close() throws IOException {
+    shutdown();
   }
 }
 

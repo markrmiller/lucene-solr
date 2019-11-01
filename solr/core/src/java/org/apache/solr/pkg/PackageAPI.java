@@ -212,7 +212,7 @@ public class PackageAPI {
 
       for (String s : coreContainer.getPackageStoreAPI().shuffledNodes()) {
         Utils.executeGET(coreContainer.getUpdateShardHandler().getDefaultHttpClient(),
-            coreContainer.getZkController().zkStateReader.getBaseUrlForNodeName(s).replace("/solr", "/api") + "/cluster/package?wt=javabin&omitHeader=true&refreshPackage=" + p,
+            coreContainer.getZkController().getZkStateReader().getBaseUrlForNodeName(s).replace("/solr", "/api") + "/cluster/package?wt=javabin&omitHeader=true&refreshPackage=" + p,
             Utils.JAVABINCONSUMER);
       }
 
@@ -370,7 +370,7 @@ public class PackageAPI {
   void notifyAllNodesToSync(int expected) {
     for (String s : coreContainer.getPackageStoreAPI().shuffledNodes()) {
       Utils.executeGET(coreContainer.getUpdateShardHandler().getDefaultHttpClient(),
-          coreContainer.getZkController().zkStateReader.getBaseUrlForNodeName(s).replace("/solr", "/api") + "/cluster/package?wt=javabin&omitHeader=true&expectedVersion" + expected,
+          coreContainer.getZkController().getZkStateReader().getBaseUrlForNodeName(s).replace("/solr", "/api") + "/cluster/package?wt=javabin&omitHeader=true&expectedVersion" + expected,
           Utils.JAVABINCONSUMER);
     }
   }

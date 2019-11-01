@@ -46,7 +46,7 @@ final class OnReconnectDoThis implements OnReconnect {
     zkController.clearZkCollectionTerms();
 
     // recreate our watchers first so that they exist even on any problems below
-    zkController.zkStateReader.createClusterStateWatchersAndUpdate();
+    zkController.getZkStateReader().createClusterStateWatchersAndUpdate();
 
     // this is troublesome - we dont want to kill anything the old
     // leader accepted
@@ -61,22 +61,23 @@ final class OnReconnectDoThis implements OnReconnect {
 
     // start the overseer first as following code may need it's processing
 
-    ElectionContext context = new OverseerElectionContext(zkController.getNodeName(), zkController.zkClient, zkController.overseer);
-    try {
-      ElectionContext prevContext = zkController.overseerElector.getContext();
-      if (prevContext != null) {
-
-        prevContext.cancelElection();
-
-        prevContext.close();
-
-      }
-      zkController.overseerElector.setup(context);
-      zkController.overseerElector.joinElection(context, true);
-
-    } catch (Exception e) {
-      throw new DW.Exp(e);
-    }
+    // nocommit
+//    ElectionContext context = new OverseerElectionContext(zkController.getNodeName(), zkController.zkClient, zkController.overseer);
+//    try {
+//      ElectionContext prevContext = zkController.overseerElector.getContext();
+//      if (prevContext != null) {
+//
+//        prevContext.cancelElection();
+//
+//        prevContext.close();
+//
+//      }
+//      zkController.overseerElector.setup(context);
+//      zkController.overseerElector.joinElection(context, true);
+//
+//    } catch (Exception e) {
+//      throw new DW.Exp(e);
+//    }
 
     // we have to register as live first to pick up docs in the buffer
     zkController.createEphemeralLiveNode();
@@ -96,11 +97,12 @@ final class OnReconnectDoThis implements OnReconnect {
 
           worker.collect(() -> {
             // unload solrcores that have been 'failed over'
-            try {
-              zkController.throwErrorIfReplicaReplaced(descriptor);
-            } catch (SolrException e) {
-              ZkController.log.info(e.getMessage());
-            }
+            // nocommt - we want to do this without corecontainer access ...
+//            try {
+//              zkController.throwErrorIfReplicaReplaced(descriptor);
+//            } catch (SolrException e) {
+//              ZkController.log.info(e.getMessage());
+//            }
 
             try {
               zkController.register(descriptor.getName(), descriptor, true, true, false);

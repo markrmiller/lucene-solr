@@ -413,6 +413,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               ZkStateReader.SHARD_ID_PROP, shardId,
               ZkStateReader.COLLECTION_PROP, collection,
               ZkStateReader.BASE_URL_PROP, leaderProps.get(ZkStateReader.BASE_URL_PROP),
+              ZkStateReader.NODE_NAME_PROP, leaderProps.get(ZkStateReader.NODE_NAME_PROP),
               ZkStateReader.CORE_NAME_PROP, leaderProps.get(ZkStateReader.CORE_NAME_PROP),
               ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
           assert zkController != null;
@@ -537,7 +538,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
     
     cancelElection();
     
-    core.getUpdateHandler().getSolrCoreState().doRecovery(cc, core.getCoreDescriptor());
+    core.getUpdateHandler().getSolrCoreState().doRecovery(zkController, core.getCoreDescriptor());
     
     leaderElector.joinElection(this, true);
   }

@@ -42,7 +42,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
   public static void setupCluster() throws Exception {
     System.setProperty("solr.suppressDefaultConfigBootstrap", "true");
     
-    configureCluster(2)
+    configureCluster(1)
        // .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
@@ -54,8 +54,8 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
     CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 1, 1).setMaxShardsPerNode(100).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 1, 1);
-    CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
-    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
+//    CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
+//    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
   }
 
   @After
@@ -73,7 +73,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
       splitDocumentsAcrossCollections(client, numTotalDocs);
 
       assertEquals(numExpectedPerCollection, client.query(COLLECTION_ONE_NAME, new SolrQuery("*:*")).getResults().getNumFound());
-      assertEquals(numExpectedPerCollection, client.query(COLLECTION_TWO_NAME, new SolrQuery("*:*")).getResults().getNumFound());
+    //  assertEquals(numExpectedPerCollection, client.query(COLLECTION_TWO_NAME, new SolrQuery("*:*")).getResults().getNumFound());
     }
 
   }
@@ -86,11 +86,11 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
       if (docNum %2 == 0) {
         client.add(COLLECTION_ONE_NAME, doc);
       } else {
-        client.add(COLLECTION_TWO_NAME, doc);
+     //   client.add(COLLECTION_TWO_NAME, doc);
       }
     }
 
     client.commit(COLLECTION_ONE_NAME);
-    client.commit(COLLECTION_TWO_NAME);
+  //  client.commit(COLLECTION_TWO_NAME);
   }
 }

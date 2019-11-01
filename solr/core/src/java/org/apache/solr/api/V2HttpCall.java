@@ -66,9 +66,9 @@ import com.google.common.collect.ImmutableSet;
 public class V2HttpCall extends HttpSolrCall {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private Api api;
-  List<String> pieces;
+  private List<String> pieces;
   private String prefix;
-  HashMap<String, String> parts = new HashMap<>();
+  private HashMap<String, String> parts = new HashMap<>(); // nocommit
   static final Set<String> knownPrefixes = ImmutableSet.of("cluster", "node", "collections", "cores", "c");
 
   public V2HttpCall(SolrDispatchFilter solrDispatchFilter, CoreContainer cc,
@@ -76,9 +76,10 @@ public class V2HttpCall extends HttpSolrCall {
     super(solrDispatchFilter, cc, request, response, retry);
   }
 
-  protected void init() throws Exception {
+  protected SolrQueryRequest init() throws Exception {
     String path = this.path;
     final String fullPath = path = path.substring(7);//strip off '/____v2'
+    SolrQueryRequest solrReq = null;
     try {
       pieces = getPathSegments(path);
       if (pieces.size() == 0 || (pieces.size() == 1 && path.endsWith(CommonParams.INTROSPECT))) {
@@ -89,8 +90,7 @@ public class V2HttpCall extends HttpSolrCall {
             rsp.add("description", "V2 API root path");
           }
         };
-        initAdminRequest(path);
-        return;
+        return initAdminRequest(path);
       } else {
         prefix = pieces.get(0);
       }
@@ -101,8 +101,7 @@ public class V2HttpCall extends HttpSolrCall {
         if (api != null) {
           isCompositeApi = api instanceof CompositeApi;
           if (!isCompositeApi) {
-            initAdminRequest(path);
-            return;
+            return initAdminRequest(path);
           }
         }
       }
@@ -125,7 +124,7 @@ public class V2HttpCall extends HttpSolrCall {
             if (action == REMOTEQUERY) {
               coreUrl = coreUrl.replace("/solr/", "/solr/____v2/c/");
               this.path = path = path.substring(prefix.length() + collection.getName().length() + 2);
-              return;
+              return null;
             }
           }
         }
@@ -136,8 +135,7 @@ public class V2HttpCall extends HttpSolrCall {
       if (core == null) {
         log.error(">> path: '" + path + "'");
         if (path.endsWith(CommonParams.INTROSPECT)) {
-          initAdminRequest(path);
-          return;
+          return initAdminRequest(path);
         } else {
           throw new SolrException(SolrException.ErrorCode.NOT_FOUND, "no core retrieved for " + origCorename);
         }
@@ -151,36 +149,39 @@ public class V2HttpCall extends HttpSolrCall {
         api = apiInfo == null ? api : apiInfo;
       }
       MDCLoggingContext.setCore(core);
-      parseRequest();
+      solrReq = parseRequest(solrReq);
 
-      addCollectionParamIfNeeded(getCollectionsList());
+      addCollectionParamIfNeeded(solrReq, getCollectionsList());
 
       action = PROCESS;
       // we are done with a valid handler
-    } catch (RuntimeException rte) {
-      log.error("Error in init()", rte);
-      throw rte;
+    } catch (Exception e) {
+      throw new DW.Exp(e);
     } finally {
       if (action == null && api == null) action = PROCESS;
       if (solrReq != null) solrReq.getContext().put(CommonParams.PATH, path);
     }
+    return solrReq;
   }
 
-  private void initAdminRequest(String path) throws Exception {
-    solrReq = SolrRequestParsers.DEFAULT.parse(null, path, req);
+  private SolrQueryRequest initAdminRequest(String path) throws Exception {
+    SolrQueryRequest solrReq = SolrRequestParsers.DEFAULT.parse(null, path, req);
     solrReq.getContext().put(CoreContainer.class.getName(), cores);
     requestType = AuthorizationContext.RequestType.ADMIN;
     action = ADMIN;
+    return solrReq;
   }
 
-  protected void parseRequest() throws Exception {
+  protected SolrQueryRequest parseRequest(SolrQueryRequest solrReq) throws Exception {
     config = core.getSolrConfig();
     // get or create/cache the parser for the core
     SolrRequestParsers parser = config.getRequestParsers();
 
     // With a valid handler and a valid core...
 
-    if (solrReq == null) solrReq = parser.parse(core, path, req);
+    if (solrReq == null) return parser.parse(core, path, req);
+    
+    return solrReq;
   }
 
   /**
@@ -325,7 +326,6 @@ public class V2HttpCall extends HttpSolrCall {
       for (Api api : apis) {
         api.call(req, rsp);
       }
-
     }
 
     public CompositeApi add(Api api) {
@@ -335,9 +335,9 @@ public class V2HttpCall extends HttpSolrCall {
   }
 
   @Override
-  protected void handleAdmin(SolrQueryResponse solrResp) {
+  protected void handleAdmin(SolrQueryRequest solrReq, SolrQueryResponse solrResp) {
     try {
-      api.call(this.solrReq, solrResp);
+      api.call(solrReq, solrResp);
     } catch (Exception e) {
       DW.propegateInterrupt(e);
       solrResp.setException(e);
@@ -345,7 +345,7 @@ public class V2HttpCall extends HttpSolrCall {
   }
 
   @Override
-  protected void execute(SolrQueryResponse rsp) {
+  protected void execute(SolrQueryRequest solrReq, SolrQueryResponse rsp) {
     SolrCore.preDecorateResponse(solrReq, rsp);
     if (api == null) {
       rsp.setException(new SolrException(SolrException.ErrorCode.NOT_FOUND,
@@ -354,8 +354,8 @@ public class V2HttpCall extends HttpSolrCall {
       try {
         api.call(solrReq, rsp);
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
         rsp.setException(e);
+        DW.propegateInterrupt(e);
       }
     }
 
@@ -379,5 +379,9 @@ public class V2HttpCall extends HttpSolrCall {
   @Override
   protected Map<String, JsonSchemaValidator> getValidators() {
     return api == null ? null : api.getCommandSchema();
+  }
+
+  public List<String> getPieces() {
+    return pieces;
   }
 }

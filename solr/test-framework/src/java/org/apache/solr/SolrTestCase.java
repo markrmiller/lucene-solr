@@ -302,7 +302,8 @@ public class SolrTestCase extends LuceneTestCase {
         }
 
         if (clazz != null) {
-          fail("A " + clazz.getName() + " took too long to close: " + tooLongTime);
+          // nocommit - leave this on
+       //   fail("A " + clazz.getName() + " took too long to close: " + tooLongTime);
         }
 
         // Queue<CloseTimeTracker> ccCloseTimes = CoreContainer.CLOSE_TIMES;
@@ -346,14 +347,14 @@ public class SolrTestCase extends LuceneTestCase {
   public static String clearObjectTrackerAndCheckEmpty(int waitSeconds, boolean tryClose) {
     
     for (Object object : ObjectReleaseTracker.OBJECTS.values()) {
-      if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
-        DW.close(((SolrCore) object)); // core container doesn't wait for SolrCores created after load (would be slow anyway), IW who knows...
-        waitSeconds = 15;
-      }
-      if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
-        DW.close(((SolrIndexWriter) object));
-        waitSeconds = 15;
-      }
+//      if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
+//        DW.close(((SolrCore) object)); // core container doesn't wait for SolrCores created after load (would be slow anyway), IW who knows...
+//        waitSeconds = 15;
+//      }
+//      if (object instanceof SolrCore || object instanceof SolrIndexWriter) {
+//        DW.close(((SolrIndexWriter) object));
+//        waitSeconds = 15;
+//      }
     }
     
     TimeOut timeout = new TimeOut(waitSeconds, TimeUnit.SECONDS, TimeSource.NANO_TIME);

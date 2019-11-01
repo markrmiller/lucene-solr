@@ -26,6 +26,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.Sort;
 import org.apache.solr.cloud.ActionThrottle;
 import org.apache.solr.cloud.RecoveryStrategy;
+import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.core.CoreContainer;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public abstract class SolrCoreState {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  protected boolean closed = false;
+  protected volatile boolean closed = false;
   private final Object updateLock = new Object();
   private final Object reloadLock = new Object();
   
@@ -159,7 +160,7 @@ public abstract class SolrCoreState {
     void closeWriter(IndexWriter writer) throws IOException;
   }
 
-  public abstract void doRecovery(CoreContainer cc, CoreDescriptor cd);
+  public abstract void doRecovery(ZkController zkController, CoreDescriptor cd);
   
   public abstract void cancelRecovery();
 

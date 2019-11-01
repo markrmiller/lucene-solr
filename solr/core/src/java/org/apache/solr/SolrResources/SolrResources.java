@@ -32,6 +32,7 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.http.client.HttpClient;
 import org.apache.solr.SolrModule;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -41,6 +42,7 @@ import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.SolrXmlConfig;
+import org.apache.solr.core.ZkContainer;
 import org.apache.solr.metrics.AltBufferPoolMetricSet;
 import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.OperatingSystemMetricSet;
@@ -61,6 +63,9 @@ public class SolrResources implements Closeable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  private volatile boolean closed = false;
+  private volatile boolean started = false;
+  
   private final String metricTag = SolrMetricProducer.getUniqueMetricTag(this, null);
 
   private final Properties extraProperties;
@@ -73,6 +78,7 @@ public class SolrResources implements Closeable {
   private volatile SolrMetricManager metricManager;
   private volatile NodeConfig nodeConfig;
   private volatile CoreContainer cores;
+  private volatile String registryName;
 
   public SolrResources(Path solrHomePath, Properties extraProperties) {
     this.solrHomePath = solrHomePath;
@@ -81,6 +87,12 @@ public class SolrResources implements Closeable {
 
   public void start() {
     // nocommit error if start not called
+    
+    if (started) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, "SolrResources already started");
+    }
+    
+    started = true;
 
     String zkHost = System.getProperty("zkHost");
     if (!StringUtils.isEmpty(zkHost)) {
@@ -101,55 +113,55 @@ public class SolrResources implements Closeable {
     }
     nodeConfig = loadNodeConfig(solrHomePath, extraProperties, zkClient);
 
-    cores = createCoreContainer(solrHomePath, extraProperties);
-    cores.load(true);
-    SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
-    this.httpClient = cores.getUpdateShardHandler().getDefaultHttpClient();
-    setupJvmMetrics(cores);
-  }
-
-  @Override
-  public void close() throws IOException {
-
-    // nocommit
-
-    // () -> {
-    // SolrMetricManager mm = metricManager;
-    // if (mm != null) {
-    // try {
-    // mm.unregisterGauges(registryName, metricTag);
-    // } catch (NullPointerException e) {
-    // // okay
-    // } catch (Exception e) {
-    // log.warn("Exception closing FileCleaningTracker", e);
-    // } finally {
-    // metricManager = null;
-    // }
-    //
-    // }
-    // return "MetricManager";
-    // });
-  }
-
-  /**
-   * Override this to change CoreContainer initialization
-   * 
-   * @return a CoreContainer to hold this server's cores
-   */
-  protected CoreContainer createCoreContainer(Path solrHome, Properties extraProperties) {
-
+    
     // final CoreContainer coreContainer = new CoreContainer(nodeConfig, extraProperties,
     // new CorePropertiesLocator(nodeConfig.getCoreRootDirectory()), zkClient);
 
     SolrModule solrModule = new SolrModule(zkClient, nodeConfig, extraProperties);
     injector = Guice.createInjector(solrModule);
 
-    CoreContainer coreContainer = injector.getInstance(CoreContainer.class);
-
-    return coreContainer;
+    cores = injector.getInstance(CoreContainer.class);
+    
+    cores.load(true);
+    SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
+    this.httpClient = cores.getUpdateShardHandler().getDefaultHttpClient();
+    registryName = setupJvmMetrics(cores);
   }
 
-  private void setupJvmMetrics(CoreContainer coresInit) {
+  @Override
+  public void close() throws IOException {
+    log.info("Close SolrResources");
+    if (closed) {
+      throw new AlreadyClosedException();
+    }
+    closed = true;
+    // nocommit
+    try (DW worker = new DW(this, true)) {
+      worker.add("SolrResourcesInternal",
+
+          () -> {
+            SolrMetricManager mm = metricManager;
+            if (mm != null) {
+              try {
+                mm.unregisterGauges(registryName, metricTag);
+              } catch (NullPointerException e) {
+                // okay
+              } catch (Exception e) {
+                log.warn("Exception closing FileCleaningTracker", e);
+              } finally {
+                metricManager = null;
+              }
+
+            }
+            return "MetricManager";
+          });
+
+      worker.add("CoreContainer", cores);
+      worker.add(zkClient);
+    }
+  }
+
+  private String setupJvmMetrics(CoreContainer coresInit) {
     metricManager = coresInit.getMetricManager();
     String registryName = SolrMetricManager.getRegistryName(SolrInfoBean.Group.jvm);
     final Set<String> hiddenSysProps = coresInit.getConfig().getMetricsConfig().getHiddenSysProps();
@@ -170,6 +182,7 @@ public class SolrResources implements Closeable {
         });
       });
       metricManager.registerGauge(null, registryName, sysprops, metricTag, true, "properties", "system");
+      return registryName;
     } catch (Exception e) {
       throw new DW.Exp("Error registering JVM metrics", e);
     }

@@ -317,21 +317,14 @@ public class ZkShardTerms implements AutoCloseable{
     String path = "/collections/" + collection + "/terms";
     try {
       path += "/" + shard;
-
       try {
         Map<String,Long> initialTerms = new HashMap<>();
         zkClient.makePath(path, Utils.toJSON(initialTerms), CreateMode.PERSISTENT, true);
       } catch (KeeperException.NodeExistsException e) {
         // it's okay if another beats us creating the node
       }
-
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Error creating shard term node in Zookeeper for collection: " + collection, e);
-    } catch (KeeperException e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Error creating shard term node in Zookeeper for collection: " + collection, e);
+    } catch (Exception e) {
+      throw new DW.Exp("Error creating shard term node in Zookeeper for collection: " + collection, e);
     }
   }
 
@@ -344,11 +337,8 @@ public class ZkShardTerms implements AutoCloseable{
       Stat stat = new Stat();
       byte[] data = zkClient.getData(znodePath, null, stat, true);
       newTerms = new Terms((Map<String, Long>) Utils.fromJSON(data), stat.getVersion());
-    } catch (KeeperException e) {
-      Thread.interrupted();
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error updating shard term for collection: " + collection, e);
-    } catch (InterruptedException e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error updating shard term for collection: " + collection, e);
+    } catch (Exception e) {
+      throw new DW.Exp("Error updating shard term for collection: " + collection, e);
     }
 
     setNewTerms(newTerms);
@@ -358,23 +348,11 @@ public class ZkShardTerms implements AutoCloseable{
    * Retry register a watcher to the correspond ZK term node
    */
   private void retryRegisterWatcher() {
-    while (!isClosed.get()) {
+    if (!isClosed.get()) {
       try {
         registerWatcher();
-        return;
-      } catch (KeeperException.SessionExpiredException | KeeperException.AuthFailedException e) {
-        isClosed.set(true);
-        log.error("Failed watching shard term for collection: {} due to unrecoverable exception", collection, e);
-        return;
-      } catch (KeeperException e) {
-        log.warn("Failed watching shard term for collection: {}, retrying!", collection, e);
-        try {
-          zkClient.getConnectionManager().waitForConnected(zkClient.getZkClientTimeout());
-        } catch (TimeoutException te) {
-          if (Thread.interrupted()) {
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error watching shard term for collection: " + collection, te);
-          }
-        }
+      } catch (Exception e) {
+        throw new DW.Exp("Error watching shard term for collection: " + collection, e);
       }
     }
   }
@@ -395,9 +373,8 @@ public class ZkShardTerms implements AutoCloseable{
     try {
       // exists operation is faster than getData operation
       zkClient.exists(znodePath, watcher, true);
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error watching shard term for collection: " + collection, e);
+    } catch (Exception e) {
+      throw new DW.Exp("Error watching shard term for collection: " + collection, e);
     }
   }
 
@@ -417,6 +394,7 @@ public class ZkShardTerms implements AutoCloseable{
     if (isChanged) onTermUpdates(newTerms);
   }
 
+  // nocommit improve sync
   private void onTermUpdates(Terms newTerms) {
     synchronized (listeners) {
       listeners.removeIf(coreTermWatcher -> !coreTermWatcher.onTermChanged(newTerms));

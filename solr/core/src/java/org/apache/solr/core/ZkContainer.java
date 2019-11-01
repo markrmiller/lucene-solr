@@ -50,17 +50,14 @@ public class ZkContainer implements Closeable {
   
   // see ZkController.zkRunOnly
   private boolean zkRunOnly = Boolean.getBoolean("zkRunOnly"); // expert
-
-  private volatile SolrZkClient zkClient;
   
   public ZkContainer() {
     this.zkController = null;
     this.zkServer = null;
-    this.zkClient = null;
   }
 
   public void initZooKeeper(final CoreContainer cc, String solrHome, CloudConfig config, SolrZkClient zkClient) {
-    this.zkClient = zkClient;
+
     assert zkClient != null;
     
     ZkController zkController = null;
@@ -213,8 +210,9 @@ public class ZkContainer implements Closeable {
   
   @Override
   public void close() {
-    try (DW closer = new DW(this)) {
-      closer.add("ZkContainer", zkController, zkServer);
+    try (DW closer = new DW(this, true)) {
+      closer.add(zkController);
+      closer.add(zkServer);
     }
   }
 }

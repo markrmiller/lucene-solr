@@ -176,7 +176,7 @@ public class RoutedAliasUpdateProcessor extends UpdateRequestProcessor {
 
     // to avoid potential for race conditions, this next method should not get called again unless
     // we have created a collection synchronously
-    routedAlias.updateParsedCollectionAliases(this.zkController.zkStateReader, false);
+    routedAlias.updateParsedCollectionAliases(this.zkController.getZkStateReader(), false);
 
     String targetCollection = routedAlias.createCollectionsIfRequired(cmd);
 

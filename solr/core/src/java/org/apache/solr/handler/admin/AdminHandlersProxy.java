@@ -72,7 +72,7 @@ public class AdminHandlersProxy {
     Map<String,String> paramsMap = req.getParams().toMap(new HashMap<>());
     paramsMap.remove(PARAM_NODES);
     SolrParams params = new MapSolrParams(paramsMap);
-    Set<String> liveNodes = container.getZkController().zkStateReader.getClusterState().getLiveNodes();
+    Set<String> liveNodes = container.getZkController().getZkStateReader().getClusterState().getLiveNodes();
     
     if (nodeNames.equals("all")) {
       nodes = liveNodes;
@@ -119,7 +119,7 @@ public class AdminHandlersProxy {
                                                                            SolrParams params, ZkController zkController) 
       throws IOException, SolrServerException {
     log.debug("Proxying {} request to node {}", endpoint, nodeName);
-    URL baseUrl = new URL(zkController.zkStateReader.getBaseUrlForNodeName(nodeName));
+    URL baseUrl = new URL(zkController.getZkStateReader().getBaseUrlForNodeName(nodeName));
     HttpSolrClient solr = new HttpSolrClient.Builder(baseUrl.toString()).build();
     SolrRequest proxyReq = new GenericSolrRequest(SolrRequest.METHOD.GET, endpoint, params);
     HttpSolrClient.HttpUriRequestResponse proxyResp = solr.httpUriRequest(proxyReq);

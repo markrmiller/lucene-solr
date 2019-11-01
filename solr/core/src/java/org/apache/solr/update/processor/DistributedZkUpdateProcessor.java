@@ -55,6 +55,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.request.SolrQueryRequest;
@@ -123,10 +124,22 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
   }
 
   private boolean isReadOnly() {
-    return readOnlyCollection || req.getCore().readOnly;
+    if (log.isDebugEnabled()) {
+      log.debug("isReadOnly() - start");
+    }
+
+    boolean returnboolean = readOnlyCollection || req.getCore().readOnly;
+    if (log.isDebugEnabled()) {
+      log.debug("isReadOnly() - end");
+    }
+    return returnboolean;
   }
 
   private boolean isCloneRequiredOnLeader(UpdateRequestProcessor next) {
+    if (log.isDebugEnabled()) {
+      log.debug("isCloneRequiredOnLeader(UpdateRequestProcessor next={}) - start", next);
+    }
+
     boolean shouldClone = false;
     UpdateRequestProcessor nextInChain = next;
     while (nextInChain != null)  {
@@ -139,17 +152,33 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       }
       nextInChain = nextInChain.next;
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("isCloneRequiredOnLeader(UpdateRequestProcessor) - end");
+    }
     return shouldClone;
   }
 
   @Override
   protected Replica.Type computeReplicaType() {
+    if (log.isDebugEnabled()) {
+      log.debug("computeReplicaType() - start");
+    }
+
     // can't use cloudDesc since this is called by super class, before the constructor instantiates cloudDesc.
-    return req.getCore().getCoreDescriptor().getCloudDescriptor().getReplicaType();
+    Replica.Type returnType = req.getCore().getCoreDescriptor().getCloudDescriptor().getReplicaType();
+    if (log.isDebugEnabled()) {
+      log.debug("computeReplicaType() - end");
+    }
+    return returnType;
   }
 
   @Override
   public void processCommit(CommitUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("processCommit(CommitUpdateCommand cmd={}) - start", cmd);
+    }
+
     clusterState = zkController.getClusterState();
 
     assert TestInjection.injectFailUpdateRequests();
@@ -166,8 +195,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     try {
       leaderReplica = zkController.getZkStateReader().getLeaderRetry(collection, cloudDesc.getShardId());
     } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Exception finding leader for shard " + cloudDesc.getShardId(), e);
+      log.error("processCommit(CommitUpdateCommand=" + cmd + ")", e);
+
+      throw new DW.Exp("Exception finding leader for shard " + cloudDesc.getShardId(), e);
+      
     }
     isLeader = leaderReplica.getName().equals(cloudDesc.getCoreNodeName());
 
@@ -225,10 +256,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         }
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("processCommit(CommitUpdateCommand) - end");
+    }
   }
 
   @Override
   public void processAdd(AddUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("processAdd(AddUpdateCommand cmd={}) - start", cmd);
+    }
+
     clusterState = zkController.getClusterState();
 
     assert TestInjection.injectFailUpdateRequests();
@@ -244,10 +283,17 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     checkReplicationTracker(cmd);
 
     super.processAdd(cmd);
+
+    if (log.isDebugEnabled()) {
+      log.debug("processAdd(AddUpdateCommand) - end");
+    }
   }
 
   @Override
   protected void doDistribAdd(AddUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribAdd(AddUpdateCommand cmd={}) - start", cmd);
+    }
 
     if (isLeader && !isSubShardLeader)  {
       DocCollection coll = clusterState.getCollection(collection);
@@ -301,10 +347,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         cmdDistrib.distribAdd(cmd, nodes, params, false, rollupReplicationTracker, leaderReplicationTracker);
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribAdd(AddUpdateCommand) - end");
+    }
   }
 
   @Override
   public void processDelete(DeleteUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("processDelete(DeleteUpdateCommand cmd={}) - start", cmd);
+    }
+
     clusterState = zkController.getClusterState();
 
     if (isReadOnly()) {
@@ -312,10 +366,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     }
 
     super.processDelete(cmd);
+
+    if (log.isDebugEnabled()) {
+      log.debug("processDelete(DeleteUpdateCommand) - end");
+    }
   }
 
   @Override
   protected void doDeleteById(DeleteUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doDeleteById(DeleteUpdateCommand cmd={}) - start", cmd);
+    }
+
     setupRequest(cmd);
 
     // check if client has requested minimum replication factor information. will set replicationTracker to null if
@@ -323,10 +385,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     checkReplicationTracker(cmd);
 
     super.doDeleteById(cmd);
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDeleteById(DeleteUpdateCommand) - end");
+    }
   }
 
   @Override
   protected void doDistribDeleteById(DeleteUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribDeleteById(DeleteUpdateCommand cmd={}) - start", cmd);
+    }
+
     if (isLeader && !isSubShardLeader)  {
       DocCollection coll = clusterState.getCollection(collection);
       List<SolrCmdDistributor.Node> subShardLeaders = getSubShardLeaders(coll, cloudDesc.getShardId(), cmd.getId(), null);
@@ -366,10 +436,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       }
       cmdDistrib.distribDelete(cmd, nodes, params, false, rollupReplicationTracker, leaderReplicationTracker);
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribDeleteById(DeleteUpdateCommand) - end");
+    }
   }
 
   @Override
   protected void doDeleteByQuery(DeleteUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doDeleteByQuery(DeleteUpdateCommand cmd={}) - start", cmd);
+    }
+
     zkCheck();
 
     // NONE: we are the first to receive this deleteByQuery
@@ -407,6 +485,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         try {
           leader = zkController.getZkStateReader().getLeaderRetry(collection, sliceName);
         } catch (InterruptedException e) {
+          log.error("doDeleteByQuery(DeleteUpdateCommand=" + cmd + ")", e);
+
           throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Exception finding leader for shard " + sliceName, e);
         }
 
@@ -437,6 +517,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       cmdDistrib.distribDelete(cmd, leaders, outParams, false, rollupReplicationTracker, null);
 
       if (!leaderForAnyShard) {
+        if (log.isDebugEnabled()) {
+          log.debug("doDeleteByQuery(DeleteUpdateCommand) - end");
+        }
         return;
       }
 
@@ -457,11 +540,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     // we aren't the leader or subShardLeader
     checkReplicationTracker(cmd);
     super.doDeleteByQuery(cmd, replicas, coll);
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDeleteByQuery(DeleteUpdateCommand) - end");
+    }
   }
 
   @Override
   protected void doDistribDeleteByQuery(DeleteUpdateCommand cmd, List<SolrCmdDistributor.Node> replicas,
                                         DocCollection coll) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribDeleteByQuery(DeleteUpdateCommand cmd={}, List<SolrCmdDistributor.Node> replicas={}, DocCollection coll={}) - start", cmd, replicas, coll);
+    }
 
     boolean isReplayOrPeersync = (cmd.getFlags() & (UpdateCommand.REPLAY | UpdateCommand.PEER_SYNC)) != 0;
     boolean leaderLogic = isLeader && !isReplayOrPeersync;
@@ -494,6 +584,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         }
       }
     } catch (InterruptedException e) {
+      log.error("doDistribDeleteByQuery(DeleteUpdateCommand=" + cmd + ", List<SolrCmdDistributor.Node>=" + replicas + ", DocCollection=" + coll + ")", e);
+
       Thread.currentThread().interrupt();
       throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
     }
@@ -522,10 +614,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     if (someReplicas) {
       cmdDistrib.blockAndDoRetries();
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribDeleteByQuery(DeleteUpdateCommand, List<SolrCmdDistributor.Node>, DocCollection) - end");
+    }
   }
 
   // used for deleteByQuery to get the list of nodes this leader should forward to
   private List<SolrCmdDistributor.Node> setupRequestForDBQ() {
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequestForDBQ() - start");
+    }
+
     List<SolrCmdDistributor.Node> nodes = null;
     String shardId = cloudDesc.getShardId();
 
@@ -545,24 +645,44 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         }
       }
     } catch (InterruptedException e) {
+      log.error("setupRequestForDBQ()", e);
+
       Thread.currentThread().interrupt();
       throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequestForDBQ() - end");
+    }
     return nodes;
   }
 
   @Override
   protected String getLeaderUrl(String id) {
+    if (log.isDebugEnabled()) {
+      log.debug("getLeaderUrl(String id={}) - start", id);
+    }
+
     // try get leader from req params, fallback to zk lookup if not found.
     String distribFrom = req.getParams().get(DISTRIB_FROM);
     if(distribFrom != null) {
+      if (log.isDebugEnabled()) {
+        log.debug("getLeaderUrl(String) - end");
+      }
       return distribFrom;
     }
-    return getLeaderUrlZk(id);
+    String returnString = getLeaderUrlZk(id);
+    if (log.isDebugEnabled()) {
+      log.debug("getLeaderUrl(String) - end");
+    }
+    return returnString;
   }
 
   private String getLeaderUrlZk(String id) {
+    if (log.isDebugEnabled()) {
+      log.debug("getLeaderUrlZk(String id={}) - start", id);
+    }
+
     // An update we're dependent upon didn't arrive! This is unexpected. Perhaps likely our leader is
     // down or partitioned from us for some reason. Lets force refresh cluster state, and request the
     // leader for the update.
@@ -571,14 +691,24 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
           + "failed since we're not in cloud mode.");
     }
     try {
-      return zkController.getZkStateReader().getLeaderRetry(collection, cloudDesc.getShardId()).getCoreUrl();
+      String returnString = zkController.getZkStateReader().getLeaderRetry(collection, cloudDesc.getShardId()).getCoreUrl();
+      if (log.isDebugEnabled()) {
+        log.debug("getLeaderUrlZk(String) - end");
+      }
+      return returnString;
     } catch (InterruptedException e) {
+      log.error("getLeaderUrlZk(String=" + id + ")", e);
+
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception during fetching from leader.", e);
     }
   }
 
   @Override
   void setupRequest(UpdateCommand cmd) {
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequest(UpdateCommand cmd={}) - start", cmd);
+    }
+
     updateCommand = cmd;
     zkCheck();
     if (cmd instanceof AddUpdateCommand) {
@@ -588,13 +718,29 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       DeleteUpdateCommand dcmd = (DeleteUpdateCommand)cmd;
       nodes = setupRequest(dcmd.getId(), null);
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequest(UpdateCommand) - end");
+    }
   }
 
   protected List<SolrCmdDistributor.Node> setupRequest(String id, SolrInputDocument doc) {
-    return setupRequest(id, doc, null);
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequest(String id={}, SolrInputDocument doc={}) - start", id, doc);
+    }
+
+    List<SolrCmdDistributor.Node> returnList = setupRequest(id, doc, null);
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequest(String, SolrInputDocument) - end");
+    }
+    return returnList;
   }
 
   protected List<SolrCmdDistributor.Node> setupRequest(String id, SolrInputDocument doc, String route) {
+    if (log.isDebugEnabled()) {
+      log.debug("setupRequest(String id={}, SolrInputDocument doc={}, String route={}) - start", id, doc, route);
+    }
+
     // if we are in zk mode...
 
     assert TestInjection.injectUpdateRandomPause();
@@ -602,6 +748,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     if ((updateCommand.getFlags() & (UpdateCommand.REPLAY | UpdateCommand.PEER_SYNC)) != 0) {
       isLeader = false;     // we actually might be the leader, but we don't want leader-logic for these types of updates anyway.
       forwardToLeader = false;
+
+      if (log.isDebugEnabled()) {
+        log.debug("setupRequest(String, SolrInputDocument, String) - end");
+      }
       return null;
     }
 
@@ -633,6 +783,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
         isLeader = false;     // we actually might be the leader, but we don't want leader-logic for these types of updates anyway.
         forwardToLeader = false;
+
+        if (log.isDebugEnabled()) {
+          log.debug("setupRequest(String, SolrInputDocument, String) - end");
+        }
         return null;
       }
     }
@@ -662,6 +816,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       if (DistribPhase.FROMLEADER == phase && !isSubShardLeader && fromCollection == null) {
         // we are coming from the leader, just go local - add no urls
         forwardToLeader = false;
+
+        if (log.isDebugEnabled()) {
+          log.debug("setupRequest(String, SolrInputDocument, String) - end");
+        }
         return null;
       } else if (isLeader || isSubShardLeader) {
         // that means I want to forward onto my replicas...
@@ -673,6 +831,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
             .getReplicas(EnumSet.of(Replica.Type.NRT, Replica.Type.TLOG));
         replicas.removeIf((replica) -> replica.getName().equals(leaderCoreNodeName));
         if (replicas.isEmpty()) {
+          if (log.isDebugEnabled()) {
+            log.debug("setupRequest(String, SolrInputDocument, String) - end");
+          }
           return null;
         }
 
@@ -701,16 +862,26 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
             nodes.add(new SolrCmdDistributor.StdNode(new ZkCoreNodeProps(replica), collection, shardId, maxRetriesToFollowers));
           }
         }
+
+        if (log.isDebugEnabled()) {
+          log.debug("setupRequest(String, SolrInputDocument, String) - end");
+        }
         return nodes;
 
       } else {
         // I need to forward on to the leader...
         forwardToLeader = true;
-        return Collections.singletonList(
+        List<SolrCmdDistributor.Node> returnList = Collections.singletonList(
             new SolrCmdDistributor.ForwardNode(new ZkCoreNodeProps(leaderReplica), zkController.getZkStateReader(), collection, shardId, maxRetriesOnForward));
+        if (log.isDebugEnabled()) {
+          log.debug("setupRequest(String, SolrInputDocument, String) - end");
+        }
+        return returnList;
       }
 
     } catch (InterruptedException e) {
+      log.error("setupRequest(String=" + id + ", SolrInputDocument=" + doc + ", String=" + route + ")", e);
+
       Thread.currentThread().interrupt();
       throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e);
     }
@@ -718,8 +889,16 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
   @Override
   protected boolean shouldCloneCmdDoc() {
+    if (log.isDebugEnabled()) {
+      log.debug("shouldCloneCmdDoc() - start");
+    }
+
     boolean willDistrib = isLeader && nodes != null && nodes.size() > 0;
-    return willDistrib & cloneRequiredOnLeader;
+    boolean returnboolean = willDistrib & cloneRequiredOnLeader;
+    if (log.isDebugEnabled()) {
+      log.debug("shouldCloneCmdDoc() - end");
+    }
+    return returnboolean;
   }
 
   // helper method, processAdd was getting a bit large.
@@ -730,6 +909,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
   // 2> we're a follower: allocat a RollupTracker
   //
   private void checkReplicationTracker(UpdateCommand cmd) {
+    if (log.isDebugEnabled()) {
+      log.debug("checkReplicationTracker(UpdateCommand cmd={}) - start", cmd);
+    }
 
     SolrParams rp = cmd.getReq().getParams();
     String distribUpdate = rp.get(DISTRIB_UPDATE_PARAM);
@@ -745,10 +927,18 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       leaderReplicationTracker = new LeaderRequestReplicationTracker(
           req.getCore().getCoreDescriptor().getCloudDescriptor().getShardId());
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("checkReplicationTracker(UpdateCommand) - end");
+    }
   }
 
 
   private List<SolrCmdDistributor.Node> getCollectionUrls(String collection, EnumSet<Replica.Type> types, boolean onlyLeaders) {
+    if (log.isDebugEnabled()) {
+      log.debug("getCollectionUrls(String collection={}, EnumSet<Replica.Type> types={}, boolean onlyLeaders={}) - start", collection, types, onlyLeaders);
+    }
+
     final DocCollection docCollection = clusterState.getCollectionOrNull(collection);
     if (collection == null || docCollection.getSlicesMap() == null) {
       throw new ZooKeeperException(SolrException.ErrorCode.BAD_REQUEST,
@@ -779,22 +969,41 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       }
     }
     if (urls.isEmpty()) {
+      if (log.isDebugEnabled()) {
+        log.debug("getCollectionUrls(String, EnumSet<Replica.Type>, boolean) - end");
+      }
       return null;
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getCollectionUrls(String, EnumSet<Replica.Type>, boolean) - end");
     }
     return urls;
   }
 
   /** For {@link org.apache.solr.common.params.CollectionParams.CollectionAction#SPLITSHARD} */
   private boolean couldIbeSubShardLeader(DocCollection coll) {
+    if (log.isDebugEnabled()) {
+      log.debug("couldIbeSubShardLeader(DocCollection coll={}) - start", coll);
+    }
+
     // Could I be the leader of a shard in "construction/recovery" state?
     String myShardId = cloudDesc.getShardId();
     Slice mySlice = coll.getSlice(myShardId);
     Slice.State state = mySlice.getState();
-    return state == Slice.State.CONSTRUCTION || state == Slice.State.RECOVERY;
+    boolean returnboolean = state == Slice.State.CONSTRUCTION || state == Slice.State.RECOVERY;
+    if (log.isDebugEnabled()) {
+      log.debug("couldIbeSubShardLeader(DocCollection) - end");
+    }
+    return returnboolean;
   }
 
   /** For {@link org.apache.solr.common.params.CollectionParams.CollectionAction#SPLITSHARD} */
   protected boolean amISubShardLeader(DocCollection coll, Slice parentSlice, String id, SolrInputDocument doc) throws InterruptedException {
+    if (log.isDebugEnabled()) {
+      log.debug("amISubShardLeader(DocCollection coll={}, Slice parentSlice={}, String id={}, SolrInputDocument doc={}) - start", coll, parentSlice, id, doc);
+    }
+
     // Am I the leader of a shard in "construction/recovery" state?
     String myShardId = cloudDesc.getShardId();
     Slice mySlice = coll.getSlice(myShardId);
@@ -808,23 +1017,42 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         if (myRange == null) myRange = new DocRouter.Range(Integer.MIN_VALUE, Integer.MAX_VALUE);
         if (parentSlice != null)  {
           boolean isSubset = parentSlice.getRange() != null && myRange.isSubsetOf(parentSlice.getRange());
-          return isSubset && coll.getRouter().isTargetSlice(id, doc, req.getParams(), myShardId, coll);
+          boolean returnboolean = isSubset && coll.getRouter().isTargetSlice(id, doc, req.getParams(), myShardId, coll);
+          if (log.isDebugEnabled()) {
+            log.debug("amISubShardLeader(DocCollection, Slice, String, SolrInputDocument) - end");
+          }
+          return returnboolean;
         } else  {
           // delete by query case -- as long as I am a sub shard leader we're fine
+
+          if (log.isDebugEnabled()) {
+            log.debug("amISubShardLeader(DocCollection, Slice, String, SolrInputDocument) - end");
+          }
           return true;
         }
       }
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("amISubShardLeader(DocCollection, Slice, String, SolrInputDocument) - end");
     }
     return false;
   }
 
   protected List<SolrCmdDistributor.Node> getReplicaNodesForLeader(String shardId, Replica leaderReplica) {
+    if (log.isDebugEnabled()) {
+      log.debug("getReplicaNodesForLeader(String shardId={}, Replica leaderReplica={}) - start", shardId, leaderReplica);
+    }
+
     String leaderCoreNodeName = leaderReplica.getName();
     List<Replica> replicas = clusterState.getCollection(collection)
         .getSlice(shardId)
         .getReplicas(EnumSet.of(Replica.Type.NRT, Replica.Type.TLOG));
     replicas.removeIf((replica) -> replica.getName().equals(leaderCoreNodeName));
     if (replicas.isEmpty()) {
+      if (log.isDebugEnabled()) {
+        log.debug("getReplicaNodesForLeader(String, Replica) - end");
+      }
       return null;
     }
 
@@ -854,11 +1082,19 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         nodes.add(new SolrCmdDistributor.StdNode(new ZkCoreNodeProps(replica), collection, shardId));
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getReplicaNodesForLeader(String, Replica) - end");
+    }
     return nodes;
   }
 
   /** For {@link org.apache.solr.common.params.CollectionParams.CollectionAction#SPLITSHARD} */
   protected List<SolrCmdDistributor.Node> getSubShardLeaders(DocCollection coll, String shardId, String docId, SolrInputDocument doc) {
+    if (log.isDebugEnabled()) {
+      log.debug("getSubShardLeaders(DocCollection coll={}, String shardId={}, String docId={}, SolrInputDocument doc={}) - start", coll, shardId, docId, doc);
+    }
+
     Collection<Slice> allSlices = coll.getSlices();
     List<SolrCmdDistributor.Node> nodes = null;
     for (Slice aslice : allSlices) {
@@ -880,11 +1116,19 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         }
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getSubShardLeaders(DocCollection, String, String, SolrInputDocument) - end");
+    }
     return nodes;
   }
 
   /** For {@link org.apache.solr.common.params.CollectionParams.CollectionAction#MIGRATE} */
   protected List<SolrCmdDistributor.Node> getNodesByRoutingRules(ClusterState cstate, DocCollection coll, String id, SolrInputDocument doc)  {
+    if (log.isDebugEnabled()) {
+      log.debug("getNodesByRoutingRules(ClusterState cstate={}, DocCollection coll={}, String id={}, SolrInputDocument doc={}) - start", cstate, coll, id, doc);
+    }
+
     DocRouter router = coll.getRouter();
     List<SolrCmdDistributor.Node> nodes = null;
     if (router instanceof CompositeIdRouter)  {
@@ -905,6 +1149,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
               if (nodes == null) nodes = new ArrayList<>();
               nodes.add(new SolrCmdDistributor.StdNode(new ZkCoreNodeProps(any.getLeader())));
             }
+          }
+
+          if (log.isDebugEnabled()) {
+            log.debug("getNodesByRoutingRules(ClusterState, DocCollection, String, SolrInputDocument) - end");
           }
           return nodes;
         }
@@ -953,6 +1201,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
                     }
                   }
                 } catch (InterruptedException e) {
+                  log.error("getNodesByRoutingRules(ClusterState=" + cstate + ", DocCollection=" + coll + ", String=" + id + ", SolrInputDocument=" + doc + ")", e);
+
                   Thread.currentThread().interrupt();
                 }
               }
@@ -961,12 +1211,26 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         }
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("getNodesByRoutingRules(ClusterState, DocCollection, String, SolrInputDocument) - end");
+    }
     return nodes;
   }
 
   private void doDefensiveChecks(DistribPhase phase) {
+    if (log.isDebugEnabled()) {
+      log.debug("doDefensiveChecks(DistribPhase phase={}) - start", phase);
+    }
+
     boolean isReplayOrPeersync = (updateCommand.getFlags() & (UpdateCommand.REPLAY | UpdateCommand.PEER_SYNC)) != 0;
-    if (isReplayOrPeersync) return;
+    if (isReplayOrPeersync) {
+      
+      if (log.isDebugEnabled()) {
+        log.debug("doDefensiveChecks(DistribPhase) - end");
+      }
+      return;
+    }
 
     String from = req.getParams().get(DISTRIB_FROM);
 
@@ -1007,6 +1271,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       try {
         Thread.sleep(500);
       } catch (InterruptedException e) {
+        log.error("doDefensiveChecks(DistribPhase=" + phase + ")", e);
+
         Thread.currentThread().interrupt();
       }
     }
@@ -1017,37 +1283,69 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
           "ClusterState says we are the leader (" + zkController.getBaseUrl()
               + "/" + req.getCore().getName() + "), but locally we don't think so. Request came from " + from);
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("doDefensiveChecks(DistribPhase) - end");
+    }
   }
 
   @Override
   protected void doClose() {
+    if (log.isDebugEnabled()) {
+      log.debug("doClose() - start");
+    }
+
     if (cmdDistrib != null) {
       cmdDistrib.close();
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("doClose() - end");
     }
   }
 
   @Override
   public void processMergeIndexes(MergeIndexesCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("processMergeIndexes(MergeIndexesCommand cmd={}) - start", cmd);
+    }
+
     clusterState = zkController.getClusterState();
 
     if (isReadOnly()) {
       throw new SolrException(ErrorCode.FORBIDDEN, "Collection " + collection + " is read-only.");
     }
     super.processMergeIndexes(cmd);
+
+    if (log.isDebugEnabled()) {
+      log.debug("processMergeIndexes(MergeIndexesCommand) - end");
+    }
   }
 
   @Override
   public void processRollback(RollbackUpdateCommand cmd) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("processRollback(RollbackUpdateCommand cmd={}) - start", cmd);
+    }
+
     clusterState = zkController.getClusterState();
 
     if (isReadOnly()) {
       throw new SolrException(ErrorCode.FORBIDDEN, "Collection " + collection + " is read-only.");
     }
     super.processRollback(cmd);
+
+    if (log.isDebugEnabled()) {
+      log.debug("processRollback(RollbackUpdateCommand) - end");
+    }
   }
 
   // TODO: optionally fail if n replicas are not reached...
   protected void doDistribFinish() {
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribFinish() - start");
+    }
+
     clusterState = zkController.getClusterState();
 
     boolean shouldUpdateTerms = isLeader && isIndexChanged;
@@ -1128,6 +1426,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
             leaderCoreNodeName = leaderProps.getName();
           }
         } catch (Exception exc) {
+          log.error("doDistribFinish()", exc);
+
           getLeaderExc = exc;
         }
         if (leaderCoreNodeName == null) {
@@ -1190,6 +1490,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       throw new DistributedUpdatesAsyncException(errorsForClient);
     }
 
+    if (log.isDebugEnabled()) {
+      log.debug("doDistribFinish() - end");
+    }
   }
 
   /**
@@ -1197,6 +1500,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
    */
   @SuppressWarnings("deprecation")
   private void handleReplicationFactor() {
+    if (log.isDebugEnabled()) {
+      log.debug("handleReplicationFactor() - start");
+    }
+
     if (leaderReplicationTracker != null || rollupReplicationTracker != null) {
       int achievedRf = Integer.MAX_VALUE;
 
@@ -1223,9 +1530,16 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       leaderReplicationTracker = null;
 
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("handleReplicationFactor() - end");
+    }
   }
 
   private void zkCheck() {
+    if (log.isDebugEnabled()) {
+      log.debug("zkCheck() - start");
+    }
 
     // Streaming updates can delay shutdown and cause big update reorderings (new streams can't be
     // initiated, but existing streams carry on).  This is why we check if the CC is shutdown.
@@ -1236,13 +1550,22 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
     if ((updateCommand.getFlags() & (UpdateCommand.REPLAY | UpdateCommand.PEER_SYNC)) != 0) {
       // for log reply or peer sync, we don't need to be connected to ZK
+
+      if (log.isDebugEnabled()) {
+        log.debug("zkCheck() - end");
+      }
       return;
     }
 
-    if (!zkController.getZkClient().getConnectionManager().isLikelyExpired()) {
-      return;
-    }
+    // nocommit
+//    if (!zkController.getZkClient().getConnectionManager().isLikelyExpired()) {
+//      return;
+//    }
 
-    throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Cannot talk to ZooKeeper - Updates are disabled.");
+//    throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Cannot talk to ZooKeeper - Updates are disabled.");
+
+    if (log.isDebugEnabled()) {
+      log.debug("zkCheck() - end");
+    }
   }
 }

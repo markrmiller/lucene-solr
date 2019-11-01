@@ -89,8 +89,8 @@ public class ConfigureRecoveryStrategyTest extends SolrTestCaseJ4 {
       this.alternativeBaseUrlProp = alternativeBaseUrlProp;
     }
 
-    public CustomRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
-      super(cc, zkController, zkStateReader);
+    public CustomRecoveryStrategy(ZkController zkController, ZkStateReader zkStateReader) {
+      super(zkController, zkStateReader);
     }
 
     @Override
@@ -103,8 +103,8 @@ public class ConfigureRecoveryStrategyTest extends SolrTestCaseJ4 {
 
   static public class CustomRecoveryStrategyBuilder extends RecoveryStrategy.Builder {
     @Override
-    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
-      return new CustomRecoveryStrategy(cc, zkController, zkStateReader);
+    protected RecoveryStrategy newRecoveryStrategy(ZkController zkController, ZkStateReader zkStateReader) {
+      return new CustomRecoveryStrategy(zkController, zkStateReader);
     }
   }
 

@@ -155,9 +155,8 @@ public class ZkTestServer {
     }
 
     private class WatchLimit {
-      private long limit;
       private final String desc;
-
+      private volatile long limit;
       private volatile LimitViolationAction action;
       @SuppressWarnings("unchecked")
       private AtomicLongMap<String> counters = AtomicLongMap.create(((Map<String,Long>) DW.concReqsO()));
@@ -200,8 +199,12 @@ public class ZkTestServer {
         counters.decrementAndGet(event.getPath());
       }
 
-      private String reportLimitViolations() {
-        String[] maxKeys = maxCounters.keySet().toArray(new String[maxCounters.size()]);
+      private String reportLimitViolations() {         
+        String[] maxKeys;
+        synchronized (maxCounters) {
+           maxKeys = maxCounters.keySet().toArray(new String[maxCounters.size()]);
+        }
+
         Arrays.sort(maxKeys, new Comparator<String>() {
           private final Comparator<Long> valComp = Comparator.<Long>naturalOrder().reversed();
           @Override

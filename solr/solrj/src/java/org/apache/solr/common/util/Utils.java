@@ -290,6 +290,7 @@ public class Utils {
   }
 
   public static Object fromJSON(Reader is) {
+    assert is != null;
     try {
       return STANDARDOBJBUILDER.apply(getJSONParser(is)).getValStrict();
     } catch (IOException e) {

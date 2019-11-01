@@ -18,6 +18,7 @@ package org.apache.solr.cloud;
 
 import static org.apache.solr.common.params.CommonParams.DISTRIB;
 
+import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,7 @@ import org.apache.solr.update.PeerSync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SyncStrategy {
+public class SyncStrategy implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final boolean SKIP_AUTO_RECOVERY = Boolean.getBoolean("solrcloud.skip.autorecovery");
@@ -75,9 +76,7 @@ public class SyncStrategy {
         return PeerSync.PeerSyncResult.failure();
       }
       
-
-      
-      log.info("Sync replicas to " + ZkCoreNodeProps.getCoreUrl(leaderProps));
+      log.info("Sync replicas to " + leaderProps);
       
       if (core.getUpdateHandler().getUpdateLog() == null) {
         log.error("No UpdateLog found - cannot sync");
@@ -131,7 +130,7 @@ public class SyncStrategy {
     } catch (Exception e) {
       throw new DW.Exp(e);
     }
-    
+    log.info("Sync result={}", result);
     return result == null ? PeerSync.PeerSyncResult.failure() : result;
   }
   
@@ -206,10 +205,9 @@ public class SyncStrategy {
       }
       
       if (!success) {
-        log.info(ZkCoreNodeProps.getCoreUrl(leaderProps) + ": Sync failed - (" + srsp.getShardAddress()
-            + ") will enter recovery.");
+        log.info("{}: Sync failed - ({}) will enter recovery.", leaderProps, srsp.getShardAddress());
       } else {
-        log.info(ZkCoreNodeProps.getCoreUrl(leaderProps) + ": " + " sync completed with " + srsp.getShardAddress());
+        log.info("{}: Sync completed with ({})", leaderProps, srsp.getShardAddress());
       }
     }
   }

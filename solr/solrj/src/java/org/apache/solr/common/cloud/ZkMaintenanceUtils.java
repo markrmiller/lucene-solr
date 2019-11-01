@@ -295,7 +295,7 @@ public class ZkMaintenanceUtils {
       path = path.substring(0, path.length() - 1);
     }
 
-    AsyncCuratorFramework asyncClient = AsyncCuratorFramework.wrap(zkClient.getCurator());
+    AsyncCuratorFramework asyncClient = zkClient.getAsynCurator();
 
     List<CuratorOp> operations = new ArrayList<>(30);
     

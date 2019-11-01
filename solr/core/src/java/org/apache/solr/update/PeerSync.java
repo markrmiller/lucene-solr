@@ -554,6 +554,11 @@ public class PeerSync implements SolrMetricProducer {
     public static PeerSyncResult failure(boolean otherHasVersions)  {
       return new PeerSyncResult(false, otherHasVersions);
     }
+
+    @Override
+    public String toString() {
+      return "PeerSyncResult [success=" + success + ", otherHasVersions=" + otherHasVersions + "]";
+    }
   }
 
   /**

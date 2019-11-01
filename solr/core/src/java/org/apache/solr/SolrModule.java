@@ -29,6 +29,7 @@ import org.apache.solr.request.SolrRequestHandler;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.google.inject.name.Names;
 
 public class SolrModule extends AbstractModule {
   
@@ -36,6 +37,7 @@ public class SolrModule extends AbstractModule {
   private final CorePropertiesLocator corePropertiesLocator;
   private final Properties extraProperties; // nocommit
   private final SolrZkClient zkClient;
+
 
   public SolrModule(SolrZkClient zkClient, NodeConfig nodeConfig, Properties extraProperties) {
     this.zkClient = zkClient;
@@ -47,7 +49,7 @@ public class SolrModule extends AbstractModule {
   @Override 
   protected void configure() {
 
-    
+    bindConstant().annotatedWith(Names.named("nodeName")).to("red-service");
     
     bind(Map.class).to(HashMap.class);
   }

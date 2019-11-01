@@ -58,6 +58,7 @@ import org.apache.lucene.util.FixedBitSet;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -108,7 +109,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
   private final String name;
   private final Date openTime = new Date();
   private final long openNanoTime = System.nanoTime();
-  private Date registerTime;
+  private volatile Date registerTime;
   private long warmupTime = 0;
   private final DirectoryReader reader;
   private final boolean closeReader;
@@ -128,27 +129,34 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
   // list of all caches associated with this searcher.
   private final SolrCache[] cacheList;
 
-  private DirectoryFactory directoryFactory;
+  private final DirectoryFactory directoryFactory;
 
   private final LeafReader leafReader;
   // only for addIndexes etc (no fieldcache)
   private final DirectoryReader rawReader;
 
   private final String path;
-  private boolean releaseDirectory;
+  private volatile boolean releaseDirectory;
+  
+  private volatile boolean releaseDirectoryForReserve;
 
   private final StatsCache statsCache;
 
-  private Set<String> metricNames = ConcurrentHashMap.newKeySet();
-  private SolrMetricsContext solrMetricsContext;
+  private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
+  private volatile SolrMetricsContext solrMetricsContext;
 
   private static DirectoryReader getReader(SolrCore core, SolrIndexConfig config, DirectoryFactory directoryFactory,
                                            String path) throws IOException {
     final Directory dir = directoryFactory.get(path, DirContext.DEFAULT, config.lockType);
+    DirectoryReader dr = null;
     try {
-      return core.getIndexReaderFactory().newReader(dir, core);
+     dr = core.getIndexReaderFactory().newReader(dir, core);
+     return dr;
     } catch (Exception e) {
-      directoryFactory.release(dir);
+      DW.propegateInterrupt(e);
+      if (dir != null && dr == null) {
+        directoryFactory.release(dir);
+      }
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening Reader", e);
     }
   }
@@ -232,7 +240,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       boolean closeReader, boolean enableCache, boolean reserveDirectory, DirectoryFactory directoryFactory)
           throws IOException {
     super(wrapReader(core, r));
-
+    this.releaseDirectory = true;
     this.path = path;
     this.directoryFactory = directoryFactory;
     this.reader = (DirectoryReader) super.readerContext.reader();
@@ -254,7 +262,9 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       // Keep the directory from being released while we use it.
       directoryFactory.incRef(getIndexReader().directory());
       // Make sure to release it when closing.
-      this.releaseDirectory = true;
+      this.releaseDirectoryForReserve = true;
+    } else {
+      this.releaseDirectoryForReserve = false;
     }
 
     this.closeReader = closeReader;
@@ -445,6 +455,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
    */
   @Override
   public void close() throws IOException {
+    // nocommit - speed up
     if (log.isDebugEnabled()) {
       if (cachingEnabled) {
         final StringBuilder sb = new StringBuilder();
@@ -469,7 +480,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     try {
       if (closeReader) rawReader.decRef();
     } catch (Exception e) {
-      SolrException.log(log, "Problem dec ref'ing reader", e);
+      DW.propegateInterrupt("Problem dec ref'ing reader", e);
     }
 
     if (directoryFactory.searchersReserveCommitPoints()) {
@@ -480,18 +491,22 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       try {
         cache.close();
       } catch (Exception e) {
-        SolrException.log(log, "Exception closing cache " + cache.name(), e);
+        DW.propegateInterrupt("Exception closing cache " + cache.name(), e);
       }
     }
 
     if (releaseDirectory) {
       directoryFactory.release(getIndexReader().directory());
     }
+    
+    if (releaseDirectoryForReserve) {
+      directoryFactory.release(getIndexReader().directory());
+    }
 
     try {
       SolrMetricProducer.super.close();
     } catch (Exception e) {
-      log.warn("Exception closing", e);
+      DW.propegateInterrupt("Exception closing", e);
     }
 
     // do this at the end so it only gets done if there are no exceptions
@@ -2311,6 +2326,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
         }
         return total;
       } catch (Exception e) {
+        DW.propegateInterrupt(e);
         return -1;
       }
     }, true, "indexCommitSize", Category.SEARCHER.toString(), scope);

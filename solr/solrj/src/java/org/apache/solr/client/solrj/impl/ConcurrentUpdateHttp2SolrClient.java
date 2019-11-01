@@ -179,9 +179,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
           sendUpdateStream();
 
         } catch (Throwable e) {
-          if (e instanceof OutOfMemoryError) {
-            throw (OutOfMemoryError) e;
-          }
+          DW.propegateInterrupt(e);
           handleError(e);
         } finally {
           synchronized (runners) {
@@ -268,7 +266,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
               } catch (Exception exc) {
         
                 String result = IOUtils.toString(rspBody, "UTF-8");
-                log.error("Problem parsing response={}", result, exc);
+                log.error("Problem parsing response={} status={} {} {}", result, statusCode, basePath, update.getRequest(),exc);
                 throw new DW.Exp("Failed to parse error response from " + basePath + " " + result, exc);
               } finally {
                 solrExc = new HttpSolrClient.RemoteSolrException(basePath , statusCode, msg.toString(), null);

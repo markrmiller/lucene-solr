@@ -156,7 +156,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
       // we can delete any remaining unique aliases
       if (!aliasReferences.isEmpty()) {
-        coreContainer.getZkController().zkStateReader.aliasesManager.applyModificationAndExportToZk(a -> {
+        coreContainer.getZkController().getZkStateReader().aliasesManager.applyModificationAndExportToZk(a -> {
           for (String alias : aliasReferences) {
             a = a.cloneWithCollectionAlias(alias, null);
           }

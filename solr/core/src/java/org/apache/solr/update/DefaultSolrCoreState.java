@@ -34,8 +34,10 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.search.Sort;
 import org.apache.solr.cloud.ActionThrottle;
 import org.apache.solr.cloud.RecoveryStrategy;
+import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.DirectoryFactory;
@@ -53,9 +55,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
   private final ReentrantLock recoveryLock = new ReentrantLock();
   
-  private final ActionThrottle recoveryThrottle = new ActionThrottle("recovery", 10000);
+  private final ActionThrottle recoveryThrottle = new ActionThrottle("recovery", 3000);
   
-  private final ActionThrottle leaderThrottle = new ActionThrottle("leader", 5000);
+  private final ActionThrottle leaderThrottle = new ActionThrottle("leader", 1000);
   
   private final AtomicInteger recoveryWaiting = new AtomicInteger();
 
@@ -288,12 +290,12 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   }
 
   @Override
-  public void doRecovery(CoreContainer cc, CoreDescriptor cd) {
+  public void doRecovery(ZkController zkController, CoreDescriptor cd) {
     
     Runnable recoveryTask = new Runnable() {
       @Override
       public void run() {
-        MDCLoggingContext.setCoreDescriptor(cc, cd);
+        MDCLoggingContext.setCoreDescriptor(zkController.getNodeName(), cd);
         try {
           if (SKIP_AUTO_RECOVERY) {
             log.warn("Skipping recovery according to sys prop solrcloud.skip.autorecovery");
@@ -301,8 +303,8 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
           }
           
           // check before we grab the lock
-          if (cc.isShutDown()) {
-            log.warn("Skipping recovery because Solr is shutdown");
+          if (closed) {
+            log.info("Skipping recovery due to being closed");
             return;
           }
           
@@ -327,8 +329,8 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
               }
               
               // to be air tight we must also check after lock
-              if (cc.isShutDown()) {
-                log.warn("Skipping recovery because Solr is shutdown");
+              if (closed) {
+                log.info("Skipping recovery due to being closed");
                 return;
               }
               log.info("Running recovery");
@@ -336,18 +338,15 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
               recoveryThrottle.minimumWaitBetweenActions();
               recoveryThrottle.markAttemptingAction();
               
-              recoveryStrat = recoveryStrategyBuilder.create(cc, cc.getZkController(), cc.getZkController().getZkStateReader());
+              recoveryStrat = recoveryStrategyBuilder.create(zkController, zkController.getZkStateReader());
               recoveryStrat.setCoreDescriptor(cd);
               recoveryStrat.setRecoveryListener( DefaultSolrCoreState.this);
               recoveryStrat.setRecoveringAfterStartup(recoveringAfterStartup);
-              Future<?> future = cc.getUpdateShardHandler().getRecoveryExecutor().submit(recoveryStrat);
+              Future<?> future = zkController.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor().submit(recoveryStrat);
               try {
                 future.get();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new SolrException(ErrorCode.SERVER_ERROR, e);
-              } catch (ExecutionException e) {
-                throw new SolrException(ErrorCode.SERVER_ERROR, e);
+              } catch (Exception e) {
+                throw new DW.Exp(e);
               }
             } finally {
               recoveryLock.unlock();
@@ -367,7 +366,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       // in another thread on another 'recovery' executor.
       //
       // avoid deadlock: we can't use the recovery executor here!
-      cc.getUpdateShardHandler().getUpdateExecutor().submit(recoveryTask);
+      zkController.getCoreContainer().getUpdateShardHandler().getUpdateExecutor().submit(recoveryTask);
     } catch (RejectedExecutionException e) {
       // fine, we are shutting down
     }

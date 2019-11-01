@@ -48,13 +48,11 @@
      <!-- <AsyncLogger name="org.apache.solr.common.cloud.SolrZkClient" level="DEBUG"/> -->
     <AsyncLogger name="org.apache.solr.cloud.overseer.SliceMutator" level="DEBUG"/>
     <AsyncLogger name="org.apache.solr.client.solrj.impl.LBSolrClient" level="DEBUG"/>
-    
+    <AsyncLogger name="org.apache.solr.cloud.ZkController" level="DEBUG"/>
     <AsyncLogger name="org.apache.solr.common.cloud.ZkMaintenanceUtils" level="DEBUG"/>
-    
+    <AsyncLogger name="org.apache.solr.update.processor.DistributedZkUpdateProcessor" level="DEBUG"/>
     <AsyncLogger name="com.google.inject.servlet" level="DEBUG"/>
-   
-   
-    
+
     <AsyncRoot level="INFO">
       <AppenderRef ref="STDERR"/>
       <AppenderRef ref="FILE"/>

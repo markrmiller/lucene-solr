@@ -712,45 +712,39 @@ public class JettySolrRunner {
     // Do not let Jetty/Solr pollute the MDC for this thread
     Map<String,String> prevContext = MDC.getCopyOfContextMap();
     MDC.clear();
+    Filter filter = dispatchFilter.getFilter();
     try {
-      Filter filter = dispatchFilter.getFilter();
 
+
+      server.setStopAtShutdown(true); // nocommit
+      server.setStopTimeout(10000);
+        
       QueuedThreadPool qtp = (QueuedThreadPool) server.getThreadPool();
-      ReservedThreadExecutor rte = qtp.getBean(ReservedThreadExecutor.class);
 
       server.stop();
 
-      if (server.getState().equals(Server.FAILED)) {
-        filter.destroy();
-        if (extraFilters != null) {
-          for (FilterHolder f : extraFilters) {
-            f.getFilter().destroy();
-          }
-        }
-      }
-
-      // we tried to kill everything, now we wait for executor to stop
-      qtp.setStopTimeout(15000);
-      qtp.stop();
-
-      if (rte != null) {
-        // we try and wait for the reserved thread executor, but it doesn't always seem to work
-        // so we actually set 0 reserved threads at creation
-        rte.stop();
-      }
-
       try {
 
-        qtp.join();
+
         server.join();
       } catch (InterruptedException e) {
         // ignore
       }
 
     } finally {
+
       if (enableProxy) {
         proxy.close();
       }
+      
+//      if (server.getState().equals(Server.FAILED)) {
+//        if (filter != null) filter.destroy();
+//        if (extraFilters != null) {
+//          for (FilterHolder f : extraFilters) {
+//            f.getFilter().destroy();
+//          }
+//        }
+//      }
 
       if (prevContext != null) {
         MDC.setContextMap(prevContext);

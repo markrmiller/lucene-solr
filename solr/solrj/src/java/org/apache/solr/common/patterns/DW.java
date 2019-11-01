@@ -106,19 +106,38 @@ public class DW implements Closeable {
 
   private final boolean ignoreExceptions;
 
+  private Set<Throwable> warns = DW.concSetSmallO();
+
   // nocommit should take logger as well
   public static class Exp extends SolrException {
 
     private static final String ERROR_MSG = "Solr ran into an unexpected Exception";
 
+    /**
+     * Handles exceptions correctly for you, including logging.
+     * 
+     * @param msg message to include to clarify the problem
+     */
     public Exp(String msg) {
       this(ErrorCode.SERVER_ERROR, msg, null);
     }
     
+    /**
+     * Handles exceptions correctly for you, including logging.
+     * 
+     * @param th the exception to handle
+     */
     public Exp(Throwable th) {
       this(ErrorCode.SERVER_ERROR, th.getMessage(), th);
     }
     
+
+    /**
+     * Handles exceptions correctly for you, including logging.
+     * 
+     * @param msg message to include to clarify the problem
+     * @param th the exception to handle
+     */
     public Exp(String msg, Throwable th) {
       this(ErrorCode.SERVER_ERROR, msg, th);
     }
@@ -318,14 +337,10 @@ public class DW implements Closeable {
         ((Map) object).forEach((k, v) -> gatherObjects(v, objects));
       } else {
         if (log.isDebugEnabled()) {
-          log.debug("Found a non collection object to add");
+          log.debug("Found a non collection object to add {}", object.getClass().getName());
         }
         objects.add(object);
       }
-    }
-
-    if (log.isDebugEnabled()) {
-      log.debug("gatherObjects(Object, List<Object>) - end");
     }
   }
 
@@ -340,10 +355,6 @@ public class DW implements Closeable {
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
-
-    if (log.isDebugEnabled()) {
-      log.debug("add(String, Object, Callable) - end");
-    }
   }
 
   public void add(String label, Object object1, Object object2, Callable<?>... Callables) {
@@ -360,9 +371,7 @@ public class DW implements Closeable {
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
 
-    if (log.isDebugEnabled()) {
-      log.debug("add(String, Object, Object, Callable<?>) - end");
-    }
+    log.error("Add WorkUnit:" + objects); // nocommit
   }
 
   public void add(String label, Object object1, Object object2, Object object3, Callable<?>... Callables) {
@@ -378,10 +387,6 @@ public class DW implements Closeable {
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
-
-    if (log.isDebugEnabled()) {
-      log.debug("add(String, Object, Object, Object, Callable<?>) - end");
-    }
   }
 
   public void add(String label, List<Callable<?>> Callables) {
@@ -393,10 +398,6 @@ public class DW implements Closeable {
     objects.addAll(Callables);
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
-
-    if (log.isDebugEnabled()) {
-      log.debug("add(String, List<Callable<?>>) - end");
-    }
   }
 
   @Override
@@ -417,30 +418,32 @@ public class DW implements Closeable {
         try {
           List<Object> objects = workUnit.objects;
 
-          List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
+          if (objects.size() == 1) {
+            handleObject(workUnit.label, exception, workUnitTracker, Collections.emptyList(), objects.get(0));
+          } else {
 
-          for (Object object : objects) {
+            List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
 
-            if (object == null) continue;
+            for (Object object : objects) {
 
-            if (objects.size() == 1) {
-              handleObject(workUnit.label, exception, workUnitTracker, closeCalls, object);
-            } else {
+              if (object == null) continue;
+
               initExecutor();
-              
+
               closeCalls.add(() -> {
                 handleObject(workUnit.label, exception, workUnitTracker, closeCalls, object);
                 return object;
               });
+
             }
-          }
-          if (closeCalls.size() > 0) {
-            try {
-              executor.invokeAll(closeCalls);
-            } catch (InterruptedException e1) {
-              log.error("close()", e1);
-              Thread.currentThread().interrupt();
-              throw new RuntimeException("Close was interrupted!");
+            if (closeCalls.size() > 0) {
+              try {
+                executor.invokeAll(closeCalls);
+              } catch (InterruptedException e1) {
+                log.error("close()", e1);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Close was interrupted!");
+              }
             }
           }
         } finally {
@@ -458,6 +461,9 @@ public class DW implements Closeable {
     } finally {
 
       tracker.doneClose();
+
+      warns.forEach(
+          (it) -> log.warn(SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK, new SolrException(ErrorCode.SERVER_ERROR, it)));
 
       if (exception.get() != null) {
         Throwable exp = exception.get();
@@ -514,34 +520,25 @@ public class DW implements Closeable {
       if (object instanceof ExecutorService) {
         ExecutorUtil.shutdownAndAwaitTermination((ExecutorService) object);
         handled = true;
-      }
-      if (object instanceof OrderedExecutor) {
+      } else if (object instanceof OrderedExecutor) {
         ((OrderedExecutor) object).shutdownAndAwaitTermination();
         handled = true;
-      }
-      if (object instanceof Closeable) {
+      } else if (object instanceof Closeable) {
         ((Closeable) object).close();
         handled = true;
-      }
-      if (object instanceof AutoCloseable) {
+      } else if (object instanceof AutoCloseable) {
         ((AutoCloseable) object).close();
         handled = true;
-      }
-      if (object instanceof Callable) {
+      }else if (object instanceof Callable) {
         returnObject = ((Callable<?>) object).call();
         handled = true;
-      }
-
-      if (object instanceof Runnable) {
+      } else if (object instanceof Runnable) {
         ((Runnable) object).run();
 
         handled = true;
-      }
-
-      if (object instanceof Timer) {
+      } else if (object instanceof Timer) {
         ((Timer) object).cancel();
         
-
         handled = true;
       }
       
@@ -555,19 +552,19 @@ public class DW implements Closeable {
         log.info("NPE closing " + object == null ? "Null Object" : object.getClass().getName());
       } else {
         if (ignoreExceptions) {
-          log.warn(SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK);
+          warns .add(t);
           if (t instanceof Error) {
             throw (Error) t;
           }
         } else {
-        
-        log.error("handleObject(AtomicReference<Throwable>=" + exception + ", CloseTimeTracker=" + workUnitTracker
-            + ", List<Callable<Object>>=" + closeCalls + ", Object=" + object + ")", t);
-        propegateInterrupt(t);
-        if (t instanceof Error) {
-          throw (Error) t;
-        }
-        throw new SolrException(ErrorCode.SERVER_ERROR, SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK, t);
+
+          log.error("handleObject(AtomicReference<Throwable>=" + exception + ", CloseTimeTracker=" + workUnitTracker
+              + ", List<Callable<Object>>=" + closeCalls + ", Object=" + object + ")", t);
+          propegateInterrupt(t);
+          if (t instanceof Error) {
+            throw (Error) t;
+          }
+          throw new SolrException(ErrorCode.SERVER_ERROR, SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK, t);
         }
       }
     } finally {

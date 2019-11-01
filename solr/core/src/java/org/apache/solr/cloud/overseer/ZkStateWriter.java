@@ -16,13 +16,14 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import static java.util.Collections.singletonMap;
+
 import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.Timer;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.Stats;
 import org.apache.solr.common.cloud.ClusterState;
@@ -31,13 +32,12 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.patterns.SolrSingleThreaded;
 import org.apache.solr.common.util.Utils;
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Collections.singletonMap;
+import com.codahale.metrics.Timer;
 
 /**
  * ZkStateWriter is responsible for writing updates to the cluster state stored in ZooKeeper for
@@ -126,7 +126,7 @@ public class ZkStateWriter {
     if (isNoOps(cmds)) {
       return prevState;
     }
-
+// nocommit - all this
     for (ZkWriteCommand cmd : cmds) {
       if (cmd == NO_OP) continue;
 //      if (!isClusterStateModified && clusterStateGetModifiedWith(cmd, prevState)) {
@@ -140,7 +140,7 @@ public class ZkStateWriter {
     }
     clusterState = prevState;
 
-    if (maybeFlushAfter()) {
+   // if (maybeFlushAfter()) {
       ClusterState state = writePendingUpdates();
       if (callback != null) {
         callback.onWrite();
@@ -150,12 +150,12 @@ public class ZkStateWriter {
         log.debug("enqueueUpdate(ClusterState, List<ZkWriteCommand>, ZkWriteCallback) - end");
       }
       return state;
-    }
+   // }
 
-    if (log.isDebugEnabled()) {
-      log.debug("enqueueUpdate(ClusterState, List<ZkWriteCommand>, ZkWriteCallback) - end");
-    }
-    return clusterState;
+//    if (log.isDebugEnabled()) {
+//      log.debug("enqueueUpdate(ClusterState, List<ZkWriteCommand>, ZkWriteCallback) - end");
+//    }
+//    return clusterState;
   }
 
   private boolean isNoOps(List<ZkWriteCommand> cmds) {
@@ -164,11 +164,16 @@ public class ZkStateWriter {
     }
 
     for (ZkWriteCommand cmd : cmds) {
-      if (cmd != NO_OP) return false;
+      if (cmd != NO_OP) {
+        if (log.isDebugEnabled()) {
+          log.debug("isNoOps(List<ZkWriteCommand>) - end - false");
+        }
+        return false;
+      }
     }
 
     if (log.isDebugEnabled()) {
-      log.debug("isNoOps(List<ZkWriteCommand>) - end");
+      log.debug("isNoOps(List<ZkWriteCommand>) - end - true");
     }
     return true;
   }
@@ -289,7 +294,7 @@ public class ZkStateWriter {
       // this is a tragic error, we must disallow usage of this instance
       log.error("Tried to update the cluster state using version={} but we where rejected as the version is {}",
           clusterState.getZkClusterStateVersion(), bve.getMessage(), bve);
-      invalidState = true;
+      // nocommit invalidState = true;
       throw bve;
     } finally {
       timerContext.stop();

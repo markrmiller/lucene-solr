@@ -164,8 +164,7 @@ public class Http2SolrClient extends SolrClient {
     this.listenerFactory.add(factory);
   }
 
-  // internal usage only
-  HttpClient getHttpClient() {
+  public HttpClient getHttpClient() {
     return httpClient;
   }
 

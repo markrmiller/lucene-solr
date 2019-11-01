@@ -52,6 +52,7 @@ import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.admin.CollectionsHandler;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,12 +63,12 @@ import org.slf4j.LoggerFactory;
 public class SolrSeer  implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final String name;
-  private final LeaderSelector stateUpdateLeaderSelector;
-  private final AtomicInteger leaderCount = new AtomicInteger();
+  //private final LeaderSelector stateUpdateLeaderSelector;
+  //private final AtomicInteger leaderCount = new AtomicInteger();
   private final DistributedQueue<ZkNodeProps> stateUpdateQueue;
   public static final String QUEUE_OPERATION = "operation";
   private final DistributedQueue<ZkNodeProps> adminOperationQueue;
-  private final LeaderSelector adminOperationLeaderSelector;
+  //private final LeaderSelector adminOperationLeaderSelector;
   private final ZkController zkController;
   private final OverseerCollectionMessageHandler collMessageHandler;
   private final ZkStateWriter zkStateWriter;
@@ -97,24 +98,36 @@ public class SolrSeer  implements Closeable {
     @Override
     public void consumeMessage(ZkNodeProps message) throws Exception {
       log.warn("Consume state update from queue {}", message);
-      
-    final String operation = message.getStr(QUEUE_OPERATION);
-    if (operation == null) {
-      throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
-    }
-    
-    ClusterState clusterState = zkController.getZkStateReader().getClusterState();
-    
-     List<ZkWriteCommand> zkWriteOps = processMessage(clusterState, message, operation);
-     
-     zkStateWriter.enqueueUpdate(clusterState, zkWriteOps,  new ZkWriteCallback() {
-      
-      @Override
-      public void onWrite() throws Exception {
-        log.info("on write callback");
+      try {
+        final String operation = message.getStr(QUEUE_OPERATION);
+        if (operation == null) {
+          throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
+        }
+
+        ClusterState clusterState = zkController.getZkStateReader().getClusterState();
+
+        List<ZkWriteCommand> zkWriteOps = processMessage(clusterState, message, operation);
+
+        while (true) {
+          try {
+          zkStateWriter.enqueueUpdate(clusterState, zkWriteOps, new ZkWriteCallback() {
+
+            @Override
+            public void onWrite() throws Exception {
+              log.info("on write callback");
+            }
+
+          });
+          break;
+          } catch (KeeperException.BadVersionException e)   {
+            // try again
+            Thread.sleep(250);
+          }
+        }
+
+      } catch (Exception e) {
+        DW.propegateInterrupt("Failure processing message=" + message, e);
       }
-      
-    });
     }
 
     @Override
@@ -153,71 +166,72 @@ public class SolrSeer  implements Closeable {
     this.stateUpdateQueue = QueueBuilder.builder(client, stateUpdateConsumer, serializer, "/solrseer/queues/stateupdate").lockPath("/solrseer/queues/stateupdate_lock").buildQueue();
     this.adminOperationQueue = QueueBuilder.builder(client, adminOpConsumer, serializer, "/solrseer/queues/adminop").lockPath("/solrseer/queues/adminop_lock").buildQueue();
     
-    // create a leader selector using the given path for management
-    // all participants in a given leader selection must use the same path
-    // ExampleClient here is also a LeaderSelectorListener but this isn't required
-    stateUpdateLeaderSelector = new LeaderSelector(client, "/solrseer/leaders/stateupdate_leader", new LeaderSelectorListenerAdapter() {
-
-      @Override
-      public void takeLeadership(CuratorFramework client) throws Exception {
-        // we are now the leader. This method should not return until we want to relinquish leadership
-
-        final int waitSeconds = (int) (5 * Math.random()) + 1;
-
-        log.info(zkController.getNodeName() + "-StateUpdate is now the leader. Waiting " + waitSeconds + " seconds...");
-        log.info(zkController.getNodeName() + "-StateUpdate has been leader " + leaderCount.getAndIncrement() + " time(s) before.");
-        try {
-          Thread.sleep(TimeUnit.SECONDS.toMillis(waitSeconds));
-        } catch (InterruptedException e) {
-          log.info(zkController.getNodeName() + "-StateUpdate was interrupted.");
-          Thread.currentThread().interrupt();
-        } finally {
-          log.info(zkController.getNodeName() + "-StateUpdate relinquishing leadership.\n");
-        }
-      }});
-
-    // for most cases you will want your instance to requeue when it relinquishes leadership
-    stateUpdateLeaderSelector.autoRequeue();
-    
-    adminOperationLeaderSelector = new LeaderSelector(client, "/solrseer/leaders/adminop_leader", new LeaderSelectorListenerAdapter() {
-
-      @Override
-      public void takeLeadership(CuratorFramework client) throws Exception {
-        // we are now the leader. This method should not return until we want to relinquish leadership
-
-        final int waitSeconds = (int) (5 * Math.random()) + 1;
-
-        log.info(zkController.getNodeName() + "-AdminOp is now the leader. Waiting " + waitSeconds + " seconds...");
-        log.info(zkController.getNodeName() + "-AdminOp has been leader " + leaderCount.getAndIncrement() + " time(s) before.");
-        try {
-          Thread.sleep(TimeUnit.SECONDS.toMillis(waitSeconds));
-        } catch (InterruptedException e) {
-          log.info(zkController.getNodeName() + "-AdminOp was interrupted.");
-          Thread.currentThread().interrupt();
-        } finally {
-          log.info(zkController.getNodeName() + "-AdminOp relinquishing leadership.\n");
-        }
-      }});
-
-    // for most cases you will want your instance to requeue when it relinquishes leadership
-    adminOperationLeaderSelector.autoRequeue();
+//    // create a leader selector using the given path for management
+//    // all participants in a given leader selection must use the same path
+//    // ExampleClient here is also a LeaderSelectorListener but this isn't required
+//    stateUpdateLeaderSelector = new LeaderSelector(client, "/solrseer/leaders/stateupdate_leader", new LeaderSelectorListenerAdapter() {
+//
+//      @Override
+//      public void takeLeadership(CuratorFramework client) throws Exception {
+//        // we are now the leader. This method should not return until we want to relinquish leadership
+//
+//        final int waitSeconds = (int) (5 * Math.random()) + 1;
+//
+//        log.info(zkController.getNodeName() + "-StateUpdate is now the leader. Waiting " + waitSeconds + " seconds...");
+//        log.info(zkController.getNodeName() + "-StateUpdate has been leader " + leaderCount.getAndIncrement() + " time(s) before.");
+//        try {
+//          Thread.sleep(TimeUnit.SECONDS.toMillis(waitSeconds));
+//        } catch (InterruptedException e) {
+//          log.info(zkController.getNodeName() + "-StateUpdate was interrupted.");
+//          Thread.currentThread().interrupt();
+//        } finally {
+//          log.info(zkController.getNodeName() + "-StateUpdate relinquishing leadership.\n");
+//        }
+//      }});
+//
+//    // for most cases you will want your instance to requeue when it relinquishes leadership
+//    stateUpdateLeaderSelector.autoRequeue();
+//    
+//    adminOperationLeaderSelector = new LeaderSelector(client, "/solrseer/leaders/adminop_leader", new LeaderSelectorListenerAdapter() {
+//
+//      @Override
+//      public void takeLeadership(CuratorFramework client) throws Exception {
+//        // we are now the leader. This method should not return until we want to relinquish leadership
+//
+//        final int waitSeconds = (int) (5 * Math.random()) + 1;
+//
+//        log.info(zkController.getNodeName() + "-AdminOp is now the leader. Waiting " + waitSeconds + " seconds...");
+//        log.info(zkController.getNodeName() + "-AdminOp has been leader " + leaderCount.getAndIncrement() + " time(s) before.");
+//        try {
+//          Thread.sleep(TimeUnit.SECONDS.toMillis(waitSeconds));
+//        } catch (InterruptedException e) {
+//          log.info(zkController.getNodeName() + "-AdminOp was interrupted.");
+//          Thread.currentThread().interrupt();
+//        } finally {
+//          log.info(zkController.getNodeName() + "-AdminOp relinquishing leadership.\n");
+//        }
+//      }});
+//
+//    // for most cases you will want your instance to requeue when it relinquishes leadership
+//    adminOperationLeaderSelector.autoRequeue();
   }
 
   public void start() throws Exception {
     // the selection for this instance doesn't start until the leader selector is started
     // leader selection is done in the background so this call to leaderSelector.start() returns immediately
-    stateUpdateLeaderSelector.start();
+//    stateUpdateLeaderSelector.start();
+//    this.stateUpdateQueue.setErrorMode(newErrorMode); // nocommit
     this.stateUpdateQueue.start();
-    
-    adminOperationLeaderSelector.start();
-    this.adminOperationQueue.start();
+//    
+//    adminOperationLeaderSelector.start();
+//    this.adminOperationQueue.start();
   }
 
   @Override
   public void close() throws IOException {
 
-    try (DW worker = new DW(this)) {
-      worker.add("SolrSeerInternals", stateUpdateQueue, stateUpdateLeaderSelector, adminOperationQueue, adminOperationLeaderSelector);
+    try (DW worker = new DW(this, true)) {
+      worker.add("SolrSeerInternals", stateUpdateQueue);
     }
     
 //    stateUpdateQueue.close();
@@ -229,7 +243,7 @@ public class SolrSeer  implements Closeable {
 //    adminOperationLeaderSelector.close();
   }
 
-  public void sendUpdate(ZkNodeProps msg) {
+  public void sendUpdate(ZkNodeProps msg) { // nocommit
     try {
       stateUpdateQueue.put(msg);
       stateUpdateQueue.flushPuts(10, TimeUnit.SECONDS);

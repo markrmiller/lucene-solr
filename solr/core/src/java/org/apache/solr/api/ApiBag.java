@@ -17,6 +17,12 @@
 
 package org.apache.solr.api;
 
+import static org.apache.solr.client.solrj.SolrRequest.SUPPORTED_METHODS;
+import static org.apache.solr.common.params.CommonParams.NAME;
+import static org.apache.solr.common.util.StrUtils.formatString;
+import static org.apache.solr.common.util.ValidatingJsonMap.ENUM_OF;
+import static org.apache.solr.common.util.ValidatingJsonMap.NOT_NULL;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -26,11 +32,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
 import org.apache.solr.common.patterns.DW;
@@ -51,17 +54,14 @@ import org.apache.solr.security.PermissionNameProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.client.solrj.SolrRequest.SUPPORTED_METHODS;
-import static org.apache.solr.common.params.CommonParams.NAME;
-import static org.apache.solr.common.util.StrUtils.formatString;
-import static org.apache.solr.common.util.ValidatingJsonMap.ENUM_OF;
-import static org.apache.solr.common.util.ValidatingJsonMap.NOT_NULL;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 public class ApiBag {
   private final boolean isCoreSpecific;
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final Map<String, PathTrie<Api>> apis = new ConcurrentHashMap<>();
+  private final Map<String, PathTrie<Api>> apis = DW.concMapSmallO();
 
   public ApiBag(boolean isCoreSpecific) {
     this.isCoreSpecific = isCoreSpecific;
@@ -160,7 +160,7 @@ public class ApiBag {
         result = specCopy;
       }
       if (isCoreSpecific) {
-        List<String> pieces = req.getHttpSolrCall() == null ? null : ((V2HttpCall) req.getHttpSolrCall()).pieces;
+        List<String> pieces = req.getHttpSolrCall() == null ? null : ((V2HttpCall) req.getHttpSolrCall()).getPieces();
         if (pieces != null) {
           String prefix = "/" + pieces.get(0) + "/" + pieces.get(1);
           List<String> paths = result.getMap("url", NOT_NULL).getList("paths", NOT_NULL);

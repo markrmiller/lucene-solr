@@ -558,9 +558,9 @@ public class Overseer implements SolrCloseable {
 //    ccThread.setDaemon(true);
 
     ThreadGroup triggerThreadGroup = new ThreadGroup("Overseer autoscaling triggers");
-    OverseerTriggerThread trigger = new OverseerTriggerThread(zkController.getCoreContainer().getResourceLoader(),
-        zkController.getSolrCloudManager(), config);
-    triggerThread = new OverseerThread(triggerThreadGroup, trigger, "OverseerAutoScalingTriggerThread-" + id);
+//    OverseerTriggerThread trigger = new OverseerTriggerThread(zkController.getCoreContainer().getResourceLoader(),
+//        zkController.getSolrCloudManager(), config);
+//    triggerThread = new OverseerThread(triggerThreadGroup, trigger, "OverseerAutoScalingTriggerThread-" + id);
 
   //  updaterThread.start();
    // ccThread.start();
@@ -618,7 +618,7 @@ public class Overseer implements SolrCloseable {
       doCompatCheck(consumer);
     } else {
       // wait for all leaders to become active and then check
-      zkController.zkStateReader.registerCollectionStateWatcher(CollectionAdminParams.SYSTEM_COLL, (liveNodes, state) -> {
+      zkController.getZkStateReader().registerCollectionStateWatcher(CollectionAdminParams.SYSTEM_COLL, (liveNodes, state) -> {
         boolean active = true;
         if (state == null || liveNodes.isEmpty()) {
           return true;
@@ -733,11 +733,11 @@ public class Overseer implements SolrCloseable {
       log.debug("getCoreContainer() - start");
     }
 
-    CoreContainer returnCoreContainer = zkController.getCoreContainer();
+    //CoreContainer returnCoreContainer = zkController.getCoreContainer();
     if (log.isDebugEnabled()) {
       log.debug("getCoreContainer() - end");
     }
-    return returnCoreContainer;
+    return null;
   }
 
   public SolrCloudManager getSolrCloudManager() {
@@ -891,7 +891,7 @@ public class Overseer implements SolrCloseable {
           log.debug("$ConnectionManager.IsClosed.isClosed() - start");
         }
 
-        boolean returnboolean = Overseer.this.isClosed() || zkController.getCoreContainer().isShutDown();
+        boolean returnboolean = Overseer.this.isClosed();
         if (log.isDebugEnabled()) {
           log.debug("$ConnectionManager.IsClosed.isClosed() - end");
         }

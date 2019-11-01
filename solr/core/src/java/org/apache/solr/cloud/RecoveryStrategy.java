@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.store.Directory;
@@ -52,6 +53,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.DirectoryFactory.DirContext;
+import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.ReplicationHandler;
 import org.apache.solr.logging.MDCLoggingContext;
@@ -90,14 +92,14 @@ public class RecoveryStrategy implements Runnable, Closeable {
     }
 
     // this should only be used from SolrCoreState
-    public RecoveryStrategy create(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
-      final RecoveryStrategy recoveryStrategy = newRecoveryStrategy(cc, zkController, zkStateReader);
+    public RecoveryStrategy create(ZkController zkController, ZkStateReader zkStateReader) {
+      final RecoveryStrategy recoveryStrategy = newRecoveryStrategy(zkController, zkStateReader);
       SolrPluginUtils.invokeSetters(recoveryStrategy, args);
       return recoveryStrategy;
     }
 
-    protected RecoveryStrategy newRecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
-      return new RecoveryStrategy(cc, zkController, zkStateReader);
+    protected RecoveryStrategy newRecoveryStrategy(ZkController zkController, ZkStateReader zkStateReader) {
+      return new RecoveryStrategy(zkController, zkStateReader);
     }
   }
 
@@ -123,15 +125,16 @@ public class RecoveryStrategy implements Runnable, Closeable {
   private final ZkStateReader zkStateReader;
   private volatile String coreName;
   private AtomicInteger retries = new AtomicInteger(0);
-  private boolean recoveringAfterStartup;
-  private final CoreContainer cc;
+  private boolean recoveringAfterStartup; 
   private volatile HttpUriRequest prevSendPreRecoveryHttpUriRequest;
   private volatile Replica.Type replicaType;
   private volatile CoreDescriptor coreDescriptor;
 
+  private CoreContainer cc;
+
   @Inject
-  public RecoveryStrategy(CoreContainer cc, ZkController zkController, ZkStateReader zkStateReader) {
-    this.cc = cc;
+  public RecoveryStrategy(ZkController zkController, ZkStateReader zkStateReader) {
+    this.cc = zkController.getCoreContainer();
     this.zkController = zkController;
     this.zkStateReader = zkStateReader;
     this.baseUrl = zkController.getBaseUrl();
@@ -858,7 +861,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
   }
 
   final public boolean isClosed() {
-    return close || cc.isShutDown();
+    return close;
   }
 
   final private void sendPrepRecoveryCmd(String leaderBaseUrl, String leaderCoreName, Slice slice)

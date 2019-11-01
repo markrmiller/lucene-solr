@@ -163,7 +163,7 @@ enum CoreAdminOperation implements CoreAdminOp {
     try (SolrCore core = it.handler.coreContainer.getCore(cname)) {
       if (core != null) {
         // This can take a while, but doRecovery is already async so don't worry about it here
-        core.getUpdateHandler().getSolrCoreState().doRecovery(it.handler.coreContainer, core.getCoreDescriptor());
+        core.getUpdateHandler().getSolrCoreState().doRecovery(it.handler.coreContainer.getZkController(), core.getCoreDescriptor());
       } else {
         throw new SolrException(ErrorCode.BAD_REQUEST, "Unable to locate core " + cname);
       }
@@ -233,7 +233,7 @@ enum CoreAdminOperation implements CoreAdminOp {
     ZkController zkController = it.handler.coreContainer.getZkController();
 
     if (zkController != null) {
-      zkController.rejoinShardLeaderElection(it.req.getParams());
+      //zkController.rejoinShardLeaderElection(it.req.getParams()); // nocommit
     } else {
       log().warn("zkController is null in CoreAdminHandler.handleRequestInternal:REJOINLEADERELECTION. No action taken.");
     }

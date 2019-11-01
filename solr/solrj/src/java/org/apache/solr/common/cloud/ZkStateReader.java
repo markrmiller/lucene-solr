@@ -793,6 +793,7 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public Replica getLeader(Set<String> liveNodes, DocCollection docCollection, String shard) {
+    assert liveNodes != null;
     Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
     if (replica != null && liveNodes.contains(replica.getNodeName())) {
       return replica;
@@ -801,12 +802,16 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public Replica getLeader(String collection, String shard) {
-    if (clusterState != null) {
-      DocCollection docCollection = clusterState.getCollectionOrNull(collection);
-      Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
-      if (replica != null && getClusterState().liveNodesContain(replica.getNodeName())) {
-        return replica;
+    try {
+      if (clusterState != null) {
+        DocCollection docCollection = clusterState.getCollectionOrNull(collection);
+        Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
+        if (replica != null && getClusterState().liveNodesContain(replica.getNodeName())) {
+          return replica;
+        }
       }
+    } catch (Exception e) {
+      throw new DW.Exp("Could not get leader from clusterstate clusterstate=" + clusterState, e);
     }
     return null;
   }
@@ -840,9 +845,12 @@ public class ZkStateReader implements SolrCloseable {
    * Get path where shard leader properties live in zookeeper.
    */
   public static String getShardLeadersPath(String collection, String shardId) {
+    return getShardLeadersParentPath(collection, shardId) + "/leader";
+  }
+  
+  public static String getShardLeadersParentPath(String collection, String shardId) {
     return COLLECTIONS_ZKNODE + "/" + collection + "/"
-        + SHARD_LEADERS_ZKNODE + (shardId != null ? ("/" + shardId)
-        : "") + "/leader";
+        + SHARD_LEADERS_ZKNODE + (shardId != null ? ("/" + shardId) : "");
   }
 
   /**
@@ -850,8 +858,7 @@ public class ZkStateReader implements SolrCloseable {
    */
   public static String getShardLeadersElectPath(String collection, String shardId) {
     return COLLECTIONS_ZKNODE + "/" + collection + "/"
-        + LEADER_ELECT_ZKNODE + (shardId != null ? ("/" + shardId + "/" + ELECTION_NODE)
-        : "");
+        + LEADER_ELECT_ZKNODE + (shardId != null ? ("/" + shardId + "/" + ELECTION_NODE) : "");
   }
 
 
@@ -879,8 +886,7 @@ public class ZkStateReader implements SolrCloseable {
     }
     final DocCollection docCollection = clusterState.getCollectionOrNull(collection);
     if (docCollection == null || docCollection.getSlicesMap() == null) {
-      throw new ZooKeeperException(ErrorCode.BAD_REQUEST,
-          "Could not find collection in zk: " + collection);
+      throw new ZooKeeperException(ErrorCode.BAD_REQUEST, "Could not find collection in zk: " + collection);
     }
 
     Map<String, Slice> slices = docCollection.getSlicesMap();

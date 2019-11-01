@@ -1499,7 +1499,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     ZkController zkController = handler.coreContainer.getZkController();
     ClusterState clusterState = zkController.getClusterState();
     String extCollectionName = req.getParams().required().get(COLLECTION_PROP);
-    String collectionName = zkController.zkStateReader.getAliases().resolveSimpleAlias(extCollectionName);
+    String collectionName = zkController.getZkStateReader().getAliases().resolveSimpleAlias(extCollectionName);
     String sliceId = req.getParams().required().get(SHARD_ID_PROP);
 
     log.info("Force leader invoked, state: {}", clusterState);

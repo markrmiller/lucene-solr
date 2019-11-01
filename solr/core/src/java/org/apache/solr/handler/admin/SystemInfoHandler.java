@@ -152,7 +152,7 @@ public class SystemInfoHandler extends RequestHandlerBase
       rsp.add("node", getCoreContainer(req, core).getZkController().getNodeName());
     }
     SolrEnvironment env = SolrEnvironment.getFromSyspropOrClusterprop(solrCloudMode ?
-        getCoreContainer(req, core).getZkController().zkStateReader : null);
+        getCoreContainer(req, core).getZkController().getZkStateReader() : null);
     if (env.isDefined()) {
       rsp.add("environment", env.getCode());
       if (env.getLabel() != null) {

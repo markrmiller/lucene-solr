@@ -170,6 +170,12 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     // fail fast if parameters are wrong or incomplete
     List<String> shardNames = populateShardNames(message, router);
     checkReplicaTypes(message);
+    
+    
+    for (String shardName : shardNames) {
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/" + shardName, null, CreateMode.PERSISTENT, false);
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leader_elect/" + shardName + "/election", null, CreateMode.PERSISTENT, false);
+    }
 
     AtomicReference<PolicyHelper.SessionWrapper> sessionWrapper = new AtomicReference<>();
 
@@ -208,7 +214,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           exp.addSuppressed(e1);
         }
         throw exp;
-      }
+      } // nocommit example of exception while handling exception
 
       if (replicaPositions.isEmpty()) {
         if (log.isDebugEnabled()) {
@@ -224,7 +230,6 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       Map<String,ShardRequest> coresToCreate = new LinkedHashMap<>();
       
       ShardHandler shardHandler = ((HttpShardHandlerFactory) coreContainer.getShardHandlerFactory()).getShardHandler(coreContainer.getUpdateShardHandler().getDefaultHttpClient());
-          //coreContainer.getShardHandler(coreContainer.getUpdateShardHandler().getDefaultHttpClient());
       for (ReplicaPosition replicaPosition : replicaPositions) {
         String nodeName = replicaPosition.node;
 
@@ -272,6 +277,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
               ZkStateReader.CORE_NAME_PROP, coreName,
               ZkStateReader.STATE_PROP, Replica.State.DOWN.toString(),
               ZkStateReader.BASE_URL_PROP, baseUrl,
+              ZkStateReader.NODE_NAME_PROP, nodeName,
               ZkStateReader.REPLICA_TYPE, replicaPosition.type.name(),
               ZkStateReader.NUM_SHARDS_PROP, message.getStr(ZkStateReader.NUM_SHARDS_PROP),
           //    "shards", message.getStr("shards"),
@@ -320,7 +326,10 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         Map<String, Replica> replicas = waitToSeeReplicasInState(collectionName, coresToCreate.keySet());
         for (Map.Entry<String, ShardRequest> e : coresToCreate.entrySet()) {
           ShardRequest sreq = e.getValue();
-          sreq.params.set(CoreAdminParams.CORE_NODE_NAME, replicas.get(e.getKey()).getName());
+          String coreNodeName = replicas.get(e.getKey()).getName();
+          sreq.params.set(CoreAdminParams.CORE_NODE_NAME, coreNodeName);
+          log.info("Set the {} for replica {} to {}", CoreAdminParams.CORE_NODE_NAME, replicas.get(e.getKey()), coreNodeName);
+          
           log.info("Submit request to shard for for replica={}", sreq.actualShards != null ? Arrays.asList(sreq.actualShards) : "null");
           shardHandler.submit(sreq, sreq.shards[0], sreq.params);
         }
@@ -373,7 +382,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       log.error("Error during collection create", ex);
       throw ex;
     } catch (Exception ex) {
-      throw new DW.Exp("call(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", ex);
+      throw new DW.Exp("Error during collection create(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", ex);
     } finally {
       if (sessionWrapper.get() != null) sessionWrapper.get().release();
     }
@@ -592,80 +601,63 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
     try {
-
       log.info("Creating collection in ZooKeeper:" + collection);
 
-      try {
-        Map<String,Object> collectionProps = new HashMap<>();
+      Map<String,Object> collectionProps = new HashMap<>();
 
-        if (params.size() > 0) {
-          collectionProps.putAll(params);
-          // if the config name wasn't passed in, use the default
-          if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP)) {
-            // users can create the collection node and conf link ahead of time, or this may return another option
-            getConfName(stateManager, collection, collectionPath, collectionProps);
-          }
-
-        } else if (System.getProperty("bootstrap_confdir") != null) {
-          String defaultConfigName = System
-              .getProperty(ZkController.COLLECTION_PARAM_PREFIX + ZkController.CONFIGNAME_PROP, collection);
-
-          // if we are bootstrapping a collection, default the config for
-          // a new collection to the collection we are bootstrapping
-          log.info("Setting config for collection:" + collection + " to " + defaultConfigName);
-
-          Properties sysProps = System.getProperties();
-          for (String sprop : System.getProperties().stringPropertyNames()) {
-            if (sprop.startsWith(ZkController.COLLECTION_PARAM_PREFIX)) {
-              collectionProps.put(sprop.substring(ZkController.COLLECTION_PARAM_PREFIX.length()),
-                  sysProps.getProperty(sprop));
-            }
-          }
-
-          // if the config name wasn't passed in, use the default
-          if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP))
-            collectionProps.put(ZkController.CONFIGNAME_PROP, defaultConfigName);
-
-        } else if (Boolean.getBoolean("bootstrap_conf")) {
-          // the conf name should should be the collection name of this core
-          collectionProps.put(ZkController.CONFIGNAME_PROP, collection);
-        } else {
+      if (params.size() > 0) {
+        collectionProps.putAll(params);
+        // if the config name wasn't passed in, use the default
+        if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP)) {
+          // users can create the collection node and conf link ahead of time, or this may return another option
           getConfName(stateManager, collection, collectionPath, collectionProps);
         }
 
-        collectionProps.remove(ZkStateReader.NUM_SHARDS_PROP); // we don't put numShards in the collections properties
+      } else if (System.getProperty("bootstrap_confdir") != null) {
+        String defaultConfigName = System
+            .getProperty(ZkController.COLLECTION_PARAM_PREFIX + ZkController.CONFIGNAME_PROP, collection);
 
-        ZkNodeProps zkProps = new ZkNodeProps(collectionProps);
-        stateManager.makePath(collectionPath, Utils.toJSON(zkProps), CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection
-            + "/leader_elect/" , null, CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + "/"
-            + ZkStateReader.SHARD_LEADERS_ZKNODE , null, CreateMode.PERSISTENT, false);
-        
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + ZkStateReader.STATE_JSON, 
-            ZkController.emptyJson, CreateMode.PERSISTENT, false);
-        
-      } catch (KeeperException e) {
-        log.error("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection
-            + ", Map<String,String>=" + params + ")", e);
+        // if we are bootstrapping a collection, default the config for
+        // a new collection to the collection we are bootstrapping
+        log.info("Setting config for collection:" + collection + " to " + defaultConfigName);
 
-        // TODO shouldn't the stateManager ensure this does not happen; should throw AlreadyExistsException
-        // it's okay if the node already exists
-//        if (e.code() != KeeperException.Code.NODEEXISTS) {
-//          throw e;
-//        }
-        throw e;
+        Properties sysProps = System.getProperties();
+        for (String sprop : System.getProperties().stringPropertyNames()) {
+          if (sprop.startsWith(ZkController.COLLECTION_PARAM_PREFIX)) {
+            collectionProps.put(sprop.substring(ZkController.COLLECTION_PARAM_PREFIX.length()),
+                sysProps.getProperty(sprop));
+          }
+        }
+
+        // if the config name wasn't passed in, use the default
+        if (!collectionProps.containsKey(ZkController.CONFIGNAME_PROP))
+          collectionProps.put(ZkController.CONFIGNAME_PROP, defaultConfigName);
+
+      } else if (Boolean.getBoolean("bootstrap_conf")) {
+        // the conf name should should be the collection name of this core
+        collectionProps.put(ZkController.CONFIGNAME_PROP, collection);
+      } else {
+        getConfName(stateManager, collection, collectionPath, collectionProps);
       }
+
+      collectionProps.remove(ZkStateReader.NUM_SHARDS_PROP); // we don't put numShards in the collections properties
+
+      // nocommit make efficient
+
+      ZkNodeProps zkProps = new ZkNodeProps(collectionProps);
+      stateManager.makePath(collectionPath, Utils.toJSON(zkProps), CreateMode.PERSISTENT, false);
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection
+          + "/leader_elect/", null, CreateMode.PERSISTENT, false);
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + "/"
+          + ZkStateReader.SHARD_LEADERS_ZKNODE, null, CreateMode.PERSISTENT, false);
+
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + ZkStateReader.STATE_JSON,
+          ZkController.emptyJson, CreateMode.PERSISTENT, false);
+
+      stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection + "/terms", null, CreateMode.PERSISTENT,
+          false);
 
     } catch (Exception e) {
-      // it's okay if another beats us creating the node
-      if (e instanceof KeeperException && ((KeeperException) e).code() == KeeperException.Code.NODEEXISTS) {
-        if (log.isDebugEnabled()) {
-          log.debug("createCollectionZkNode(DistribStateManager, String, Map<String,String>) - end");
-        }
-        return;
-      }
-
       throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
 
@@ -885,6 +877,8 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
   }
   
   // nocommit
+  
+  // this should be picking up the coreNodeName for a replica
   Map<String, Replica> waitToSeeReplicasInState(String collectionName, Collection<String> coreNames) throws InterruptedException {
     AtomicReference<Map<String, Replica>> result = new AtomicReference<>();
     AtomicReference<String> errorMessage = new AtomicReference<>();

@@ -396,7 +396,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       lastNewIndexDir = result;
       return result;
     } catch (IOException e) {
-      SolrException.log(log, "", e);
+      SolrException.log(log, "getNewIndexDir", e);
       // See SOLR-11687. It is inadvisable to assume we can do the right thing for any but a small
       // number of exceptions that ware caught and swallowed in getIndexProperty.
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error in getNewIndexDir, exception: ", e);
@@ -541,16 +541,16 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           getSolrConfig().indexConfig.lockType);
       return new SolrSnapshotMetaDataManager(this, snapshotDir);
     } catch (Throwable e) {
+      DW.propegateInterrupt(e);
+
+      // nocommit have to get this wwriter and writer close
       try {
-        // nocommit have to get this wwriter and writer close
         directoryFactory.doneWithDirectory(snapshotDir);
         directoryFactory.release(snapshotDir);
-      } catch (Exception e1) {
-        log.error("", e1);
+      } catch (IOException e1) {
+        e.addSuppressed(e1);
       }
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
+
       throw new IllegalStateException(e);
     }
   }
@@ -861,6 +861,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
+      
       // The JVM likes to wrap our helpful SolrExceptions in things like
       // "InvocationTargetException" that have no useful getMessage
       if (null != e.getCause() && e.getCause() instanceof SolrException) {
@@ -890,6 +892,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       // The JVM likes to wrap our helpful SolrExceptions in things like
       // "InvocationTargetException" that have no useful getMessage
       if (null != e.getCause() && e.getCause() instanceof SolrException) {
@@ -1375,7 +1378,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         p.load(new InputStreamReader(is, StandardCharsets.UTF_8));
       } catch (Exception e) {
-        log.error("Unable to load {}", IndexFetcher.INDEX_PROPERTIES, e);
+        DW.propegateInterrupt("Unable to load {}", e);
       } finally {
         DW.close(is);
       }
@@ -1393,7 +1396,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       p.store(os, IndexFetcher.INDEX_PROPERTIES);
       dir.sync(Collections.singleton(tmpFileName));
     } catch (Exception e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to write " + IndexFetcher.INDEX_PROPERTIES, e);
+      throw new DW.Exp("Unable to write " + IndexFetcher.INDEX_PROPERTIES);
     } finally {
       DW.close(os);
     }
@@ -1413,7 +1416,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    * @see #close()
    * @see #isClosed()
    */
-  public void closeAndWait() {
+  public void closeAndWait() { // nocommit yikes!
     close();
     while (!isClosed()) {
       final long milliSleep = 100;
@@ -1599,7 +1602,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       }
     }
     
-    try (DW closer = new DW(this)) {
+    try (DW closer = new DW(this, true)) {
       List<Callable<?>> closeHookCalls = new ArrayList<>();
 
       if (closeHooks != null) {
@@ -1683,16 +1686,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       System.out.println("after uhandler");
       System.out.println("add close seacher");
       
-      closer.add("CloseSearcher", () -> {
-        // Since we waited for the searcherExecutor to shut down,
-        // there should be no more searchers warming in the background
-        // that we need to take care of.
-        //
-        // For the case that a searcher was registered *before* warming
-        // then the searchExecutor will throw an exception when getSearcher()
-        // tries to use it, and the exception handling code should close it.
-        closeSearcher();
-      });
+
       
       System.out.println("add clear info and release snapshots dir");
       closer.add("ClearInfoReg&ReleaseSnapShotsDir", () -> {
@@ -1708,6 +1702,17 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       });
 
       closer.add("CleanupOldIndexDirs", () ->  {if (coreStateClosed.get()) cleanupOldIndexDirectories(false);});
+      
+      closer.add("CloseSearcher", () -> {
+        // Since we waited for the searcherExecutor to shut down,
+        // there should be no more searchers warming in the background
+        // that we need to take care of.
+        //
+        // For the case that a searcher was registered *before* warming
+        // then the searchExecutor will throw an exception when getSearcher()
+        // tries to use it, and the exception handling code should close it.
+        closeSearcher();
+      });
 
       closer.add("directoryFactory", () -> {
         if (coreStateClosed.get()) DW.close(directoryFactory);
@@ -2432,7 +2437,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return newSearcher;
 
     } catch (Exception e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening new searcher", e);
+      throw new DW.Exp("Error opening new searcher", e);
     } finally {
       openSearcherLock.unlock();
       if (newestSearcher != null) {
@@ -2679,6 +2684,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return returnSearcher ? newSearchHolder : null;
 
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       if (e instanceof RuntimeException) throw (RuntimeException) e;
       throw new SolrException(ErrorCode.SERVER_ERROR, e);
     } finally {
@@ -2739,7 +2745,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         } catch (Exception e) {
           // do not allow decref() operations to fail since they are typically called in finally blocks
           // and throwing another exception would be very unexpected.
-          SolrException.log(log, "Error closing searcher:" + this, e);
+          DW.propegateInterrupt("Error opening new searcher", e);
         }
       }
     };
@@ -2954,7 +2960,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   }
 
   final public static void log(Throwable e) {
-    SolrException.log(log, null, e);
+    DW.propegateInterrupt(e);
   }
 
   public PluginBag<QueryResponseWriter> getResponseWriters() {
@@ -2986,6 +2992,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       m.put("xlsx",
           (QueryResponseWriter) Class.forName("org.apache.solr.handler.extraction.XLSXResponseWriter").getConstructor().newInstance());
     } catch (Exception e) {
+      DW.propegateInterrupt(e);
       //don't worry; solrcell contrib not in class path
     }
   }
@@ -3070,8 +3077,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         Object o = getResourceLoader().newInstance(e.getValue().getName(), e.getValue());
         result.put(e.getKey(), (T) o);
       } catch (Exception exp) {
+        throw new DW.Exp("Unable to instantiate class", exp);
         //should never happen
-        throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to instantiate class", exp);
       }
     }
     return result;
@@ -3228,14 +3235,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         directoryFactory.remove(getIndexDir());
       } catch (Exception e) {
-        SolrException.log(log, "Failed to flag index dir for removal for core:" + name + " dir:" + getIndexDir());
+        DW.propegateInterrupt("Failed to flag index dir for removal for core:" + name + " dir:" + getIndexDir(), e);
       }
     }
     if (deleteDataDir) {
       try {
         directoryFactory.remove(getDataDir(), true);
       } catch (Exception e) {
-        SolrException.log(log, "Failed to flag data dir for removal for core:" + name + " dir:" + getDataDir());
+        DW.propegateInterrupt("Failed to flag data dir for removal for core:" + name + " dir:" + getDataDir(), e);
       }
     }
     if (deleteInstanceDir) {
@@ -3251,8 +3258,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             try {
               FileUtils.deleteDirectory(desc.getInstanceDir().toFile());
             } catch (IOException e) {
-              SolrException.log(log, "Failed to delete instance dir for core:"
-                  + core.getName() + " dir:" + desc.getInstanceDir());
+              SolrException.log(log, "Failed to delete instance dir for core:" + core.getName() + " dir:" + desc.getInstanceDir());
             }
           }
         }
@@ -3362,13 +3368,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         return;
       }
       //some files in conf directory may have  other than managedschema, overlay, params
+      // nocommit dowork
       try (SolrCore solrCore = cc.solrCores.getCoreFromAnyList(coreName, true)) {
         if (solrCore == null || solrCore.isClosed() || cc.isShutDown()) return;
         for (Runnable listener : solrCore.confListeners) {
           try {
             listener.run();
           } catch (Exception e) {
-            log.error("Error in listener ", e);
+            DW.propegateInterrupt("Error in listener ", e);
           }
         }
       }
@@ -3418,7 +3425,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         myDirFactory.cleanupOldIndexDirectories(myDataDir, myIndexDir, reload);
       } catch (Exception exc) {
-        log.error("Failed to cleanup old index directories for core {}", coreName, exc);
+        DW.propegateInterrupt("Failed to cleanup old index directories for core name=" + coreName, exc);
       }
     }
   }

@@ -858,7 +858,7 @@ public class MiniSolrCloudCluster {
     ZkStateReader reader = getSolrClient().getZkStateReader();
 
     try {
-      reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> !n.contains(nodeName));
+      reader.waitForLiveNodes(10, TimeUnit.SECONDS, (o, n) -> !n.contains(nodeName));
     } catch (InterruptedException e) {
       DW.propegateInterrupt(e);
     }

@@ -154,6 +154,7 @@ public class Replica extends ZkNodeProps {
 
   /** The name of the node this replica resides on */
   public String getNodeName() {
+    assert nodeName != null;
     return nodeName;
   }
   

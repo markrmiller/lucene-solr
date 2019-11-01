@@ -48,6 +48,7 @@ public class ZkCoreNodeProps {
   }
   
   public static String getCoreUrl(String baseUrl, String coreName) {
+    if (baseUrl == null || coreName == null) throw new IllegalArgumentException("Null argument not allowed baseUlr=" + baseUrl + " coreName=" + coreName);
     StringBuilder sb = new StringBuilder();
     sb.append(baseUrl);
     if (!baseUrl.endsWith("/")) sb.append("/");

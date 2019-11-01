@@ -1144,7 +1144,7 @@ public class RealTimeGetComponent extends SearchComponent
     rb.rsp.add("sync", success);
     
     if (!success) {
-      rb.req.getCore().getSolrCoreState().doRecovery(rb.req.getCore().getCoreContainer(), rb.req.getCore().getCoreDescriptor()); 
+      rb.req.getCore().getSolrCoreState().doRecovery(rb.req.getCore().getCoreContainer().getZkController(), rb.req.getCore().getCoreDescriptor()); 
     }
   }
   

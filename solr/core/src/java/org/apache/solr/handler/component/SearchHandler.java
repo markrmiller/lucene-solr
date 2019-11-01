@@ -256,7 +256,8 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       String shardsTolerant = req.getParams().get(ShardParams.SHARDS_TOLERANT);
       boolean requireZkConnected = shardsTolerant != null && shardsTolerant.equals(ShardParams.REQUIRE_ZK_CONNECTED);
       ZkController zkController = cc.getZkController();
-      boolean zkConnected = zkController != null && ! zkController.getZkClient().getConnectionManager().isLikelyExpired();
+      // nocommit
+      boolean zkConnected = true;//zkController != null && ! zkController.getZkClient().getConnectionManager().isLikelyExpired();
       if (requireZkConnected && false == zkConnected) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "ZooKeeper is not connected");
       } else {

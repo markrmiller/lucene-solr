@@ -260,7 +260,7 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
 
     try (DW closer = new DW(this)) {
       closer.add("Executors", updateExecutor, recoveryExecutor);
-      closer.add("HttpClients", updateOnlyClient, recoveryOnlyClient);
+      closer.add("HttpClients", updateOnlyClient, recoveryOnlyClient, defaultClient);
       closer.add("ConnectionMgr&MetricsProducer", defaultConnectionManager, recoveryOnlyConnectionManager, () -> {SolrMetricProducer.super.close(); return this;});
     }
   }

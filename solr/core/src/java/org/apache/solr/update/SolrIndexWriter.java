@@ -37,7 +37,6 @@ import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.InfoStream;
 import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -67,21 +66,21 @@ public class SolrIndexWriter extends IndexWriter {
 
   private final Object CLOSE_LOCK = new Object();
   
-  String name;
-  private DirectoryFactory directoryFactory;
-  private InfoStream infoStream;
-  private Directory directory;
+  final String name;
+  private volatile DirectoryFactory directoryFactory;
+  private final InfoStream infoStream;
+  private final Directory directory;
 
   // metrics
-  private long majorMergeDocs = 512 * 1024;
-  private Timer majorMerge;
-  private Timer minorMerge;
-  private Meter majorMergedDocs;
-  private Meter majorDeletedDocs;
-  private Counter mergeErrors;
-  private Meter flushMeter; // original counter is package-private in IndexWriter
-  private boolean mergeTotals = false;
-  private boolean mergeDetails = false;
+  private volatile long majorMergeDocs = 512 * 1024;
+  private volatile Timer majorMerge;
+  private volatile Timer minorMerge;
+  private volatile Meter majorMergedDocs;
+  private volatile Meter majorDeletedDocs;
+  private volatile Counter mergeErrors;
+  private volatile Meter flushMeter; // original counter is package-private in IndexWriter
+  private volatile boolean mergeTotals = false;
+  private volatile boolean mergeDetails = false;
   private final AtomicInteger runningMajorMerges = new AtomicInteger();
   private final AtomicInteger runningMinorMerges = new AtomicInteger();
   private final AtomicInteger runningMajorMergesSegments = new AtomicInteger();
@@ -94,6 +93,9 @@ public class SolrIndexWriter extends IndexWriter {
   private final Map<String, Long> runningMerges = new ConcurrentHashMap<>();
 
   public static SolrIndexWriter create(SolrCore core, String name, String path, DirectoryFactory directoryFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("create(SolrCore core={}, String name={}, String path={}, DirectoryFactory directoryFactory={}, boolean create={}, IndexSchema schema={}, SolrIndexConfig config={}, IndexDeletionPolicy delPolicy={}, Codec codec={}) - start", core, name, path, directoryFactory, create, schema, config, delPolicy, codec);
+    }
 
     SolrIndexWriter w = null;
     final Directory d = directoryFactory.get(path, DirContext.DEFAULT, config.lockType);
@@ -101,6 +103,10 @@ public class SolrIndexWriter extends IndexWriter {
       w = new SolrIndexWriter(core, name, path, d, create, schema, 
                               config, delPolicy, codec);
       w.setDirectoryFactory(directoryFactory);
+
+      if (log.isDebugEnabled()) {
+        log.debug("create(SolrCore, String, String, DirectoryFactory, boolean, IndexSchema, SolrIndexConfig, IndexDeletionPolicy, Codec) - end");
+      }
       return w;
     } finally {
       if (null == w && null != d) { 
@@ -116,7 +122,7 @@ public class SolrIndexWriter extends IndexWriter {
     this.infoStream = conf.getInfoStream();
     this.directory = d;
     numOpens.incrementAndGet();
-    log.debug("Opened Writer " + name);
+    if (log.isDebugEnabled()) log.debug("Opened Writer " + name);
     // no metrics
     mergeTotals = false;
     mergeDetails = false;
@@ -129,7 +135,7 @@ public class SolrIndexWriter extends IndexWriter {
           setOpenMode(create ? IndexWriterConfig.OpenMode.CREATE : IndexWriterConfig.OpenMode.APPEND).
           setIndexDeletionPolicy(delPolicy).setCodec(codec)
           );
-    log.debug("Opened Writer " + name);
+    if (log.isDebugEnabled()) log.debug("Opened Writer " + name);
     this.name = name;
     infoStream = getConfig().getInfoStream();
     this.directory = directory;
@@ -185,6 +191,10 @@ public class SolrIndexWriter extends IndexWriter {
     commitData.put(COMMIT_TIME_MSEC_KEY, String.valueOf(System.currentTimeMillis()));
     commitData.put(COMMIT_COMMAND_VERSION, String.valueOf(commitCommandVersion));
     iw.setLiveCommitData(commitData.entrySet());
+
+    if (log.isDebugEnabled()) {
+      log.debug("setCommitData(IndexWriter, long) - end");
+    }
   }
 
   private void setDirectoryFactory(DirectoryFactory factory) {
@@ -194,6 +204,10 @@ public class SolrIndexWriter extends IndexWriter {
   // we override this method to collect metrics for merges.
   @Override
   public void merge(MergePolicy.OneMerge merge) throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("merge(MergePolicy.OneMerge merge={}) - start", merge);
+    }
+
     String segString = merge.segString();
     long totalNumDocs = merge.totalNumDocs();
     runningMerges.put(segString, totalNumDocs);
@@ -202,6 +216,10 @@ public class SolrIndexWriter extends IndexWriter {
         super.merge(merge);
       } finally {
         runningMerges.remove(segString);
+      }
+
+      if (log.isDebugEnabled()) {
+        log.debug("merge(MergePolicy.OneMerge) - end");
       }
       return;
     }
@@ -246,18 +264,38 @@ public class SolrIndexWriter extends IndexWriter {
         runningMinorMergesSegments.addAndGet(-segmentsCount);
       }
     }
+
+    if (log.isDebugEnabled()) {
+      log.debug("merge(MergePolicy.OneMerge) - end");
+    }
   }
 
   public Map<String, Object> getRunningMerges() {
-    return Collections.unmodifiableMap(runningMerges);
+    if (log.isDebugEnabled()) {
+      log.debug("getRunningMerges() - start");
+    }
+
+    Map<String,Object> returnMap = Collections.unmodifiableMap(runningMerges);
+    if (log.isDebugEnabled()) {
+      log.debug("getRunningMerges() - end");
+    }
+    return returnMap;
   }
 
   @Override
   protected void doAfterFlush() throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("doAfterFlush() - start");
+    }
+
     if (flushMeter != null) { // this is null when writer is used only for snapshot cleanup
       flushMeter.mark();      // or if mergeTotals == false
     }
     super.doAfterFlush();
+
+    if (log.isDebugEnabled()) {
+      log.debug("doAfterFlush() - end");
+    }
   }
 
   /**
@@ -298,12 +336,15 @@ public class SolrIndexWriter extends IndexWriter {
     try {
       super.close();
     } catch (Throwable t) {
-      if (t instanceof OutOfMemoryError) {
-        throw (OutOfMemoryError) t;
-      }
-      log.error("Error closing IndexWriter", t);
+      log.error("close()", t);
+
+      DW.propegateInterrupt("Error closing IndexWriter", t);
     } finally {
       cleanup();
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("close() - end");
     }
   }
 
@@ -313,16 +354,23 @@ public class SolrIndexWriter extends IndexWriter {
     try {
       super.rollback();
     } catch (Throwable t) {
-      if (t instanceof OutOfMemoryError) {
-        throw (OutOfMemoryError) t;
-      }
-      log.error("Exception rolling back IndexWriter", t);
+      log.error("rollback()", t);
+
+      DW.propegateInterrupt("Exception rolling back IndexWriter", t);
     } finally {
       cleanup();
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("rollback() - end");
     }
   }
 
   private void cleanup() throws IOException {
+    if (log.isDebugEnabled()) {
+      log.debug("cleanup() - start");
+    }
+
     // It's kind of an implementation detail whether
     // or not IndexWriter#close calls rollback, so
     // we assume it may or may not
@@ -334,7 +382,9 @@ public class SolrIndexWriter extends IndexWriter {
       }
     }
     if (doClose) {
-      
+      if (log.isDebugEnabled()) {
+        log.debug("cleanup() - doClose");
+      }  
       if (infoStream != null) {
         DW.close(infoStream);
       }
@@ -346,6 +396,10 @@ public class SolrIndexWriter extends IndexWriter {
       if (solrMetricsContext != null) {
         solrMetricsContext.unregister();
       }
+    }
+
+    if (log.isDebugEnabled()) {
+      log.debug("cleanup() - end");
     }
   }
 
