@@ -83,6 +83,8 @@ import com.codahale.metrics.MetricRegistry;
  * "Mini" SolrCloud cluster to be used for testing
  */
 public class MiniSolrCloudCluster {
+  
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final String ZOOKEEPER_SERVER1_DATA = "zookeeper/server1/data";
 
@@ -95,8 +97,6 @@ public class MiniSolrCloudCluster {
   private static final String SOLR_SECURITY_JSON = "/solr/security.json";
 
   private static final int STARTUP_WAIT_SECONDS = 10;
-
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   public static final String SOLR_TESTS_SHARDS_WHITELIST = "solr.tests.shardsWhitelist";
 

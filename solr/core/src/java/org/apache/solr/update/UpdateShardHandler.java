@@ -18,6 +18,7 @@ package org.apache.solr.update;
 
 import static org.apache.solr.util.stats.InstrumentedHttpRequestExecutor.KNOWN_METRIC_NAME_STRATEGIES;
 
+import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
@@ -56,7 +57,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 @SolrThreadSafe
-public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
+public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean, Closeable {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -260,8 +261,17 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean {
 
     try (DW closer = new DW(this)) {
       closer.add("Executors", updateExecutor, recoveryExecutor);
-      closer.add("HttpClients", updateOnlyClient, recoveryOnlyClient, defaultClient);
-      closer.add("ConnectionMgr&MetricsProducer", defaultConnectionManager, recoveryOnlyConnectionManager, () -> {SolrMetricProducer.super.close(); return this;});
+      closer.add("HttpClients", updateOnlyClient, () -> {
+        HttpClientUtil.close(recoveryOnlyClient);
+        return recoveryOnlyClient;
+      }, () -> {
+        HttpClientUtil.close(defaultClient);
+        return defaultClient;
+      });
+      closer.add("ConnectionMgr&MetricsProducer", defaultConnectionManager, recoveryOnlyConnectionManager, () -> {
+        SolrMetricProducer.super.close();
+        return this;
+      });
     }
   }
 

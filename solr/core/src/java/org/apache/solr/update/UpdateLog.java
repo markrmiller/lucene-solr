@@ -58,8 +58,9 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.IOUtils;
+
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.PluginInfo;
@@ -94,6 +95,7 @@ import static org.apache.solr.update.processor.DistributingUpdateProcessorFactor
  *
  * @lucene.experimental
  */
+@SolrThreadSafe
 public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
   private static final long STATUS_TIME = TimeUnit.NANOSECONDS.convert(60, TimeUnit.SECONDS);
   public static String LOG_FILENAME_PATTERN = "%s.%019d";
@@ -117,7 +119,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
       try{
         return SyncLevel.valueOf(level.toUpperCase(Locale.ROOT));
       } catch(Exception ex){
-        log.warn("There was an error reading the SyncLevel - default to " + SyncLevel.FLUSH, ex);
+        DW.propegateInterrupt("There was an error reading the SyncLevel - default to " + SyncLevel.FLUSH, ex);
         return SyncLevel.FLUSH;
       }
     }
@@ -686,7 +688,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
         RefCounted<SolrIndexSearcher> holder = uhandler.core.openNewSearcher(true, true);
         holder.decref();
       } catch (Exception e) {
-        SolrException.log(log, "Error opening realtime searcher", e);
+        DW.propegateInterrupt("Error opening realtime searcher", e);
         return;
       }
 
@@ -704,7 +706,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
         RefCounted<SolrIndexSearcher> holder = uhandler.core.openNewSearcher(true, true);
         holder.decref();
       } catch (Exception e) {
-        SolrException.log(log, "Error opening realtime searcher for deleteByQuery", e);
+        DW.propegateInterrupt("Error opening realtime searcher for deleteByQuery", e);
       }
 
       if (map != null) map.clear();

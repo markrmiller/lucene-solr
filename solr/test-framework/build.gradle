@@ -26,7 +26,6 @@ dependencies {
   
   api project(':solr:solr-solrj')
   api project(':solr:solr-core')
-  api project(':solr:solr-server')
   api project(':lucene:lucene-core')
   api project(':lucene:lucene-codecs')
   api project(':lucene:lucene-queries')
@@ -53,13 +52,13 @@ dependencies {
   implementation ('io.dropwizard.metrics:metrics-jetty9')
   implementation ('commons-codec:commons-codec')
   
-//  testImplementation ('org.eclipse.jetty:jetty-http')
-//  testImplementation ('org.eclipse.jetty:jetty-io')
-//  testImplementation ('org.eclipse.jetty:jetty-security')
-//  testImplementation ('org.eclipse.jetty:jetty-client')
-//  testImplementation ('org.eclipse.jetty:jetty-xml')
-//  testImplementation ('org.eclipse.jetty:jetty-alpn-java-server')
-//  testImplementation ('org.eclipse.jetty:jetty-alpn-server')
+  testImplementation ('org.eclipse.jetty:jetty-http')
+  testImplementation ('org.eclipse.jetty:jetty-io')
+  testImplementation ('org.eclipse.jetty:jetty-security')
+  testImplementation ('org.eclipse.jetty:jetty-client')
+  testImplementation ('org.eclipse.jetty:jetty-xml')
+  testImplementation ('org.eclipse.jetty:jetty-alpn-java-server')
+  testImplementation ('org.eclipse.jetty:jetty-alpn-server')
 
   testImplementation ('org.apache.httpcomponents:httpclient')
   testImplementation ('org.apache.httpcomponents:httpcore')
@@ -68,10 +67,10 @@ dependencies {
   testImplementation ('org.rrd4j:rrd4j')
   testImplementation ('io.dropwizard.metrics:metrics-jvm')
   
-//  testImplementation ('org.eclipse.jetty.http2:http2-client')
-//  testImplementation ('org.eclipse.jetty.http2:http2-http-client-transport')
-//  testImplementation ('org.eclipse.jetty.http2:http2-common')
-//  testImplementation ('org.eclipse.jetty.http2:http2-hpack')
+  testImplementation ('org.eclipse.jetty.http2:http2-client')
+  testImplementation ('org.eclipse.jetty.http2:http2-http-client-transport')
+  testImplementation ('org.eclipse.jetty.http2:http2-common')
+  testImplementation ('org.eclipse.jetty.http2:http2-hpack')
   
   testImplementation ('org.apache.hadoop:hadoop-minicluster')
   testImplementation ('org.apache.hadoop:hadoop-common')

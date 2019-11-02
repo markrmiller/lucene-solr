@@ -73,11 +73,11 @@ public class SolrSeer  implements Closeable {
   private final OverseerCollectionMessageHandler collMessageHandler;
   private final ZkStateWriter zkStateWriter;
   
-  private QueueSerializer<ZkNodeProps> serializer = new QueueSerializer<>() {
-
+  private QueueSerializer<ZkNodeProps> serializer = new QueueSerializer<>() { // nocommit extract
+    private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public byte[] serialize(ZkNodeProps item) {
-      log.warn("SERIALIZE ITEM: " + item);
+      log.info("SERIALIZE ITEM: " + item);
       return Utils.toJSON(item);
     }
 
@@ -86,18 +86,18 @@ public class SolrSeer  implements Closeable {
    
       ZkNodeProps zkNodeProps = ZkNodeProps.load(bytes);
       
-      log.warn("DESERIALIZE ITEM: " + zkNodeProps);
+      log.info("DESERIALIZE ITEM: " + zkNodeProps);
       return zkNodeProps;
     }
 
   };
 
   
-  QueueConsumer<ZkNodeProps> stateUpdateConsumer = new QueueConsumer<>() {
-
+  QueueConsumer<ZkNodeProps> stateUpdateConsumer = new QueueConsumer<>() { // nocommit extract
+    private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public void consumeMessage(ZkNodeProps message) throws Exception {
-      log.warn("Consume state update from queue {}", message);
+      log.info("Consume state update from queue {}", message);
       try {
         final String operation = message.getStr(QUEUE_OPERATION);
         if (operation == null) {
@@ -114,7 +114,7 @@ public class SolrSeer  implements Closeable {
 
             @Override
             public void onWrite() throws Exception {
-              log.info("on write callback");
+              // log.info("on write callback");
             }
 
           });
@@ -137,7 +137,8 @@ public class SolrSeer  implements Closeable {
   };
   
   
-  QueueConsumer<ZkNodeProps> adminOpConsumer = new QueueConsumer<>() {
+  QueueConsumer<ZkNodeProps> adminOpConsumer = new QueueConsumer<>() { // nocommit extract
+    private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public void consumeMessage(ZkNodeProps message) throws Exception {
       log.warn("Consume admin op form queue {}", message);
@@ -148,7 +149,7 @@ public class SolrSeer  implements Closeable {
 
     @Override
     public void stateChanged(CuratorFramework client, ConnectionState newState) {
-      log.warn("state changed of admin op queue:" + newState);
+      log.info("state changed of admin op queue:" + newState);
     }
   };
   

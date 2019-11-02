@@ -52,13 +52,12 @@ public class ZkContainer implements Closeable {
   private boolean zkRunOnly = Boolean.getBoolean("zkRunOnly"); // expert
   
   public ZkContainer() {
-    this.zkController = null;
-    this.zkServer = null;
+
   }
 
   public void initZooKeeper(final CoreContainer cc, String solrHome, CloudConfig config, SolrZkClient zkClient) {
 
-    assert zkClient != null;
+ 
     
     ZkController zkController = null;
 
@@ -71,7 +70,13 @@ public class ZkContainer implements Closeable {
         return;  // not in zk mode
 
     String zookeeperHost = config.getZkHost();
+    
+    if (zookeeperHost == null) {
+      return;  // not in zk mode
+    }
 
+    assert zkClient != null;
+    
     // zookeeper in quorum mode currently causes a failure when trying to
     // register log4j mbeans.  See SOLR-2369
     // TODO: remove after updating to an slf4j based zookeeper
@@ -182,9 +187,9 @@ public class ZkContainer implements Closeable {
         } catch (Exception e) {
           Exp exp = new DW.Exp(e);
           try {
-            if (!zkController.getZkClient().isClosed() && zkController.isConnected()) {
+           // if (!zkController.getZkClient().isClosed() && zkController.isConnected()) { // nocommit
               zkController.publish(cd, Replica.State.DOWN);
-            }
+           // }
           } catch (Exception e1) {
             exp.addSuppressed(e1);
           }

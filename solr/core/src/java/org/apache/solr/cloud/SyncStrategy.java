@@ -146,6 +146,7 @@ public class SyncStrategy implements Closeable {
     
     if (nodes == null) {
       // I have no replicas
+      log.info("No replicas to sync with");
       return PeerSync.PeerSyncResult.success();
     }
     

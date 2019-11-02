@@ -195,7 +195,11 @@ public class DW implements Closeable {
     collectSet.add(runnable);
   }
   
-  public void addCollect(String label) {    
+  public void addCollect(String label) { 
+    if (collectSet == null) {
+      log.info("Nothing collected to submit");
+      return;
+    }
     add(label, collectSet);
     collectSet.clear();
   }
@@ -370,8 +374,9 @@ public class DW implements Closeable {
 
     WorkUnit workUnit = new WorkUnit(objects, tracker, label);
     workUnits.add(workUnit);
-
-    log.error("Add WorkUnit:" + objects); // nocommit
+    if (log.isDebugEnabled()) {
+      log.debug("Add WorkUnit:" + objects); // nocommit
+    }
   }
 
   public void add(String label, Object object1, Object object2, Object object3, Callable<?>... Callables) {
@@ -611,11 +616,19 @@ public class DW implements Closeable {
   }
 
   public static void propegateInterrupt(Throwable t) {
+    propegateInterrupt(t, false);
+  }
+  
+  public static void propegateInterrupt(Throwable t, boolean infoLogMsg) {
     if (t instanceof InterruptedException) {
       log.info("Interrupted", t);
       Thread.currentThread().interrupt();
     } else {
-      log.warn("Solr ran into an unexpected exception", t);
+      if (infoLogMsg) {
+        log.info(t.getMessage());
+      } else {
+        log.warn("Solr ran into an unexpected exception", t);
+      }
     }
     
     if (t instanceof Error) {
@@ -624,11 +637,19 @@ public class DW implements Closeable {
   }
 
   public static void propegateInterrupt(String msg, Throwable t) {
+    propegateInterrupt(msg, t, false);
+  }
+  
+  public static void propegateInterrupt(String msg, Throwable t, boolean infoLogMsg) {
     if (t instanceof InterruptedException) {
       log.info("Interrupted", t);
       Thread.currentThread().interrupt();
     } else {
-      log.warn(msg, t);
+      if (infoLogMsg) {
+        log.info(msg);
+      } else {
+        log.warn(msg, t);
+      }
     }
     if (t instanceof Error) {
       throw (Error) t;

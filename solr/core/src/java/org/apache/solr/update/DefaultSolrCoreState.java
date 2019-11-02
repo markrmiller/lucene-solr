@@ -82,7 +82,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   protected final ReentrantLock commitLock = new ReentrantLock();
 
 
-  private AtomicBoolean cdcrRunning = new AtomicBoolean();
+  private final AtomicBoolean cdcrRunning = new AtomicBoolean();
 
   private volatile Future<Boolean> cdcrBootstrapFuture;
 
@@ -101,9 +101,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   
   private void closeIndexWriter(IndexWriterCloser closer) {
     try {
-      log.debug("SolrCoreState ref count has reached 0 - closing IndexWriter");
+      if (log.isDebugEnabled()) log.debug("SolrCoreState ref count has reached 0 - closing IndexWriter");
       if (closer != null) {
-        log.debug("closing IndexWriter with IndexWriterCloser");
+        if (log.isDebugEnabled()) log.debug("closing IndexWriter with IndexWriterCloser");
         closer.closeWriter(indexWriter);
       } else if (indexWriter != null) {
         log.debug("closing IndexWriter...");
@@ -111,7 +111,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       }
       indexWriter = null;
     } catch (Exception e) {
-      log.error("Error during close of writer.", e);
+      DW.propegateInterrupt("Error during close of writer.", e);
     } 
   }
   
@@ -209,14 +209,14 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
           log.debug("Closing old IndexWriter... core=" + coreName);
           iw.close();
         } catch (Exception e) {
-          SolrException.log(log, "Error closing old IndexWriter. core=" + coreName, e);
+          DW.propegateInterrupt("Error closing old IndexWriter. core=" + coreName, e);
         }
       } else {
         try {
           log.debug("Rollback old IndexWriter... core=" + coreName);
           iw.rollback();
         } catch (Exception e) {
-          SolrException.log(log, "Error rolling back old IndexWriter. core=" + coreName, e);
+          DW.propegateInterrupt("Error rolling back old IndexWriter. core=" + coreName, e);
         }
       }
     }
@@ -259,9 +259,10 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   }
   
   protected SolrIndexWriter createMainIndexWriter(SolrCore core, String name) throws IOException {
-    return SolrIndexWriter.create(core, name, core.getNewIndexDir(),
-        core.getDirectoryFactory(), false, core.getLatestSchema(),
+    SolrIndexWriter iw = new SolrIndexWriter(core, name, core.getNewIndexDir(), core.getDirectoryFactory(), false, core.getLatestSchema(),
         core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec());
+    
+    return iw;
   }
 
   public Sort getMergePolicySort() throws IOException {
@@ -397,11 +398,18 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   }
 
   @Override
-  public synchronized void close(IndexWriterCloser closer) {
+  public void close(IndexWriterCloser closer) {
     System.out.println("CLOSE CORE STATE");
-    closed = true;
     cancelRecovery();
-    closeIndexWriter(closer);
+    lock(iwLock.writeLock());
+    synchronized (this) {
+      closed = true;
+      try {
+        closeIndexWriter(closer);
+      } finally {
+        iwLock.writeLock().unlock();
+      }
+    }
   }
   
   @Override

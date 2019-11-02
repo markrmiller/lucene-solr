@@ -75,14 +75,13 @@ public abstract class SolrCoreState {
       solrCoreStateRefCnt--;
       assert solrCoreStateRefCnt >= 0;
       if (solrCoreStateRefCnt == 0) {
-        closed = true;
         close = true;
       }
     }
     
     if (close) {
       try {
-        log.debug("Closing SolrCoreState");
+        if (log.isDebugEnabled()) log.debug("Closing SolrCoreState");
         close(closer);
       } catch (Exception e) {
         log.error("Error closing SolrCoreState", e);

@@ -52,7 +52,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
   public void createCollections() throws Exception {
     solrUrl = cluster.getJettySolrRunner(0).getBaseUrl().toString();
 
-    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 1, 1).setMaxShardsPerNode(100).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 3, 1).setMaxShardsPerNode(100).process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 1, 1);
 //    CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
 //    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
@@ -65,7 +65,7 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @Test
   public void makeSomeSolrCloud() throws Exception {
-    int numTotalDocs = 1000;
+    int numTotalDocs = 2;
     int numExpectedPerCollection = numTotalDocs / 2;
     try (Http2SolrClient http2Client = new Http2SolrClient.Builder().build();
          SolrClient client = new ConcurrentUpdateHttp2SolrClient.Builder(solrUrl, http2Client)

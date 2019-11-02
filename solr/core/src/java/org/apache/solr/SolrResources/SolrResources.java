@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.curator.RetryPolicy;
@@ -79,6 +80,8 @@ public class SolrResources implements Closeable {
   private volatile NodeConfig nodeConfig;
   private volatile CoreContainer cores;
   private volatile String registryName;
+  
+  private final AtomicBoolean loadLock = new AtomicBoolean();
 
   public SolrResources(Path solrHomePath, Properties extraProperties) {
     this.solrHomePath = solrHomePath;
@@ -87,45 +90,56 @@ public class SolrResources implements Closeable {
 
   public void start() {
     // nocommit error if start not called
-    
     if (started) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "SolrResources already started");
     }
     
+    if (closed) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, "Already closed");
+    }
+
     started = true;
 
-    String zkHost = System.getProperty("zkHost");
-    if (!StringUtils.isEmpty(zkHost)) {
-      int startUpZkTimeOut = Integer.getInteger("waitForZk", 10);
-      log.info("Using connectString={}", zkHost);
-      // nocommit for now we are bridging to a transition
-      RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
-      CuratorFramework client = CuratorFrameworkFactory.builder().connectString(zkHost).retryPolicy(retryPolicy)
-          .defaultData(null).build();
-      client.start();
-      try {
-        client.blockUntilConnected(startUpZkTimeOut, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        DW.propegateInterrupt(e);
+    loadLock.set(true);
+    try {
+
+      String zkHost = System.getProperty("zkHost");
+      if (!StringUtils.isEmpty(zkHost)) {
+        int startUpZkTimeOut = Integer.getInteger("waitForZk", 10);
+        log.info("Using connectString={}", zkHost);
+        // nocommit for now we are bridging to a transition
+        RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+        CuratorFramework client = CuratorFrameworkFactory.builder().connectString(zkHost).retryPolicy(retryPolicy)
+            .defaultData(null).build();
+        client.start();
+        try {
+          client.blockUntilConnected(startUpZkTimeOut, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          DW.propegateInterrupt(e);
+        }
+
+        zkClient = new SolrZkClient(client);
       }
+      nodeConfig = loadNodeConfig(solrHomePath, extraProperties, zkClient);
 
-      zkClient = new SolrZkClient(client);
+      // final CoreContainer coreContainer = new CoreContainer(nodeConfig, extraProperties,
+      // new CorePropertiesLocator(nodeConfig.getCoreRootDirectory()), zkClient);
+
+      SolrModule solrModule = new SolrModule(zkClient, nodeConfig, extraProperties);
+      injector = Guice.createInjector(solrModule);
+
+      cores = injector.getInstance(CoreContainer.class);
+
+      cores.load(true);
+      SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
+      this.httpClient = cores.getUpdateShardHandler().getDefaultHttpClient();
+      registryName = setupJvmMetrics(cores);
+    } finally {
+      loadLock.set(false);
+      synchronized (loadLock) {
+        loadLock.notifyAll();
+      }
     }
-    nodeConfig = loadNodeConfig(solrHomePath, extraProperties, zkClient);
-
-    
-    // final CoreContainer coreContainer = new CoreContainer(nodeConfig, extraProperties,
-    // new CorePropertiesLocator(nodeConfig.getCoreRootDirectory()), zkClient);
-
-    SolrModule solrModule = new SolrModule(zkClient, nodeConfig, extraProperties);
-    injector = Guice.createInjector(solrModule);
-
-    cores = injector.getInstance(CoreContainer.class);
-    
-    cores.load(true);
-    SolrResourceLoader.ensureUserFilesDataDir(solrHomePath);
-    this.httpClient = cores.getUpdateShardHandler().getDefaultHttpClient();
-    registryName = setupJvmMetrics(cores);
   }
 
   @Override
@@ -135,6 +149,18 @@ public class SolrResources implements Closeable {
       throw new AlreadyClosedException();
     }
     closed = true;
+    
+    
+    while (loadLock.get()) {
+      synchronized (loadLock) {
+        try {
+          loadLock.wait();
+        } catch (InterruptedException e) {
+          DW.propegateInterrupt(e);
+        }
+      }
+    }
+    
     // nocommit
     try (DW worker = new DW(this, true)) {
       worker.add("SolrResourcesInternal",
@@ -204,7 +230,7 @@ public class SolrResources implements Closeable {
       }
 
       if (zkClient != null) {
-        zkClient.printLayout(); // nocommit
+        // zkClient.printLayout(); // nocommit
 
         try {
           if (zkClient.exists("/solr.xml", true)) {

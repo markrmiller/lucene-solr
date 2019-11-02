@@ -81,7 +81,8 @@ public class ShardLeader implements Closeable {
     // all participants in a given leader selection must use the same path
     // ExampleClient here is also a LeaderSelectorListener but this isn't required
     shardLeaderSelector = new LeaderSelector(zkController.getZkClient().getCurator(),
-        "/collections/" + shardId + "/shard_leader", new LeaderSelectorListenerAdapter() {
+        "/collections/" + shardId + "/shard_leader", new LeaderSelectorListenerAdapter() { // nocommit extract
+      private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
           @Override
           public void takeLeadership(CuratorFramework client) throws Exception {

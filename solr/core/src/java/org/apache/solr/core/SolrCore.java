@@ -78,6 +78,7 @@ import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ClusterState;
@@ -88,6 +89,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CommonParams.EchoParamStyle;
 import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.CloseTimeTracker;
@@ -185,6 +187,7 @@ import com.google.common.collect.MapMaker;
  * When multi-core support was added to Solr way back in version 1.3, this class was required so that the core
  * functionality could be re-used multiple times.
  */
+@SolrThreadSafe
 public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
   public static final String version = "1.0";
@@ -193,10 +196,10 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   private static final Logger requestLog = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass().getName() + ".Request");
   private static final Logger slowLog = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass().getName() + ".SlowRequest");
 
-  private String name;
+  private volatile String name;
   private String logid; // used to show what name is set
 
-  private boolean isReloaded = false;
+  private volatile boolean isReloaded = false;
 
   private final SolrConfig solrConfig;
   private final SolrResourceLoader resourceLoader;
@@ -219,7 +222,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   private final SolrSnapshotMetaDataManager snapshotMgr;
   private final DirectoryFactory directoryFactory;
   private final RecoveryStrategy.Builder recoveryStrategyBuilder;
-  private IndexReaderFactory indexReaderFactory;
+  private volatile IndexReaderFactory indexReaderFactory;
   private final Codec codec;
   private final MemClassLoader memClassLoader;
 
@@ -228,14 +231,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   private final ReentrantLock ruleExpiryLock;
   private final ReentrantLock snapshotDelLock; // A lock instance to guard against concurrent deletions.
 
-  private Timer newSearcherTimer;
-  private Timer newSearcherWarmupTimer;
-  private Counter newSearcherCounter;
-  private Counter newSearcherMaxReachedCounter;
-  private Counter newSearcherOtherErrorsCounter;
+  private volatile Timer newSearcherTimer;
+  private volatile Timer newSearcherWarmupTimer;
+  private volatile Counter newSearcherCounter;
+  private volatile Counter newSearcherMaxReachedCounter;
+  private volatile Counter newSearcherOtherErrorsCounter;
   private final CoreContainer coreContainer;
 
-  private Set<String> metricNames = ConcurrentHashMap.newKeySet();
+  private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
   private final String metricTag = SolrMetricProducer.getUniqueMetricTag(this, null);
   private final SolrMetricsContext solrMetricsContext;
 
@@ -243,7 +246,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   public volatile boolean indexEnabled = true;
   public volatile boolean readOnly = false;
 
-  private PackageListeners packageListeners = new PackageListeners(this);
+  private final PackageListeners packageListeners = new PackageListeners(this);
 
   public Set<String> getMetricNames() {
     return metricNames;
@@ -405,7 +408,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         try {
           getDirectoryFactory().release(dir);
         } catch (IOException e) {
-          SolrException.log(log, "", e);
+          DW.propegateInterrupt( "Error releasing directory", e);
         }
       }
     }
@@ -429,8 +432,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       // All other exceptions are will propagate to caller.
       return dataDir + "index/";
     }
-    final InputStream is = new PropertiesInputStream(input); // c'tor just assigns a variable here, no exception thrown.
-    try {
+    try (InputStream is = new PropertiesInputStream(input)) { // c'tor just assigns a variable here, no exception
+                                                              // thrown.
       Properties p = new Properties();
       p.load(new InputStreamReader(is, StandardCharsets.UTF_8));
 
@@ -442,8 +445,6 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       // We'll return dataDir/index/ if the properties file has an "index" property with
       // no associated value or does not have an index property at all.
       return dataDir + "index/";
-    } finally {
-      DW.close(is);
     }
   }
 
@@ -818,12 +819,9 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     // Create the index if it doesn't exist.
     if (!indexExists) {
       log.debug("{}Solr index directory '{}' doesn't exist. Creating new index...", logid, indexDir);
-      SolrIndexWriter writer = null;
-      try {
-        writer = SolrIndexWriter.create(this, "SolrCore.initIndex", indexDir, getDirectoryFactory(), true,
-            getLatestSchema(), solrConfig.indexConfig, solrDelPolicy, codec);
-      } finally {
-        DW.close(writer);
+
+      try (SolrIndexWriter writer = new SolrIndexWriter(this, "SolrCore.initIndex", indexDir, getDirectoryFactory(),
+          true, getLatestSchema(), solrConfig.indexConfig, solrDelPolicy, codec)) {
       }
 
     }
@@ -1081,19 +1079,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       // release the latch, otherwise we block trying to do the close. This
       // should be fine, since counting down on a latch of 0 is still fine
       latch.countDown();
-      if (e instanceof OutOfMemoryError) {
-        throw (OutOfMemoryError) e;
-      }
+      DW.propegateInterrupt("Error while creating SolrCore", e);
 
       try {
         // close down the searcher and any other resources, if it exists, as this
         // is not recoverable
         close();
       } catch (Throwable t) {
-        if (t instanceof OutOfMemoryError) {
-          throw (OutOfMemoryError) t;
-        }
-        log.error("Error while closing", t);
+        DW.propegateInterrupt("Error while closing", t);
       }
 
       throw new SolrException(ErrorCode.SERVER_ERROR, e.getMessage(), e);
@@ -1578,7 +1571,6 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    */
   @Override
   public void close() {
-	  Error error = null;
     int count = refCount.decrementAndGet();
     if (count > 0) return; // close is called often, and only actually closes if nothing is using it.
     if (count < 0) {
@@ -1587,20 +1579,16 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return;
     }
     log.info("{} CLOSING SolrCore {}", logid, this);
-
-    
-    if (this.isClosed()) return;
     this.isClosed = true;
-    System.out.println("showdown " + count);
     try {
       coreAsyncTaskExecutor.shutdown();
       searcherExecutor.shutdown();
     } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        if (error == null) error = (Error) e;
-      }
+      DW.propegateInterrupt(e);
     }
+
+    System.out.println("showdown " + count);
+
     
     try (DW closer = new DW(this, true)) {
       List<Callable<?>> closeHookCalls = new ArrayList<>();
@@ -1613,16 +1601,15 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           });
         }
       }
-      
+
       assert ObjectReleaseTracker.release(searcherExecutor);
 
       System.out.println("prehooks");
       closer.add("PreCloseHooks", closeHookCalls);
 
-      closer.add("coreAsyncExecutor", coreAsyncTaskExecutor);
-      closer.add("searcherExecutor", searcherExecutor);
-      
-      //closer.add(coreMetricManager);
+      closer.add("Executors", coreAsyncTaskExecutor, searcherExecutor);
+
+      // closer.add(coreMetricManager);
 
       List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
       closeCalls.add(() -> {
@@ -1662,7 +1649,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       closer.add("SolrCoreInternals", closeCalls);
 
       AtomicBoolean coreStateClosed = new AtomicBoolean(false);
-      
+
       // this can be very slow, we submit it instead of waiting
       closer.add("SolrCoreState", () -> {
         System.out.println("DECREF THE CORE STATE");
@@ -1681,14 +1668,18 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         return solrCoreState;
       });
 
-      System.out.println("uhandler");
-      closer.add(updateHandler);
-      System.out.println("after uhandler");
-      System.out.println("add close seacher");
-      
+      closer.add("CloseUpdateHandler&Searcher", updateHandler, () -> {
+        // Since we waited for the searcherExecutor to shut down,
+        // there should be no more searchers warming in the background
+        // that we need to take care of.
+        //
+        // For the case that a searcher was registered *before* warming
+        // then the searchExecutor will throw an exception when getSearcher()
+        // tries to use it, and the exception handling code should close it.
+        closeSearcher();
+        return "Searcher";
+      });
 
-      
-      System.out.println("add clear info and release snapshots dir");
       closer.add("ClearInfoReg&ReleaseSnapShotsDir", () -> {
         infoRegistry.clear();
         return infoRegistry;
@@ -1701,17 +1692,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         return snapshotsDir;
       });
 
-      closer.add("CleanupOldIndexDirs", () ->  {if (coreStateClosed.get()) cleanupOldIndexDirectories(false);});
-      
-      closer.add("CloseSearcher", () -> {
-        // Since we waited for the searcherExecutor to shut down,
-        // there should be no more searchers warming in the background
-        // that we need to take care of.
-        //
-        // For the case that a searcher was registered *before* warming
-        // then the searchExecutor will throw an exception when getSearcher()
-        // tries to use it, and the exception handling code should close it.
-        closeSearcher();
+      closer.add("CleanupOldIndexDirs", () -> {
+        if (coreStateClosed.get()) cleanupOldIndexDirectories(false);
       });
 
       closer.add("directoryFactory", () -> {
@@ -1728,18 +1710,13 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           });
         }
       }
-      
+
       closer.add("PostCloseHooks", closeHookCalls);
-      
+
     } finally {
       assert ObjectReleaseTracker.release(this);
     }
-    
-    
-    
-    if (error != null) {
-      throw error;
-    }
+
 //
 //    CloseTimeTracker preCommitHooksTracker = tracker.startSubClose("PreCloseHooks");
 //    try {
@@ -1987,7 +1964,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    * Whether this core is closed.
    */
   public boolean isClosed() {
-    return isClosed ;
+    return isClosed;
   }
 
   private Collection<CloseHook> closeHooks = null;
@@ -2241,6 +2218,12 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return _searcher;
     }
   }
+  
+  public boolean hasRegisteredSearcher() {
+    synchronized (searcherLock) {
+      return _searcher != null;
+    }
+  }
 
   /**
    * Return the newest normal {@link RefCounted}&lt;{@link SolrIndexSearcher}&gt; with
@@ -2310,11 +2293,11 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    * This method acquires openSearcherLock - do not call with searchLock held!
    */
   public RefCounted<SolrIndexSearcher> openNewSearcher(boolean updateHandlerReopens, boolean realtime) {
-    if (isClosed()) { // catch some errors quicker
+    if (isClosed()) { // if we start new searchers after close we won't close them
       throw new SolrCoreState.CoreIsClosedException();
     }
 
-    SolrIndexSearcher tmp;
+    SolrIndexSearcher tmp = null;
     RefCounted<SolrIndexSearcher> newestSearcher = null;
 
     openSearcherLock.lock();
@@ -2487,11 +2470,15 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
    * @param updateHandlerReopens if true, the UpdateHandler will be used when reopening a {@link SolrIndexSearcher}.
    */
   public RefCounted<SolrIndexSearcher> getSearcher(boolean forceNew, boolean returnSearcher, final Future[] waitSearcher, boolean updateHandlerReopens) {
+    if (isClosed()) { // if we start new searchers after close we won't close them
+      throw new SolrCoreState.CoreIsClosedException();
+    }
     // it may take some time to open an index.... we may need to make
     // sure that two threads aren't trying to open one at the same time
     // if it isn't necessary.
 
     synchronized (searcherLock) {
+      
       for (; ; ) { // this loop is so w can retry in the event that we exceed maxWarmingSearchers
         // see if we can return the current searcher
         if (_searcher != null && !forceNew) {
@@ -2508,7 +2495,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           try {
             searcherLock.wait();
           } catch (InterruptedException e) {
-            log.info(SolrException.toStr(e));
+            DW.propegateInterrupt(e);
           }
         }
 
@@ -2537,7 +2524,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           try {
             searcherLock.wait();
           } catch (InterruptedException e) {
-            log.info(SolrException.toStr(e));
+            DW.propegateInterrupt(e);
           }
           continue;  // go back to the top of the loop and retry
         } else if (onDeckSearchers > 1) {
@@ -2553,7 +2540,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     RefCounted<SolrIndexSearcher> currSearcherHolder = null;     // searcher we are autowarming from
     RefCounted<SolrIndexSearcher> searchHolder = null;
     boolean success = false;
-
+    AtomicBoolean registered = new AtomicBoolean(false);
     openSearcherLock.lock();
     Timer.Context timerContext = newSearcherTimer.time();
     try {
@@ -2564,7 +2551,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         searchHolder.incref();
       }
 
-
+      // we make a new holder so that it's final for below
       final RefCounted<SolrIndexSearcher> newSearchHolder = searchHolder;
       final SolrIndexSearcher newSearcher = newSearchHolder.get();
 
@@ -2575,6 +2562,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           // if there isn't a current searcher then we may
           // want to register this one before warming is complete instead of waiting.
           if (solrConfig.useColdSearcher) {
+            registered.set(true);
             registerSearcher(newSearchHolder);
             decrementOnDeckCount[0] = false;
             alreadyRegistered = true;
@@ -2602,10 +2590,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             try {
               newSearcher.warm(currSearcher);
             } catch (Throwable e) {
-              SolrException.log(log, e);
-              if (e instanceof Error) {
-                throw (Error) e;
-              }
+              DW.propegateInterrupt(e);
             } finally {
               warmupContext.close();
             }
@@ -2620,10 +2605,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 listener.newSearcher(newSearcher, null);
               }
             } catch (Throwable e) {
-              SolrException.log(log, null, e);
-              if (e instanceof Error) {
-                throw (Error) e;
-              }
+              DW.propegateInterrupt(e);
             }
             return null;
           });
@@ -2636,10 +2618,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 listener.newSearcher(newSearcher, currSearcher);
               }
             } catch (Throwable e) {
-              SolrException.log(log, null, e);
-              if (e instanceof Error) {
-                throw (Error) e;
-              }
+              DW.propegateInterrupt(e);
             }
             return null;
           });
@@ -2658,11 +2637,9 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 // registerSearcher will decrement onDeckSearchers and
                 // do a notify, even if it fails.
                 registerSearcher(newSearchHolder);
+                registered.set(true);
               } catch (Throwable e) {
-                SolrException.log(log, e);
-                if (e instanceof Error) {
-                  throw (Error) e;
-                }
+                DW.propegateInterrupt(e);
               } finally {
                 // we are all done with the old searcher we used
                 // for warming...
@@ -2690,10 +2667,10 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } finally {
 
       timerContext.close();
-
+      
       if (!success) {
         newSearcherOtherErrorsCounter.inc();
-        ;
+
         synchronized (searcherLock) {
           onDeckSearchers--;
 
@@ -2716,6 +2693,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             searchHolder.decref();    // decrement 1 because we won't be returning the searcher to the user
           }
         }
+      } else if (!returnSearcher) {
+    	  searchHolder.decref();
       }
 
       // we want to do this after we decrement onDeckSearchers so another thread
@@ -2992,7 +2971,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       m.put("xlsx",
           (QueryResponseWriter) Class.forName("org.apache.solr.handler.extraction.XLSXResponseWriter").getConstructor().newInstance());
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      DW.propegateInterrupt(e, true);
       //don't worry; solrcell contrib not in class path
     }
   }

@@ -240,7 +240,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       boolean closeReader, boolean enableCache, boolean reserveDirectory, DirectoryFactory directoryFactory)
           throws IOException {
     super(wrapReader(core, r));
-    this.releaseDirectory = true;
+
     this.path = path;
     this.directoryFactory = directoryFactory;
     this.reader = (DirectoryReader) super.readerContext.reader();
@@ -262,9 +262,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       // Keep the directory from being released while we use it.
       directoryFactory.incRef(getIndexReader().directory());
       // Make sure to release it when closing.
-      this.releaseDirectoryForReserve = true;
-    } else {
-      this.releaseDirectoryForReserve = false;
+      this.releaseDirectory = true;
     }
 
     this.closeReader = closeReader;
@@ -478,7 +476,10 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
 
     long cpg = reader.getIndexCommit().getGeneration();
     try {
-      if (closeReader) rawReader.decRef();
+      if (closeReader) {
+        log.error("DECREF RAWREADER");
+        rawReader.decRef();
+      }
     } catch (Exception e) {
       DW.propegateInterrupt("Problem dec ref'ing reader", e);
     }
@@ -496,10 +497,6 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     }
 
     if (releaseDirectory) {
-      directoryFactory.release(getIndexReader().directory());
-    }
-    
-    if (releaseDirectoryForReserve) {
       directoryFactory.release(getIndexReader().directory());
     }
 

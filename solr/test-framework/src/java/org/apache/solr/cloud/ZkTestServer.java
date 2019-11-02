@@ -480,7 +480,7 @@ public class ZkTestServer {
         // tryCleanSolrZkNode();
         makeSolrZkNode(zkClient);
 
-        zkClient.printLayout();
+        // zkClient.printLayout();
       }
     }
 

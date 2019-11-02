@@ -358,7 +358,7 @@ public class ZkMaintenanceUtils {
 
     //zkClient.mkDirs(createPaths);
     
-    zkClient.printLayout();
+  //  zkClient.printLayout();
     
 //    boolean timeout = false;
 //    try {

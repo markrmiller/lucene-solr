@@ -115,8 +115,17 @@ public class MDCLoggingContext {
   
   public static void setCore(SolrCore core) {
     if (core != null) {
-      setCoreDescriptor(core.getCoreContainer().getZkController().getNodeName(), core.getCoreDescriptor());
+      if (core.getCoreContainer().isZooKeeperAware()) {
+        setCoreDescriptor(core.getCoreContainer().getZkController().getNodeName(), core.getCoreDescriptor());
+      } else {
+        setCoreDescriptor(core.getCoreDescriptor());
+      }
     }
+  }
+  
+  
+  public static void setCoreDescriptor(CoreDescriptor cd) {
+    setCoreDescriptor(null, cd);
   }
   
   public static void setCoreDescriptor(String nodeName, CoreDescriptor cd) {

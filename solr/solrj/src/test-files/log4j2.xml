@@ -28,7 +28,7 @@
     </Console>
     
     <File name="FILE" fileName="/home/miller/Solr/logoutput/solr-test.log">
-    <PatternLayout pattern="%maxLen{%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%t)}{yellow,bold} [%style{%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m=>%ex{short}}}{10240}%n"/>
+    <PatternLayout pattern="%maxLen{%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%t)}{yellow,bold} [%style{%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m=>%ex{short}}}\n{10240}"/>
     </File>   
     
   </Appenders>

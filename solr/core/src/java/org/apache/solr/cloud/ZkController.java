@@ -204,8 +204,8 @@ public class ZkController implements Closeable {
   
   private final SolrZkClient zkClient;
   private final ZkStateReader zkStateReader;
-  private final SolrCloudManager cloudManager;
-  private final CloudSolrClient cloudSolrClient;
+  private volatile SolrCloudManager cloudManager;
+  private volatile CloudSolrClient cloudSolrClient;
 
   private final int localHostPort; // example: 54065
   private final String hostName; // example: 127.0.0.1
@@ -249,7 +249,7 @@ public class ZkController implements Closeable {
   // ref is held as a HashSet since we clone the set before notifying to avoid synchronizing too long
   final Set<OnReconnect> reconnectListeners = DW.concSetSmallO();
   final CurrentCoreDescriptorProvider registerOnReconnect;
-  private final SolrSeer solrSeer;
+  private volatile SolrSeer solrSeer;
   private final InterProcessReadWriteLock clusterWriteLock;
   private final CoreAccess coreAccess;
   private final CoreContainer cc;
@@ -293,7 +293,6 @@ public class ZkController implements Closeable {
   public ZkController(final CoreContainer cc, String zkServerAddress, int zkClientConnectTimeout, CloudConfig cloudConfig, final CurrentCoreDescriptorProvider registerOnReconnect, SolrZkClient zkClient)
       throws InterruptedException, TimeoutException, IOException {
     this.zkClient = zkClient;
-    
     this.cc = cc;
     // nocommit - seeing how we can limit entanglement
     this.coreAccess = new CoreAccess() {
@@ -327,7 +326,7 @@ public class ZkController implements Closeable {
     this.clientTimeout = cloudConfig.getZkClientTimeout();
     DefaultConnectionStrategy strat = new DefaultConnectionStrategy();
     String zkACLProviderClass = cloudConfig.getZkACLProviderClass();
-    ZkACLProvider zkACLProvider = null;
+    ZkACLProvider zkACLProvider = null; // nocommit - give to curator
     if (zkACLProviderClass != null && zkACLProviderClass.trim().length() > 0) {
       zkACLProvider = cc.getResourceLoader().newInstance(zkACLProviderClass, ZkACLProvider.class);
     } else {
@@ -365,13 +364,6 @@ public class ZkController implements Closeable {
     zkStateReader = new ZkStateReader(zkClient);
         
     clusterWriteLock = new InterProcessReadWriteLock(zkClient.getCurator(), "/CLUSTER_WRITE_LOCK");
-    
-    cloudSolrClient = new CloudSolrClient.Builder(new ZkClientClusterStateProvider(zkStateReader))
-        .withHttpClient(cc.getUpdateShardHandler().getDefaultHttpClient()).build(); // nocommit
-    cloudManager = new SolrClientCloudManager(new ZkDistributedQueueFactory(zkClient), cloudSolrClient);
-    
-    solrSeer = new SolrSeer(this, cloudManager, zkStateReader, zkClient.getCurator(), Overseer.OVERSEER_QUEUE,
-        "SolrSeer-" + getNodeName());
     
     assert ObjectReleaseTracker.track(this);
   }
@@ -416,7 +408,13 @@ public class ZkController implements Closeable {
 
     // nocommit todo state listener
 
-
+    cloudSolrClient = new CloudSolrClient.Builder(new ZkClientClusterStateProvider(zkStateReader))
+        .withHttpClient(cc.getUpdateShardHandler().getDefaultHttpClient()).build(); // nocommit
+    cloudManager = new SolrClientCloudManager(new ZkDistributedQueueFactory(zkClient), cloudSolrClient);
+    
+    solrSeer = new SolrSeer(this, cloudManager, zkStateReader, zkClient.getCurator(), Overseer.OVERSEER_QUEUE,
+        "SolrSeer-" + getNodeName());
+    
 
     // boolean writeClusterLayout = createZnodesForCluster(zkClient);
 
@@ -591,7 +589,6 @@ public class ZkController implements Closeable {
     if (this.isClosed) { 
       throw new AlreadyClosedException();
     }
-    
     this.isClosed = true;
 
     try (DW closer = new DW(this, true)) {
@@ -849,7 +846,7 @@ public class ZkController implements Closeable {
     } catch(NodeExistsException e  ) {
     
     }catch (Exception e2) {
-      throw new RuntimeException(e2);
+      throw new DW.Exp(e2);
     }
   
     try {
@@ -866,22 +863,22 @@ public class ZkController implements Closeable {
     
     
     CompletableFuture<Boolean> future = asyncClient.transaction().forOperations(operations).handle((l, t) -> {
-      log.error("Error creating cluster znodes! results={} {} exception={} expresults={}", l, t, t != null ? ((KeeperException) t).getPath() : null);
+    //  log.error("Error creating cluster znodes! results={} {} exception={} expresults={}", l, t, t != null ? ((KeeperException) t).getPath() : null);
          // t != null ? ((KeeperException) t).getPath() : "No Sub Results");
       
       if (l != null && l.size() > 0) {
         Iterator<CuratorTransactionResult> it = l.iterator();
         while (it.hasNext()) {
           CuratorTransactionResult result = it.next();
-          log.error("ERRORRESULT: {}", result.getForPath());
+       //   log.error("ERRORRESULT: {}", result.getForPath());
         }
       }
       
       return t == null;
     }).toCompletableFuture();
     
-    zkClient.printLayout();
-    log.error("suppress " + System.getProperty("solr.suppressDefaultConfigBootstrap"));
+    // zkClient.printLayout();
+ //   log.error("suppress " + System.getProperty("solr.suppressDefaultConfigBootstrap"));
     if (!Boolean.getBoolean("solr.suppressDefaultConfigBootstrap")) {
       bootstrapDefaultConfigSet(zkClient);
     }
@@ -896,7 +893,7 @@ public class ZkController implements Closeable {
       throw new DW.Exp(e);
     }
 //    
-    zkClient.printLayout();
+ //   zkClient.printLayout();
     
 //    boolean timeout = latch.await(15, TimeUnit.SECONDS);
 //    if (timeout) throw new SolrException(ErrorCode.SERVER_ERROR, "Timeout waiting for cluster state znodes to be created successfully");
@@ -2517,47 +2514,43 @@ public class ZkController implements Closeable {
    */
   private static void ensureRegisteredSearcher(SolrCore core) throws InterruptedException {
     if (!core.getSolrConfig().useColdSearcher) {
-      RefCounted<SolrIndexSearcher> registeredSearcher = core.getRegisteredSearcher();
-      if (registeredSearcher != null) {
-        log.debug("Found a registered searcher: {} for core: {}", registeredSearcher.get(), core);
-        registeredSearcher.decref();
-      } else  {
-        Future[] waitSearcher = new Future[1];
-        log.info("No registered searcher found for core: {}, waiting until a searcher is registered before publishing as active", core.getName());
-        final RTimer timer = new RTimer();
-        RefCounted<SolrIndexSearcher> searcher = null;
+
+      if (core.hasRegisteredSearcher()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Found a registered searcher for core: {}", core);
+        }
+
+        return;
+      }
+
+      Future[] waitSearcher = new Future[1];
+      log.info(
+          "No registered searcher found for core: {}, waiting until a searcher is registered before publishing as active",
+          core.getName());
+      final RTimer timer = new RTimer();
+
+      core.getSearcher(false, false, waitSearcher, true);
+      boolean success = false;
+      if (waitSearcher[0] != null) {
+        if (log.isDebugEnabled()) {
+          log.debug("Waiting for first searcher of core {}, id: {} to be registered", core.getName(), core);
+        }
         try {
-          searcher = core.getSearcher(false, true, waitSearcher, true);
-          boolean success = true;
-          if (waitSearcher[0] != null)  {
-            log.debug("Waiting for first searcher of core {}, id: {} to be registered", core.getName(), core);
-            try {
-              waitSearcher[0].get();
-            } catch (ExecutionException e) {
-              log.warn("Wait for a searcher to be registered for core " + core.getName() + ",id: " + core + " failed due to: " + e, e);
-              success = false;
-            }
-          }
-          if (success)  {
-            if (searcher == null) {
-              // should never happen
-              log.debug("Did not find a searcher even after the future callback for core: {}, id: {}!!!", core.getName(), core);
-            } else  {
-              log.info("Found a registered searcher: {}, took: {} ms for core: {}, id: {}", searcher.get(), timer.getTime(), core.getName(), core);
-            }
-          }
-        } finally {
-          if (searcher != null) {
-            searcher.decref();
-          }
+          waitSearcher[0].get();
+          success = true;
+        } catch (Exception e) {
+          throw new DW.Exp(
+              "Wait for a searcher to be registered for core " + core.getName() + ", id: " + core + " failed due to: ",
+              e);
         }
       }
-      RefCounted<SolrIndexSearcher> newestSearcher = core.getNewestSearcher(false);
-      if (newestSearcher != null) {
-        log.debug("Found newest searcher: {} for core: {}, id: {}", newestSearcher.get(), core.getName(), core);
-        newestSearcher.decref();
+      if (success) {
+        log.info("Found a registered searcher, took: {} ms for core: {}, id: {}", timer.getTime(), core.getName(),
+            core);
       }
+
     }
+
   }
 
   public void sendStateUpdate(ZkNodeProps msg) throws Exception {

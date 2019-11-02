@@ -122,19 +122,19 @@ public class Http2SolrClient extends SolrClient {
   private static final String DEFAULT_PATH = "/select";
   private static final List<String> errPath = Arrays.asList("metadata", "error-class");
 
-  private HttpClient httpClient;
+  private final HttpClient httpClient;
   private volatile Set<String> queryParams = Collections.emptySet();
-  private int idleTimeout;
+  private final int idleTimeout;
 
-  private ResponseParser parser = new BinaryResponseParser();
+  private volatile ResponseParser parser = new BinaryResponseParser();
   private volatile RequestWriter requestWriter = new BinaryRequestWriter();
-  private List<HttpListenerFactory> listenerFactory = new LinkedList<>(); // nocommit thread safety
-  private AsyncTracker asyncTracker = new AsyncTracker();
+  private final List<HttpListenerFactory> listenerFactory = new LinkedList<>(); // nocommit thread safety
+  private final AsyncTracker asyncTracker = new AsyncTracker();
   /**
    * The URL of the Solr server.
    */
-  private String serverBaseUrl;
-  private boolean closeClient;
+  private volatile String serverBaseUrl;
+  private final boolean closeClient;
 
   protected Http2SolrClient(String serverBaseUrl, Builder builder) {
     if (serverBaseUrl != null)  {
@@ -155,6 +155,7 @@ public class Http2SolrClient extends SolrClient {
       httpClient = createHttpClient(builder);
       closeClient = true;
     } else {
+      closeClient = false;
       httpClient = builder.http2SolrClient.httpClient;
     }
     assert ObjectReleaseTracker.track(this);

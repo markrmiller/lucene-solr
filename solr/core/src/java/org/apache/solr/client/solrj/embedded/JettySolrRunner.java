@@ -45,7 +45,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.lucene.util.Constants;
-import org.apache.solr.SolrModule;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
@@ -80,14 +79,9 @@ import org.eclipse.jetty.servlet.Source;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.eclipse.jetty.util.thread.ReservedThreadExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceFilter;
 
 /**
  * Run solr using jetty
@@ -528,7 +522,7 @@ public class JettySolrRunner {
     gzipHandler.setIncludedMethods("GET");
 
     
-    server.setDumpAfterStart(true);
+    //server.setDumpAfterStart(true);
     server.setHandler(gzipHandler);
   }
 
@@ -882,7 +876,6 @@ public class JettySolrRunner {
       SolrDispatchFilter solrFilter = (SolrDispatchFilter) dispatchFilter.getFilter();
       CoreContainer cores = solrFilter.getCores();
       if (cores != null) {
-        cores.load();
         cores.waitForLoadingCoresToFinish(timeoutMs);
       } else {
         throw new IllegalStateException("The CoreContainer is not set!");

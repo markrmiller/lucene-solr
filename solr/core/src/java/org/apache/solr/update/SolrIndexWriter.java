@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -37,6 +38,7 @@ import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.InfoStream;
 import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -63,11 +65,9 @@ public class SolrIndexWriter extends IndexWriter {
    *  System.currentTimeMillis() when commit was called. */
   public static final String COMMIT_TIME_MSEC_KEY = "commitTimeMSec";
   public static final String COMMIT_COMMAND_VERSION = "commitCommandVer";
-
-  private final Object CLOSE_LOCK = new Object();
   
-  final String name;
-  private volatile DirectoryFactory directoryFactory;
+  private volatile String name;
+  private final DirectoryFactory directoryFactory;
   private final InfoStream infoStream;
   private final Directory directory;
 
@@ -91,29 +91,25 @@ public class SolrIndexWriter extends IndexWriter {
   private final SolrMetricsContext solrMetricsContext;
   // merge diagnostics.
   private final Map<String, Long> runningMerges = new ConcurrentHashMap<>();
+  private final boolean releaseDirectory;
 
-  public static SolrIndexWriter create(SolrCore core, String name, String path, DirectoryFactory directoryFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec) throws IOException {
+  public static SolrIndexWriter create(SolrCore core, String name, String path, DirectoryFactory directoryFactory,
+      boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec)
+      throws IOException {
     if (log.isDebugEnabled()) {
-      log.debug("create(SolrCore core={}, String name={}, String path={}, DirectoryFactory directoryFactory={}, boolean create={}, IndexSchema schema={}, SolrIndexConfig config={}, IndexDeletionPolicy delPolicy={}, Codec codec={}) - start", core, name, path, directoryFactory, create, schema, config, delPolicy, codec);
+      log.debug("create(SolrCore core={}, String name={}, String path={}, DirectoryFactory directoryFactory={}, boolean create={}, IndexSchema schema={}, SolrIndexConfig config={}, IndexDeletionPolicy delPolicy={}, Codec codec={}) - start",
+          core, name, path, directoryFactory, create, schema, config, delPolicy, codec);
     }
 
     SolrIndexWriter w = null;
-    final Directory d = directoryFactory.get(path, DirContext.DEFAULT, config.lockType);
-    try {
-      w = new SolrIndexWriter(core, name, path, d, create, schema, 
-                              config, delPolicy, codec);
-      w.setDirectoryFactory(directoryFactory);
 
-      if (log.isDebugEnabled()) {
-        log.debug("create(SolrCore, String, String, DirectoryFactory, boolean, IndexSchema, SolrIndexConfig, IndexDeletionPolicy, Codec) - end");
-      }
-      return w;
-    } finally {
-      if (null == w && null != d) { 
-        directoryFactory.doneWithDirectory(d);
-        directoryFactory.release(d);
-      }
+    w = new SolrIndexWriter(core, name, path, directoryFactory, create, schema, config, delPolicy, codec);
+
+    if (log.isDebugEnabled()) {
+      log.debug(
+          "create(SolrCore, String, String, DirectoryFactory, boolean, IndexSchema, SolrIndexConfig, IndexDeletionPolicy, Codec) - end");
     }
+    return w;
   }
 
   public SolrIndexWriter(String name, Directory d, IndexWriterConfig conf) throws IOException {
@@ -121,24 +117,29 @@ public class SolrIndexWriter extends IndexWriter {
     this.name = name;
     this.infoStream = conf.getInfoStream();
     this.directory = d;
+    this.directoryFactory = null;
     numOpens.incrementAndGet();
     if (log.isDebugEnabled()) log.debug("Opened Writer " + name);
     // no metrics
     mergeTotals = false;
     mergeDetails = false;
     solrMetricsContext = null;
+    this.releaseDirectory=false;
+    assert ObjectReleaseTracker.track(this);
   }
 
-  private SolrIndexWriter(SolrCore core, String name, String path, Directory directory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec) throws IOException {
-    super(directory,
+  public SolrIndexWriter(SolrCore core, String name, String path, DirectoryFactory directoryFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec) throws IOException {
+    super(getDir(directoryFactory, path, config),
           config.toIndexWriterConfig(core).
           setOpenMode(create ? IndexWriterConfig.OpenMode.CREATE : IndexWriterConfig.OpenMode.APPEND).
           setIndexDeletionPolicy(delPolicy).setCodec(codec)
           );
     if (log.isDebugEnabled()) log.debug("Opened Writer " + name);
+    this.releaseDirectory = true;
+    this.directory = getDirectory();
+    this.directoryFactory = directoryFactory;
     this.name = name;
     infoStream = getConfig().getInfoStream();
-    this.directory = directory;
     numOpens.incrementAndGet();
     solrMetricsContext = core.getSolrMetricsContext().getChildContext(this);
     if (config.metricsInfo != null && config.metricsInfo.initArgs != null) {
@@ -181,6 +182,15 @@ public class SolrIndexWriter extends IndexWriter {
         flushMeter = solrMetricsContext.meter(null, "flush", SolrInfoBean.Category.INDEX.toString());
       }
     }
+    assert ObjectReleaseTracker.track(this);
+  }
+
+  private static Directory getDir(DirectoryFactory directoryFactory, String path, SolrIndexConfig config) {
+    try {
+      return directoryFactory.get(path,  DirContext.DEFAULT, config.lockType);
+    } catch (Exception e) {
+      throw new DW.Exp(e);
+    }
   }
 
   @SuppressForbidden(reason = "Need currentTimeMillis, commit time should be used only for debugging purposes, " +
@@ -195,10 +205,6 @@ public class SolrIndexWriter extends IndexWriter {
     if (log.isDebugEnabled()) {
       log.debug("setCommitData(IndexWriter, long) - end");
     }
-  }
-
-  private void setDirectoryFactory(DirectoryFactory factory) {
-    this.directoryFactory = factory;
   }
 
   // we override this method to collect metrics for merges.
@@ -328,17 +334,14 @@ public class SolrIndexWriter extends IndexWriter {
    * }
    * ****
    */
-  private volatile boolean isClosed = false;
 
   @Override
   public void close() throws IOException {
-    log.debug("Closing Writer " + name);
+    if (log.isDebugEnabled()) log.debug("Closing Writer " + name);
     try {
       super.close();
-    } catch (Throwable t) {
-      log.error("close()", t);
-
-      DW.propegateInterrupt("Error closing IndexWriter", t);
+    } catch (Throwable e) {
+      DW.propegateInterrupt("Error closing IndexWriter", e);
     } finally {
       cleanup();
     }
@@ -350,13 +353,11 @@ public class SolrIndexWriter extends IndexWriter {
 
   @Override
   public void rollback() throws IOException {
-    log.debug("Rollback Writer " + name);
+    if (log.isDebugEnabled())  log.debug("Rollback Writer " + name);
     try {
       super.rollback();
-    } catch (Throwable t) {
-      log.error("rollback()", t);
-
-      DW.propegateInterrupt("Exception rolling back IndexWriter", t);
+    } catch (Throwable e) {
+      DW.propegateInterrupt("Exception rolling back IndexWriter", e);
     } finally {
       cleanup();
     }
@@ -370,37 +371,23 @@ public class SolrIndexWriter extends IndexWriter {
     if (log.isDebugEnabled()) {
       log.debug("cleanup() - start");
     }
-
-    // It's kind of an implementation detail whether
-    // or not IndexWriter#close calls rollback, so
-    // we assume it may or may not
-    boolean doClose = false;
-    synchronized (CLOSE_LOCK) {
-      if (!isClosed) {
-        doClose = true;
-        isClosed = true;
-      }
+    numCloses.incrementAndGet();
+    if (infoStream != null) {
+      DW.close(infoStream, true);
     }
-    if (doClose) {
-      if (log.isDebugEnabled()) {
-        log.debug("cleanup() - doClose");
-      }  
-      if (infoStream != null) {
-        DW.close(infoStream);
-      }
-      numCloses.incrementAndGet();
 
-      if (directoryFactory != null) {
-        directoryFactory.release(directory);
-      }
-      if (solrMetricsContext != null) {
-        solrMetricsContext.unregister();
-      }
+    if (releaseDirectory) {
+      log.info("SolrIndexWriter release {}", directory);
+      directoryFactory.release(directory);
     }
+    if (solrMetricsContext != null) {
+      solrMetricsContext.unregister();
+    }
+    
+    assert ObjectReleaseTracker.release(this);
 
     if (log.isDebugEnabled()) {
       log.debug("cleanup() - end");
     }
   }
-
 }

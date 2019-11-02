@@ -324,11 +324,11 @@ public class SolrTestCase extends LuceneTestCase {
 
         checkForInterruptRequest();
         long testTime = TimeUnit.SECONDS.convert(System.nanoTime() - testStartTime, TimeUnit.NANOSECONDS);
-        if (!TEST_NIGHTLY && testTime > SOLR_TEST_TIMEOUT) {
-          fail(
-              "This test suite is too long for non @Nightly runs! Please improve it's performance, break it up, make parts of it @Nightly or make the whole suite @Nightly: "
-                  + testTime);
-        }
+//        if (suiteFailureMarker.wasSuccessful() && !TEST_NIGHTLY && testTime > SOLR_TEST_TIMEOUT) {
+//          fail(
+//              "This test suite is too long for non @Nightly runs! Please improve it's performance, break it up, make parts of it @Nightly or make the whole suite @Nightly: "
+//                  + testTime);
+//        }
       }
 
     StartupLoggingUtils.shutdown();

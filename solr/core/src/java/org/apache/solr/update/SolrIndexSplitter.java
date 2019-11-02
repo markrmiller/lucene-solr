@@ -287,9 +287,7 @@ public class SolrIndexSplitter {
           String path = paths.get(partitionNumber);
           t = timings.sub("createSubIW");
           t.resume();
-          iw = SolrIndexWriter.create(core, partitionName, path,
-              core.getDirectoryFactory(), true, core.getLatestSchema(),
-              core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec());
+          iw = new SolrIndexWriter(core, partitionName, path, core.getDirectoryFactory(), true, core.getLatestSchema(), core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec());
           t.pause();
         }
       }

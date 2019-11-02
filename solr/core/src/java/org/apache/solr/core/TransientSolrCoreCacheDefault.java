@@ -20,11 +20,13 @@ package org.apache.solr.core;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +35,14 @@ public class TransientSolrCoreCacheDefault extends TransientSolrCoreCache {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private int cacheSize = NodeConfig.NodeConfigBuilder.DEFAULT_TRANSIENT_CACHE_SIZE;
+  private volatile int cacheSize = NodeConfig.NodeConfigBuilder.DEFAULT_TRANSIENT_CACHE_SIZE;
 
-  protected CoreContainer coreContainer;
+  protected final CoreContainer coreContainer;
 
-  protected final Map<String, CoreDescriptor> transientDescriptors = new LinkedHashMap<>();
+  protected final Map<String, CoreDescriptor> transientDescriptors = DW.concMapSmallO();
 
   //WARNING! The _only_ place you put anything into the list of transient cores is with the putTransientCore method!
-  protected Map<String, SolrCore> transientCores = new LinkedHashMap<>(); // For "lazily loaded" cores
+  protected volatile Map<String, SolrCore> transientCores; // For "lazily loaded" cores
 
   /**
    * @param container The enclosing CoreContainer. It allows us to access everything we need.
@@ -83,7 +85,7 @@ public class TransientSolrCoreCacheDefault extends TransientSolrCoreCache {
     }
     // Now don't allow ridiculous allocations here, if the size is > 1,000, we'll just deal with
     // adding cores as they're opened. This blows up with the marker value of -1.
-    transientCores = new LinkedHashMap<String, SolrCore>(Math.min(cacheSize, 1000), 0.75f, true) {
+    transientCores = Collections.synchronizedMap(new LinkedHashMap<String, SolrCore>(Math.min(cacheSize, 1000), 0.75f, true) {
       @Override
       protected boolean removeEldestEntry(Map.Entry<String, SolrCore> eldest) {
         if (size() > cacheSize) {
@@ -94,7 +96,7 @@ public class TransientSolrCoreCacheDefault extends TransientSolrCoreCache {
         }
         return false;
       }
-    };
+    });
   }
 
   

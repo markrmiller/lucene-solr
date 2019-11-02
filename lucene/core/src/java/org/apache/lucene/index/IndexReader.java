@@ -19,6 +19,7 @@ package org.apache.lucene.index;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +30,8 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.util.Bits;  // javadocs
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  IndexReader is an abstract class, providing an interface for accessing a
@@ -77,6 +80,7 @@ import org.apache.lucene.util.Bits;  // javadocs
  (non-Lucene) objects instead.
 */
 public abstract class IndexReader implements Closeable {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass()); // nocommit
   
   private boolean closed = false;
   private boolean closedByChild = false;
@@ -230,6 +234,7 @@ public abstract class IndexReader implements Closeable {
    */
   @SuppressWarnings("try")
   public final void decRef() throws IOException {
+    log.error("INTERNAL DECREF RAWREADER");
     // only check refcount here (don't call ensureOpen()), so we can
     // still close the reader if it was made invalid by a child:
     if (refCount.get() <= 0) {

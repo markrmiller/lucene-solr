@@ -222,12 +222,14 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       // zk
       ModifiableSolrParams params = new ModifiableSolrParams(filterParams(req.getParams()));
 
+      doLocalCommit(cmd);
+      
       List<SolrCmdDistributor.Node> useNodes = null;
       if (req.getParams().get(COMMIT_END_POINT) == null) {
         useNodes = nodes;
         params.set(DISTRIB_UPDATE_PARAM, DistribPhase.TOLEADER.toString());
         params.set(COMMIT_END_POINT, "leaders");
-        if (useNodes != null) {
+        if (useNodes != null && useNodes.size() > 0) {
           params.set(DISTRIB_FROM, ZkCoreNodeProps.getCoreUrl(
               zkController.getBaseUrl(), req.getCore().getName()));
           cmdDistrib.distribCommit(cmd, useNodes, params);
@@ -242,16 +244,14 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
         useNodes = getReplicaNodesForLeader(cloudDesc.getShardId(), leaderReplica);
 
-        if (useNodes != null) {
+        if (useNodes != null && useNodes.size() > 0) {
           params.set(DISTRIB_FROM, ZkCoreNodeProps.getCoreUrl(
               zkController.getBaseUrl(), req.getCore().getName()));
 
           cmdDistrib.distribCommit(cmd, useNodes, params);
         }
 
-        doLocalCommit(cmd);
-
-        if (useNodes != null) {
+        if (useNodes != null && useNodes.size() > 0) {
           cmdDistrib.blockAndDoRetries();
         }
       }

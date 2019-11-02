@@ -48,6 +48,7 @@ import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrConfig.UpdateHandlerInfo;
 import org.apache.solr.core.SolrCore;
@@ -740,7 +741,7 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
        try {
         waitSearcher[0].get();
       } catch (InterruptedException | ExecutionException e) {
-        SolrException.log(log,e);
+        throw new DW.Exp(e);
       }
     }
   }
