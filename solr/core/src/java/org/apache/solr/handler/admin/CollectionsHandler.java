@@ -354,7 +354,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
        int pullReplicas = zkProps.getInt(ZkStateReader.PULL_REPLICAS, 0);
        int tlogReplicas = zkProps.getInt(ZkStateReader.TLOG_REPLICAS, 0);
        int numShards = zkProps.getInt(ZkStateReader.NUM_SHARDS_PROP, 0);
-       waitForActiveCollection(zkProps.getStr(NAME), cores, numShards, nrtReplicas + pullReplicas + tlogReplicas);
+       waitForActiveCollection(zkProps.getStr(NAME), cores, numShards, numShards * (nrtReplicas + pullReplicas + tlogReplicas));
       //  }
      // }
 //
@@ -1606,6 +1606,8 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
   }
   
   public static CollectionStatePredicate expectedShardsAndActiveReplicas(int expectedShards, int expectedReplicas) {
+    log.info("Wait for expectedShards={} expectedReplicas={}", expectedShards, expectedReplicas);
+
     return (liveNodes, collectionState) -> {
       if (collectionState == null)
         return false;

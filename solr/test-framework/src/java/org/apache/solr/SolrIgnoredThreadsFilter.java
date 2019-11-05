@@ -46,11 +46,6 @@ public class SolrIgnoredThreadsFilter implements ThreadFilter {
       return true;
     }
     
-    // HttpClient Connection evictor threads can take a moment to wake and shutdown
-    if (threadName.startsWith("Connection evictor")) {
-      return true;
-    }
-    
     // These is a java pool for the collection stream api
     if (threadName.startsWith("ForkJoinPool.")) {
       return true;
@@ -69,8 +64,11 @@ public class SolrIgnoredThreadsFilter implements ThreadFilter {
       return true;
     }
     
+    if (threadName.startsWith("Solr-DoWork")) { // nocommit
+      return true;
+    }
     
-    if (threadName.startsWith("Solr-DoWork")) {
+    if (threadName.startsWith("Curator-SafeNotifyService")) { // nocommit curator has these threads that seem to take a moment to stop
       return true;
     }
     

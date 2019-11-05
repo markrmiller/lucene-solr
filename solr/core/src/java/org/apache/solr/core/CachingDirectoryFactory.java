@@ -103,6 +103,8 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  private static final boolean DEBUG_GET_RELEASE = false;
+
   protected final Map<String, CacheValue> byPathCache = new HashMap<>();
 
   protected final Map<Directory, CacheValue> byDirectoryCache = new IdentityHashMap<>();
@@ -201,7 +203,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
             this.getClass().getSimpleName(), val);
         try {
           // if there are still refs out, we have to wait for them
-          assert val.refCnt > -1 : val.refCnt;
+          assert val.refCnt > -1 : val.refCnt + " path=" + val.path;
           while (val.refCnt != 0) {
             wait(250);
 
@@ -443,7 +445,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           CacheValue newCacheValue = new CacheValue(fullPath, directory);
           byDirectoryCache.put(directory, newCacheValue);
           byPathCache.put(fullPath, newCacheValue);
-          log.info("return new directory for {}", newCacheValue);
+          log.info("return new directory for {}", newCacheValue, DEBUG_GET_RELEASE && newCacheValue.path.equals("data/index") ? new RuntimeException() : null );
           success = true;
         } finally {
           if (!success) {
@@ -452,7 +454,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         }
       } else {
         cacheValue.refCnt++;
-        log.info("Reusing cached directory: {}", cacheValue);
+        log.info("Reusing cached directory: {}", cacheValue, DEBUG_GET_RELEASE && cacheValue.path.equals("data/index") ? new RuntimeException() : null );
       }
     //  if (cacheValue.path.equals("data/index")) {
   //    log.info("getDir " + path, new RuntimeException("track get " + fullPath)); // nocommit
@@ -485,7 +487,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
       }
 
       cacheValue.refCnt++;
-      log.debug("incRef'ed: {}", cacheValue);
+      log.debug("incRef'ed: {}", cacheValue,  DEBUG_GET_RELEASE && cacheValue.path.equals("data/index") ? new RuntimeException() : null);
     }
 
     if (log.isDebugEnabled()) {
@@ -548,7 +550,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
 //            new RuntimeException("Fake to find stack trace")); // nocommit
 //      } else {
         log.info(
-            "Releasing directory: " + cacheValue.path + " " + (cacheValue.refCnt - 1) + " " + cacheValue.doneWithDir); // nocommit
+            "Releasing directory: " + cacheValue.path + " " + (cacheValue.refCnt - 1) + " " + cacheValue.doneWithDir,  DEBUG_GET_RELEASE && cacheValue.path.equals("data/index") ? new RuntimeException() : null ); // nocommit
 
   //    }
       cacheValue.refCnt--;

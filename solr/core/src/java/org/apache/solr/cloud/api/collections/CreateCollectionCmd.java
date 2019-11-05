@@ -880,10 +880,11 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
   
   // this should be picking up the coreNodeName for a replica
   Map<String, Replica> waitToSeeReplicasInState(String collectionName, Collection<String> coreNames) throws InterruptedException {
+    final int timeouts = 30; // nocommit - univeral config wait
     AtomicReference<Map<String, Replica>> result = new AtomicReference<>();
     AtomicReference<String> errorMessage = new AtomicReference<>();
     try {
-      zkStateReader.waitForState(collectionName, 15, TimeUnit.SECONDS, (n, c) -> { // nocommit - univeral config wait
+      zkStateReader.waitForState(collectionName, timeouts, TimeUnit.SECONDS, (n, c) -> { 
         if (c == null)
           return false;
         Map<String, Replica> r = new HashMap<>();
@@ -903,7 +904,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           result.set(r);
           return true;
         } else {
-          errorMessage.set("Timed out waiting to see all replicas: " + coreNames + " in cluster state. Last state: " + c);
+          errorMessage.set("Timed out waiting to see all replicas timeout=" + timeouts + " coreNames=" + coreNames + " Last state: " + c);
           return false;
         }
 

@@ -733,6 +733,8 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
         numErrors.increment();
         numErrorsCumulative.mark();
       }
+      
+      
     }
 
     // if we are supposed to wait for the searcher to be registered, then we should do it

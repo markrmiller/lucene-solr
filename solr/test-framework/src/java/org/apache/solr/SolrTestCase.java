@@ -42,16 +42,11 @@ import org.apache.lucene.util.LuceneTestCase.SuppressFileSystems;
 import org.apache.lucene.util.LuceneTestCase.SuppressSysoutChecks;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
-import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.CloseTimeTracker;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.core.SolrCore;
 import org.apache.solr.update.DirectUpdateHandler2;
-import org.apache.solr.update.SolrIndexWriter;
 import org.apache.solr.util.RandomizeSSL;
 import org.apache.solr.util.RevertDefaultThreadHandlerRule;
 import org.apache.solr.util.StartupLoggingUtils;
@@ -136,7 +131,7 @@ public class SolrTestCase extends LuceneTestCase {
     interuptThreadWithNameContains = null;
     
     
-    
+    // nocommit need to turn on per test method system prop reset again
     
     System.setProperty(SolrTestCaseJ4.USE_NUMERIC_POINTS_SYSPROP, "true");
     System.setProperty("solr.tests.IntegerFieldType", "solr.IntPointField");
@@ -181,7 +176,7 @@ public class SolrTestCase extends LuceneTestCase {
       // hdfs tests duplicate tons of our testing and starting hdfs clusters is expensive and slow, only run one non nightly
       System.setProperty("tests.disableHdfs", "true");
       
-      System.setProperty("solr.maxContainerThreads", "20");
+      System.setProperty("solr.maxContainerThreads", "10000");
       System.setProperty("solr.lowContainerThreadsThreshold", "-1");
       System.setProperty("solr.minContainerThreads", "0");
       System.setProperty("solr.containerThreadsIdle", "30000");
@@ -214,7 +209,7 @@ public class SolrTestCase extends LuceneTestCase {
       System.setProperty("prepRecoveryReadTimeoutExtraWait", "2000");
       System.setProperty("evictIdleConnections", "30000");
       System.setProperty("validateAfterInactivity", "-1");
-      System.setProperty("leaderVoteWait", "1000");
+      System.setProperty("leaderVoteWait", "5000"); // this is also apparently controlling how long we wait for a leader on register nocommit
       System.setProperty("leaderConflictResolveWait", "1000");
       
 

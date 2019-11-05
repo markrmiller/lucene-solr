@@ -152,7 +152,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       coreContainer.getZkController().sendStateUpdate(m);
 
       // wait for a while until we don't see the collection
-      zkStateReader.waitForState(collection, 60, TimeUnit.SECONDS, (collectionState) -> collectionState == null);
+      zkStateReader.waitForState(collection, 5, TimeUnit.SECONDS, (collectionState) -> collectionState == null); // nocommit
 
       // we can delete any remaining unique aliases
       if (!aliasReferences.isEmpty()) {

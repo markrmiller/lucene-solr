@@ -27,10 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,6 +69,8 @@ import org.slf4j.LoggerFactory;
  */
 @SolrSingleThreaded
 public class DW implements Closeable {
+
+  private static final String WORK_WAS_INTERRUPTED = "Work was interrupted!";
 
   private static final String SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK = "Solr ran into an error while doing work!";
 
@@ -443,11 +449,17 @@ public class DW implements Closeable {
             }
             if (closeCalls.size() > 0) {
               try {
-                executor.invokeAll(closeCalls);
+                List<Future<Object>> results = executor.invokeAll(closeCalls);
+                
+                for (Future<Object> future : results) {
+                  if (!future.isDone() || future.isCancelled()) {
+                    log.warn("A task did nor finish isDone={} isCanceled={}", future.isDone(), future.isCancelled());
+                  }
+                }
+                
               } catch (InterruptedException e1) {
-                log.error("close()", e1);
+                log.error(WORK_WAS_INTERRUPTED, e1);
                 Thread.currentThread().interrupt();
-                throw new RuntimeException("Close was interrupted!");
               }
             }
           }
@@ -457,7 +469,7 @@ public class DW implements Closeable {
 
       }
     } catch (Throwable t) {
-      log.error("close()", t);
+      log.error(SOLR_RAN_INTO_AN_ERROR_WHILE_DOING_WORK, t);
 
       if (t instanceof Error) {
         throw (Error) t;
@@ -491,10 +503,12 @@ public class DW implements Closeable {
         log.debug("Starting a new executor");
       }
       
-      executor = new MDCAwareThreadPoolExecutor(1, Runtime.getRuntime().availableProcessors(),
+      executor = new MDCAwareThreadPoolExecutor(Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+          Runtime.getRuntime().availableProcessors(),
           5L, TimeUnit.SECONDS,
-          new SynchronousQueue<>(), new SolrjNamedThreadFactory("Solr-DoWork", true, 7));
-      
+          new ArrayBlockingQueue<>(1000), // nocommit - retry handler?
+          new SolrjNamedThreadFactory("Solr-DoWork", true, 5)); // nocommit deamon and priority
+
       threadLocal.set(executor);
     } else {
       if (log.isDebugEnabled()) {

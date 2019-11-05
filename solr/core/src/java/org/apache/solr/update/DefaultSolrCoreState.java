@@ -19,7 +19,6 @@ package org.apache.solr.update;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -255,7 +254,12 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
   @Override
   public void rollbackIndexWriter(SolrCore core) throws IOException {
-    changeWriter(core, true, true);
+    lock(iwLock.writeLock());
+    try {
+      changeWriter(core, true, true);
+    } finally {
+      iwLock.writeLock().unlock();
+    }
   }
   
   protected SolrIndexWriter createMainIndexWriter(SolrCore core, String name) throws IOException {

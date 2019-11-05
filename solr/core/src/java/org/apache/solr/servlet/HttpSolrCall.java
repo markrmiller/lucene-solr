@@ -292,9 +292,15 @@ public class HttpSolrCall {
       }
     }
 
+    if (core != null) {
+      while (cores.isCoreLoading(core.getName())) {
+        Thread.sleep(250); // nocommit - make efficient
+      }
+    }
+    
     if (cores.isZooKeeperAware()) {
       // init collectionList (usually one name but not when there are aliases)
-      String def = core != null ? core.getCoreDescriptor().getCollectionName() : origCorename;
+      String def = core != null && core.getCoreDescriptor() != null ? core.getCoreDescriptor().getCollectionName() : origCorename;
       List<String> collList = resolveCollectionListOrAlias(queryParams.get(COLLECTION_PROP, def)); // &collection= takes precedence
 
       if (core == null) {

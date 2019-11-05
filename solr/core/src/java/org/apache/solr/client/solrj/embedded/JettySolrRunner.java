@@ -92,7 +92,7 @@ public class JettySolrRunner {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final int THREAD_POOL_MAX_THREADS = 100;
+  private static final int THREAD_POOL_MAX_THREADS = 10000;
   // NOTE: needs to be larger than HttpClientUtil.SolrHttpClient.EVICT_IDLE_CONNECTIONS
   private static final int THREAD_POOL_MAX_IDLE_TIME_MS = HttpClientUtil.EVICT_IDLE_CONNECTIONS_DEFAULT + 10000;
 
@@ -711,9 +711,7 @@ public class JettySolrRunner {
 
 
       server.setStopAtShutdown(true); // nocommit
-      server.setStopTimeout(10000);
-        
-      QueuedThreadPool qtp = (QueuedThreadPool) server.getThreadPool();
+      server.setStopTimeout(15000);
 
       server.stop();
 
@@ -722,7 +720,7 @@ public class JettySolrRunner {
 
         server.join();
       } catch (InterruptedException e) {
-        // ignore
+        DW.propegateInterrupt(e);
       }
 
     } finally {

@@ -24,6 +24,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.CommitUpdateCommand;
@@ -48,32 +49,34 @@ public class RequestHandlerUtils
 
 
   /**
-   * Check the request parameters and decide if it should commit or optimize.
-   * If it does, it will check other related parameters such as "waitFlush" and "waitSearcher"
+   * Check the request parameters and decide if it should commit or optimize. If it does, it will check other related
+   * parameters such as "waitFlush" and "waitSearcher"
    */
-  public static boolean handleCommit(SolrQueryRequest req, UpdateRequestProcessor processor, SolrParams params, boolean force ) throws IOException
-  {
-    if( params == null) {
-      params = new MapSolrParams( new HashMap<String, String>() ); 
-    }
-    
-    boolean optimize = params.getBool( UpdateParams.OPTIMIZE, false );
-    boolean commit   = params.getBool( UpdateParams.COMMIT,   false );
-    boolean softCommit = params.getBool( UpdateParams.SOFT_COMMIT,   false );
-    boolean prepareCommit = params.getBool( UpdateParams.PREPARE_COMMIT,   false );
+  public static boolean handleCommit(SolrQueryRequest req, UpdateRequestProcessor processor, SolrParams params,
+      boolean force) throws IOException {
 
+    try {
+      if (params == null) {
+        params = new MapSolrParams(new HashMap<String,String>());
+      }
 
-    if( optimize || commit || softCommit || prepareCommit || force ) {
-      CommitUpdateCommand cmd = new CommitUpdateCommand(req, optimize );
-      updateCommit(cmd, params);
-      processor.processCommit( cmd );
-      return true;
+      boolean optimize = params.getBool(UpdateParams.OPTIMIZE, false);
+      boolean commit = params.getBool(UpdateParams.COMMIT, false);
+      boolean softCommit = params.getBool(UpdateParams.SOFT_COMMIT, false);
+      boolean prepareCommit = params.getBool(UpdateParams.PREPARE_COMMIT, false);
+
+      if (optimize || commit || softCommit || prepareCommit || force) {
+        CommitUpdateCommand cmd = new CommitUpdateCommand(req, optimize);
+        updateCommit(cmd, params);
+        processor.processCommit(cmd);
+        return true;
+      }
+
+      return false;
+    } catch (Exception e) {
+      throw new DW.Exp(e);
     }
-    
-    
-    return false;
   }
-
   
   private static Set<String> commitParams = new HashSet<>(Arrays.asList(new String[]{UpdateParams.OPEN_SEARCHER, UpdateParams.WAIT_SEARCHER, UpdateParams.SOFT_COMMIT, UpdateParams.EXPUNGE_DELETES, UpdateParams.MAX_OPTIMIZE_SEGMENTS, UpdateParams.PREPARE_COMMIT}));
 

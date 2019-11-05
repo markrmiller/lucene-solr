@@ -21,11 +21,12 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.recipes.leader.LeaderSelector;
 import org.apache.curator.framework.recipes.leader.LeaderSelectorListenerAdapter;
 import org.apache.curator.framework.recipes.queue.DistributedQueue;
 import org.apache.curator.framework.recipes.queue.QueueBuilder;
@@ -50,8 +51,10 @@ import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.patterns.DW;
 import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
 import org.apache.solr.handler.admin.CollectionsHandler;
 import org.apache.solr.handler.component.HttpShardHandlerFactory;
+import org.apache.solr.util.DefaultSolrThreadFactory;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +74,11 @@ public class SolrSeer  implements Closeable {
   //private final LeaderSelector adminOperationLeaderSelector;
   private final ZkController zkController;
   private final OverseerCollectionMessageHandler collMessageHandler;
-  private final ZkStateWriter zkStateWriter;
+  
+  ExecutorService executor = new MDCAwareThreadPoolExecutor(1, 1,
+      60L, TimeUnit.SECONDS,
+      new SynchronousQueue<>(true),
+      new DefaultSolrThreadFactory("OverSeerBasicExec"));
   
   private QueueSerializer<ZkNodeProps> serializer = new QueueSerializer<>() { // nocommit extract
     private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -104,26 +111,34 @@ public class SolrSeer  implements Closeable {
           throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
         }
 
-        ClusterState clusterState = zkController.getZkStateReader().getClusterState();
+          List<ZkWriteCommand> zkWriteOps = processMessage(zkController.getZkStateReader().getClusterState(), message, operation);
+          
+        executor.invokeAll(Collections.singleton(new Callable<Object>() {
 
-        List<ZkWriteCommand> zkWriteOps = processMessage(clusterState, message, operation);
+          @Override
+          public Object call() throws Exception {
+            while (true) {
+              try {
 
-        while (true) {
-          try {
-          zkStateWriter.enqueueUpdate(clusterState, zkWriteOps, new ZkWriteCallback() {
+                ZkStateWriter zkStateWriter = new ZkStateWriter(zkController.getZkStateReader(), new Stats());
+                zkStateWriter.enqueueUpdate(zkController.getZkStateReader().getClusterState(), zkWriteOps,
+                    new ZkWriteCallback() {
 
-            @Override
-            public void onWrite() throws Exception {
-              // log.info("on write callback");
+                      @Override
+                      public void onWrite() throws Exception {
+                        // log.info("on write callback");
+                      }
+
+                    });
+                return null;
+              } catch (KeeperException.BadVersionException e) {
+                // try again
+                Thread.sleep(250);
+              }
+
+              return null;
             }
-
-          });
-          break;
-          } catch (KeeperException.BadVersionException e)   {
-            // try again
-            Thread.sleep(250);
-          }
-        }
+          }}));
 
       } catch (Exception e) {
         DW.propegateInterrupt("Failure processing message=" + message, e);
@@ -163,7 +178,7 @@ public class SolrSeer  implements Closeable {
         (HttpShardHandlerFactory) zkController.getCoreContainer().getShardHandlerFactory(),
         CommonParams.CORES_HANDLER_PATH, new Stats(), zkController.getCoreContainer(), this);
 
-    zkStateWriter = new ZkStateWriter(zkStateReader, new Stats());
+
     this.stateUpdateQueue = QueueBuilder.builder(client, stateUpdateConsumer, serializer, "/solrseer/queues/stateupdate").lockPath("/solrseer/queues/stateupdate_lock").buildQueue();
     this.adminOperationQueue = QueueBuilder.builder(client, adminOpConsumer, serializer, "/solrseer/queues/adminop").lockPath("/solrseer/queues/adminop_lock").buildQueue();
     
@@ -232,7 +247,8 @@ public class SolrSeer  implements Closeable {
   public void close() throws IOException {
 
     try (DW worker = new DW(this, true)) {
-      worker.add("SolrSeerInternals", stateUpdateQueue);
+      worker.add(executor);
+      worker.add(stateUpdateQueue);
     }
     
 //    stateUpdateQueue.close();
@@ -247,7 +263,7 @@ public class SolrSeer  implements Closeable {
   public void sendUpdate(ZkNodeProps msg) { // nocommit
     try {
       stateUpdateQueue.put(msg);
-      stateUpdateQueue.flushPuts(10, TimeUnit.SECONDS);
+   //   stateUpdateQueue.flushPuts(10, TimeUnit.SECONDS);
     } catch (Exception e) {
       throw new DW.Exp(e);
     }
@@ -256,7 +272,7 @@ public class SolrSeer  implements Closeable {
   public void sendAdminUpdate(ZkNodeProps msg) {
     try {
       adminOperationQueue.put(msg);
-      adminOperationQueue.flushPuts(10, TimeUnit.SECONDS);
+     // adminOperationQueue.flushPuts(10, TimeUnit.SECONDS);
     } catch (Exception e) {
       throw new DW.Exp(e);
     }
@@ -265,7 +281,7 @@ public class SolrSeer  implements Closeable {
   private List<ZkWriteCommand> processMessage(ClusterState clusterState,
       final ZkNodeProps message, final String operation) {
       log.info("processMessage(ClusterState clusterState={}, ZkNodeProps message={}, String operation={}) - start",
-          clusterState, message, operation);
+          log.isDebugEnabled() ? clusterState : "...", message, operation);
 
     CollectionParams.CollectionAction collectionAction = CollectionParams.CollectionAction.get(operation);
     if (collectionAction != null) {
@@ -354,7 +370,7 @@ public class SolrSeer  implements Closeable {
 
     List<ZkWriteCommand> returnList = Collections.singletonList(ZkStateWriter.NO_OP);
     if (log.isDebugEnabled()) {
-      log.debug("processMessage(ClusterState, ZkNodeProps, String) - end");
+      log.debug("processMessage(ClusterState, ZkNodeProps, String) - end returnList={}", returnList);
     }
     return returnList;
   }

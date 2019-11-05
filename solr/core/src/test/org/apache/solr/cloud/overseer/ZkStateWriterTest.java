@@ -134,7 +134,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
             new DocCollection("c1", new HashMap<String, Slice>(), new HashMap<String, Object>(), DocRouter.DEFAULT, 0, ZkStateReader.CLUSTER_STATE));
 
         writer.enqueueUpdate(reader.getClusterState(), Collections.singletonList(c1), null);
-        writer.writePendingUpdates();
+        writer.writePendingUpdates(reader.getClusterState());
 
         Map map = (Map) Utils.fromJSON(zkClient.getData("/clusterstate.json", null, null, true));
         assertNotNull(map.get("c1"));
@@ -174,7 +174,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
             new DocCollection("c1", new HashMap<String, Slice>(), new HashMap<String, Object>(), DocRouter.DEFAULT, 0, ZkStateReader.COLLECTIONS_ZKNODE + "/c1/state.json"));
 
         writer.enqueueUpdate(reader.getClusterState(), Collections.singletonList(c1), null);
-        writer.writePendingUpdates();
+        writer.writePendingUpdates(reader.getClusterState());
 
         Map map = (Map) Utils.fromJSON(zkClient.getData("/clusterstate.json", null, null, true));
         assertNull(map.get("c1"));
@@ -216,7 +216,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         ZkWriteCommand c1 = new ZkWriteCommand("c1",
             new DocCollection("c1", new HashMap<String, Slice>(), new HashMap<String, Object>(), DocRouter.DEFAULT, 0, ZkStateReader.CLUSTER_STATE));
         writer.enqueueUpdate(reader.getClusterState(), Collections.singletonList(c1), null);
-        writer.writePendingUpdates();
+        writer.writePendingUpdates(reader.getClusterState());
 
         ClusterState clusterState = reader.getClusterState(); // keep a reference to the current cluster state object
         assertTrue(clusterState.hasCollection("c1"));
@@ -250,7 +250,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         }
 
         try {
-          writer.writePendingUpdates();
+          writer.writePendingUpdates(reader.getClusterState());
           fail("writePendingUpdates after BadVersionException should not have succeeded");
         } catch (IllegalStateException e) {
           // expected
@@ -332,7 +332,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
         }
 
         try {
-          writer.writePendingUpdates();
+          writer.writePendingUpdates(reader.getClusterState());
           fail("writePendingUpdates after BadVersionException should not have succeeded");
         } catch (IllegalStateException e) {
           // expected

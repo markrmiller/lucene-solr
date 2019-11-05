@@ -886,7 +886,7 @@ public class ZkController implements Closeable {
     
     try {
       boolean success = future.get();
-//      if (!success) {
+//      if (!success) { nocommittttt
 //        throw new SolrException(ErrorCode.SERVER_ERROR, "Multi Request failed");
 //      }
     } catch (ExecutionException e) {
@@ -1159,10 +1159,16 @@ public class ZkController implements Closeable {
 
       // check replica's existence in clusterstate first
       try {
-        zkStateReader.waitForState(collection, Overseer.isLegacy(zkStateReader) ? 60000 : 10000,
-            TimeUnit.MILLISECONDS, (collectionState) -> getReplicaOrNull(collectionState, shardId, coreZkNodeName) != null);
+        zkStateReader.waitForState(collection, Overseer.isLegacy(zkStateReader) ? 60000 : 5000,
+            TimeUnit.MILLISECONDS, (l, c) -> getReplicaOrNull(c, shardId, coreZkNodeName) != null); // nocommit
       } catch (TimeoutException e) {
-        throw new SolrException(ErrorCode.SERVER_ERROR, "Error registering SolrCore, timeout waiting for replica present in clusterstate", e);
+        StringBuilder sb = new StringBuilder();
+        zkClient.printLayout("/collections", 2, sb);
+
+        throw new SolrException(ErrorCode.SERVER_ERROR,
+            "Error registering SolrCore, timeout waiting for replica present in clusterstate, collection=" + collection
+                + " shardId=" + shardId + " coreZNodeName=" + coreZkNodeName + " clusterstate=" + sb.toString(),
+            e);
       }
       Replica replica = getReplicaOrNull(zkStateReader.getClusterState().getCollectionOrNull(collection), shardId, coreZkNodeName);
       if (replica == null) {
@@ -1198,10 +1204,39 @@ public class ZkController implements Closeable {
       // in this case, we want to wait for the leader as long as the leader might
       // wait for a vote, at least - but also long enough that a large cluster has
       // time to get its act together
-      String leaderUrl = getLeader(cloudDesc, leaderVoteWait + 600000);
+     // String leaderUrl = getLeader(cloudDesc, leaderVoteWait + 600000); // nocommit timeouts 
+      
+      //nocommit - need to util this method still
+      String leaderRegPath =  ZkStateReader.getShardLeadersPath(collection, shardId);
+      CountDownLatch latch = new CountDownLatch(1);
+      Stat stat = null;
+      try {
+        stat = getZkClient().getCurator().checkExists().usingWatcher((CuratorWatcher) event -> {
+          
+          log.error("EVENT: " + event);
+          if (event.getType() == EventType.NodeCreated | event.getType() == EventType.NodeDataChanged) {
+            latch.countDown();
+          }
+        }).forPath(leaderRegPath);
+      } catch (Exception e) {
+        throw new DW.Exp(e);
+      }
+      if (stat == null) {
+        try {
+         boolean success = latch.await(15, TimeUnit.SECONDS);
+         if (!success) {
+           throw new TimeoutException("Timeout waiting to see registered leader path=" + leaderRegPath);
+         }
+        } catch (InterruptedException e) {
+          DW.propegateInterrupt(e);
+        }
+      }
+      
+      //  nocommit - there should be no stale leader state at this point, dont hit zk directly
+      String leaderUrl = zkStateReader.getLeaderUrl(collection, shardId);
 
       String ourUrl = ZkCoreNodeProps.getCoreUrl(baseUrl, coreName);
-      if (log.isDebugEnabled()) log.debug("We are " + ourUrl + " and leader is " + leaderUrl);
+      log.info("We are " + ourUrl + " and leader is " + leaderUrl);
       boolean isLeader = leaderUrl.equals(ourUrl);
       assert !(isLeader && replica.getType() == Type.PULL) : "Pull replica became leader!";
 
@@ -1277,14 +1312,24 @@ public class ZkController implements Closeable {
   }
 
   private Replica getReplicaOrNull(DocCollection docCollection, String shard, String coreNodeName) {
-    if (docCollection == null) return null;
-
+    if (docCollection == null) {
+      if (log.isDebugEnabled()) {
+        log.debug("getReplicaOrNull#docCollection=null");
+      }
+      return null;
+    }
     Slice slice = docCollection.getSlice(shard);
-    if (slice == null) return null;
+    if (slice == null) {
+      if (log.isDebugEnabled()) {
+        log.debug("getReplicaOrNull#shard=null");
+      }
+      return null;
+    }
 
     Replica replica = slice.getReplica(coreNodeName);
-    if (replica == null) return null;
-
+    if (log.isDebugEnabled()) {
+      log.debug("getReplicaOrNull#replica=" + replica + " replicas=" + slice.getReplicas());
+    }
     return replica;
   }
 
@@ -1342,11 +1387,11 @@ public class ZkController implements Closeable {
     try {
       clusterStateLeaderUrl = zkStateReader.getLeaderUrl(collection, shardId);
 
-      leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms).getCoreUrl();
+     // leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms).getCoreUrl();
     } catch (Exception e) {
       throw new DW.Exp(e);
     }
-    return clusterStateLeaderUrl.equals(leaderUrl);
+    return clusterStateLeaderUrl != null;
   }
 
   /**
@@ -1728,7 +1773,7 @@ public class ZkController implements Closeable {
     AtomicReference<String> returnId = new AtomicReference<>();
     try {
       try {
-        zkStateReader.waitForState(cd.getCollectionName(), 15, TimeUnit.SECONDS, (n, c) -> {
+        zkStateReader.waitForState(cd.getCollectionName(), 5, TimeUnit.SECONDS, (n, c) -> { // nocommit
             if (c == null) return false;
             String shardId = c.getShardId(cd.getCloudDescriptor().getCoreNodeName());
             if (shardId != null) {
@@ -1751,7 +1796,7 @@ public class ZkController implements Closeable {
       cd.getCloudDescriptor().setShardId(shardId);
 
       if (log.isDebugEnabled()) {
-        log.debug("waitForShardId(CoreDescriptor) - end");
+        log.debug("waitForShardId(CoreDescriptor) - end coreNodeName=" + cd.getCloudDescriptor().getCoreNodeName() + " shardId=" + shardId);
       }
       return;
     }

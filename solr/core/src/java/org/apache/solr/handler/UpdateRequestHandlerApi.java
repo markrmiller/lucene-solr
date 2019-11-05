@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.DW;
 import org.apache.solr.api.Api;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.request.SolrQueryRequest;
@@ -46,10 +46,8 @@ public class UpdateRequestHandlerApi extends UpdateRequestHandler  {
         if(target != null) req.getContext().put("path", target);
         try {
           handleRequest(req, rsp);
-        } catch (RuntimeException e) {
-          throw e;
-        } catch (Exception e){
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,e );
+        } catch (Exception e) {
+          throw new DW.Exp(e);
         }
       }
     };

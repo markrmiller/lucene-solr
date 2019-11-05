@@ -385,10 +385,13 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   }
 
   public String getShardId(String coreNodeName) {
+    assert coreNodeName != null;
+    
     for (Slice slice : this) {
       for (Replica replica : slice) {
-        if (Objects.equals(replica.getName(), coreNodeName));
+        if (replica.getName().equals(coreNodeName)) {
           return slice.getName();
+        }
       }
     }
     return null;

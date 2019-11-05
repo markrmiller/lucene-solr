@@ -19,7 +19,6 @@ package org.apache.solr.common.cloud;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -47,7 +46,6 @@ import java.util.stream.Collectors;
 
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.common.AlreadyClosedException;
-import org.apache.solr.common.Callable;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -55,11 +53,9 @@ import org.apache.solr.common.params.AutoScalingParams;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.SolrSingleThreaded;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.KeeperException;
@@ -823,7 +819,7 @@ public class ZkStateReader implements SolrCloseable {
 
     AtomicReference<Replica> leader = new AtomicReference<>();
     try {
-      waitForState(collection, 15, TimeUnit.MILLISECONDS, (n, c) -> {
+      waitForState(collection, 5, TimeUnit.SECONDS, (n, c) -> { // nocommit timeout
         if (c == null)
           return false;
         Replica l = getLeader(n, c, shard);
@@ -1186,7 +1182,7 @@ public class ZkStateReader implements SolrCloseable {
       Set<String> liveNodes = ZkStateReader.this.liveNodes;
       log.info("A cluster state change: [{}] for collection [{}] has occurred - updating... (live nodes size: [{}])",
           event, coll, liveNodes.size());
-
+      
       refreshAndWatch();
 
     }
@@ -1199,19 +1195,16 @@ public class ZkStateReader implements SolrCloseable {
     public void refreshAndWatch() {
       try {
         DocCollection newState = fetchCollectionState(coll, this);
+        if (log.isDebugEnabled()) {
+          log.debug("Fetched new clusterstate={}", newState);
+        }
         updateWatchedCollection(coll, newState);
         synchronized (getUpdateLock()) {
           constructState(Collections.singleton(coll));
         }
 
-      } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
-        log.warn("ZooKeeper watch triggered, but Solr cannot talk to ZK: [{}]", e.getMessage());
-      } catch (KeeperException e) {
-        log.error("Unwatched collection: [{}]", coll, e);
-        throw new ZooKeeperException(ErrorCode.SERVER_ERROR, "A ZK error has occurred", e);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        log.error("Unwatched collection: [{}]", coll, e);
+      } catch (Exception e) {
+        throw new DW.Exp("Solr encountered an unexpected exception updating the clusterstate from ZooKeeper", e);
       }
     }
   }
@@ -1579,12 +1572,23 @@ public class ZkStateReader implements SolrCloseable {
   public void waitForState(final String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
       throws InterruptedException, TimeoutException {
 
+    AtomicReference<Set<String>> liveNodes = new AtomicReference<>();
+    liveNodes.set(clusterState.getLiveNodes());
+    registerLiveNodesListener(new LiveNodesListener() {
+      
+      @Override
+      public boolean onChange(SortedSet<String> oldLiveNodes, SortedSet<String> newLiveNodes) {
+        liveNodes.set(newLiveNodes);
+        return false;
+      }
+    });
+    
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);
     AtomicReference<DocCollection> docCollection = new AtomicReference<>();
     CollectionStateWatcher watcher = (n, c) -> {
       docCollection.set(c);
-      boolean matches = predicate.matches(n, c);
+      boolean matches = predicate.matches(liveNodes.get(), c);
       if (matches)
         latch.countDown();
 
@@ -1625,10 +1629,6 @@ public class ZkStateReader implements SolrCloseable {
   public void waitForState(final String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
       throws InterruptedException, TimeoutException {
 
-    if (closed) {
-      throw new AlreadyClosedException();
-    }
-
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);
     AtomicReference<DocCollection> docCollection = new AtomicReference<>();
@@ -1668,10 +1668,6 @@ public class ZkStateReader implements SolrCloseable {
    */
   public void waitForLiveNodes(long wait, TimeUnit unit, LiveNodesPredicate predicate)
       throws InterruptedException, TimeoutException {
-
-    if (closed) {
-      throw new AlreadyClosedException();
-    }
 
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);

@@ -501,7 +501,11 @@ public class ZkTestServer {
 
         @Override
         public void run() {
-          writeZkMonitorFile();
+          try {
+            writeZkMonitorFile();
+          } catch (Exception e) {
+            DW.propegateInterrupt(e);
+          }
         }
       }, 0, 5000);
     }

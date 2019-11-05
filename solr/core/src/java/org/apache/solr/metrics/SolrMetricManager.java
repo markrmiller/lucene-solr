@@ -1073,19 +1073,11 @@ public class SolrMetricManager {
     // make sure we use a name with prefix
     registry = enforcePrefix(registry);
     try {
-      while (true) {
-        try {
-          if (reportersLock.tryLock(10, TimeUnit.SECONDS)) {
-            break;
-          }
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }
 
-      }
+      reportersLock.lock();
 
       log.info("Closing metric reporters for registry=" + registry + ", tag=" + tag);
-	  // nocommit
+      // nocommit
       Map<String,SolrMetricReporter> perRegistry = reporters.get(registry);
       if (perRegistry != null) {
         Set<String> names = new HashSet<>(perRegistry.keySet());

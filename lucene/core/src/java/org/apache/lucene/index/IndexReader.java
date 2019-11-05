@@ -234,7 +234,7 @@ public abstract class IndexReader implements Closeable {
    */
   @SuppressWarnings("try")
   public final void decRef() throws IOException {
-    log.error("INTERNAL DECREF RAWREADER");
+    log.error("INTERNAL DECREF RAWREADER: " + refCount.get() );
     // only check refcount here (don't call ensureOpen()), so we can
     // still close the reader if it was made invalid by a child:
     if (refCount.get() <= 0) {

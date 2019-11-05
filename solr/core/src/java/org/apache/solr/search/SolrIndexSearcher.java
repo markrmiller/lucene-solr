@@ -138,8 +138,6 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
   private final String path;
   private volatile boolean releaseDirectory;
   
-  private volatile boolean releaseDirectoryForReserve;
-
   private final StatsCache statsCache;
 
   private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
@@ -154,10 +152,11 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
      return dr;
     } catch (Exception e) {
       DW.propegateInterrupt(e);
-      if (dir != null && dr == null) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening Reader", e);
+    } finally {
+      if (dir != null) {
         directoryFactory.release(dir);
       }
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening Reader", e);
     }
   }
 
@@ -233,7 +232,6 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     this(core, path, schema, name, getReader(core, config, directoryFactory, path), true, enableCache, false,
         directoryFactory);
     // Release the directory at close.
-    this.releaseDirectory = true;
   }
 
   public SolrIndexSearcher(SolrCore core, String path, IndexSchema schema, String name, DirectoryReader r,
@@ -258,14 +256,14 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       core.getDeletionPolicy().saveCommitPoint(reader.getIndexCommit().getGeneration());
     }
 
-    if (reserveDirectory) {
-      // Keep the directory from being released while we use it.
-      directoryFactory.incRef(getIndexReader().directory());
-      // Make sure to release it when closing.
-      this.releaseDirectory = true;
-    }
+//    if (reserveDirectory) {
+//      // Keep the directory from being released while we use it.
+//      directoryFactory.incRef(getIndexReader().directory());
+//      // Make sure to release it when closing.
+//      this.releaseDirectory = true;
+//    }
 
-    this.closeReader = closeReader;
+    this.closeReader = false;
     setSimilarity(schema.getSimilarity());
 
     final SolrConfig solrConfig = core.getSolrConfig();
@@ -292,7 +290,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       if (solrConfig.userCacheConfigs.isEmpty()) {
         cacheMap = NO_GENERIC_CACHES;
       } else {
-        cacheMap = new HashMap<>(solrConfig.userCacheConfigs.size());
+        cacheMap = new HashMap<>(solrConfig.userCacheConfigs.size()); // nocommit thread saftey?
         for (Map.Entry<String,CacheConfig> e : solrConfig.userCacheConfigs.entrySet()) {
           SolrCache cache = e.getValue().newInstance();
           if (cache != null) {
@@ -453,6 +451,9 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
    */
   @Override
   public void close() throws IOException {
+    log.info("Closing [{}]", this);
+    
+    
     // nocommit - speed up
     if (log.isDebugEnabled()) {
       if (cachingEnabled) {
@@ -474,7 +475,12 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     // can't use super.close() since it just calls reader.close() and that may only be called once
     // per reader (even if incRef() was previously called).
 
-    long cpg = reader.getIndexCommit().getGeneration();
+    boolean releaseCommitPoint = false;
+    long cpg = 0;
+    if (reader.getRefCount() > 0) {
+      releaseCommitPoint = true;
+      cpg = reader.getIndexCommit().getGeneration();
+    }
     try {
       if (closeReader) {
         log.error("DECREF RAWREADER");
@@ -484,21 +490,20 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       DW.propegateInterrupt("Problem dec ref'ing reader", e);
     }
 
-    if (directoryFactory.searchersReserveCommitPoints()) {
+    if (releaseCommitPoint && directoryFactory.searchersReserveCommitPoints()) {
       core.getDeletionPolicy().releaseCommitPoint(cpg);
     }
 
-    for (SolrCache cache : cacheList) {
-      try {
-        cache.close();
-      } catch (Exception e) {
-        DW.propegateInterrupt("Exception closing cache " + cache.name(), e);
+    try (DW worker = new DW(this)) {
+      for (SolrCache cache : cacheList) {
+        worker.collect(cache);
+        worker.addCollect("Caches");
       }
     }
 
-    if (releaseDirectory) {
-      directoryFactory.release(getIndexReader().directory());
-    }
+//    if (releaseDirectory) {
+//      directoryFactory.release(getIndexReader().directory());
+//    }
 
     try {
       SolrMetricProducer.super.close();

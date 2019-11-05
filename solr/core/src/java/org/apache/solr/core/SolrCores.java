@@ -106,7 +106,7 @@ class SolrCores implements Closeable {
   // make a temporary copy of the names and shut them down outside the lock.
   public void close() {
     this.closed = true;
-    waitForLoadingCoresToFinish(30 * 1000);
+    waitForLoadingCoresToFinish(10 * 1000); // nocommit timeout config
 
     waitAddPendingCoreOps();
 
@@ -131,29 +131,22 @@ class SolrCores implements Closeable {
 
     coreList.addAll(pendingCloses);
     pendingCloses.clear();
-
-    // nocommit dowork
-    ExecutorService coreCloseExecutor = ExecutorUtil.newMDCAwareFixedThreadPool(Integer.MAX_VALUE,
-        new DefaultSolrThreadFactory("coreCloseExecutor"));
-    try {
+    
+    try (DW closer = new DW(this)) {
       for (SolrCore core : coreList) {
-        coreCloseExecutor.submit(() -> {
+        closer.collect(() -> {
           MDCLoggingContext.setCore(core);
           try {
             core.close();
           } catch (Throwable e) {
-            SolrException.log(log, "Error shutting down core", e);
-            if (e instanceof Error) {
-              throw (Error) e;
-            }
+            DW.propegateInterrupt("Error shutting down core", e);
           } finally {
             MDCLoggingContext.clear();
           }
           return core;
         });
       }
-    } finally {
-      ExecutorUtil.shutdownAndAwaitTermination(coreCloseExecutor);
+      closer.addCollect("CloseSolrCores");
     }
 
   }

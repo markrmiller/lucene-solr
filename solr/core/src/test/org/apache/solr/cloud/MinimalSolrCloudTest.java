@@ -18,6 +18,7 @@
 package org.apache.solr.cloud;
 import java.io.IOException;
 
+import org.apache.solr.TestSysProp;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -40,7 +41,8 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    System.setProperty("solr.suppressDefaultConfigBootstrap", "true");
+    TestSysProp.disablePublicKeyHandler();
+    TestSysProp.supressDefaultConfigBootstrap();
     
     configureCluster(1)
        // .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
@@ -52,8 +54,8 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
   public void createCollections() throws Exception {
     solrUrl = cluster.getJettySolrRunner(0).getBaseUrl().toString();
 
-    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 3, 1).setMaxShardsPerNode(100).process(cluster.getSolrClient());
-    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 1, 1);
+    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 60, 4).setMaxShardsPerNode(300).process(cluster.getSolrClient());
+  //  cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 3, 1);
 //    CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
 //    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
   }

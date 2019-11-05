@@ -340,7 +340,12 @@ public class CoreContainer implements Closeable {
   public CoreContainer(NodeConfig config, Properties properties, CoresLocator locator, SolrZkClient zkClient) { // nocommit move things to laod except whats needed for injection
     this.loader = config.getSolrResourceLoader();
     this.solrHome = loader.getInstancePath().toString();
-    containerHandlers.put(PublicKeyHandler.PATH, new PublicKeyHandler()); // nocommit
+    
+    if (!Boolean.getBoolean("solr.disablePublicKeyHandler")) {
+      containerHandlers.put(PublicKeyHandler.PATH, new PublicKeyHandler()); // nocommit
+    }
+    
+    
     this.cfg = requireNonNull(config);
     if (null != this.cfg.getBooleanQueryMaxClauseCount()) {
       IndexSearcher.setMaxClauseCount(this.cfg.getBooleanQueryMaxClauseCount());

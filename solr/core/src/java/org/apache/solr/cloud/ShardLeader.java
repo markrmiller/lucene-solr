@@ -50,7 +50,6 @@ import org.apache.solr.update.UpdateLog;
 import org.apache.solr.util.RefCounted;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.Op;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +68,8 @@ public class ShardLeader implements Closeable {
   private final String shardId;
   private final ZkNodeProps leaderProps;
   private volatile boolean closed;
+  
+  private final Object closeObject = new Object();
 
   // @Inject
   ShardLeader(ZkController zkController, ZkNodeProps leaderProps, @Named("nodeName") String nodeName, String collection, String shardId) {
@@ -81,7 +82,7 @@ public class ShardLeader implements Closeable {
     // all participants in a given leader selection must use the same path
     // ExampleClient here is also a LeaderSelectorListener but this isn't required
     shardLeaderSelector = new LeaderSelector(zkController.getZkClient().getCurator(),
-        "/collections/" + shardId + "/shard_leader", new LeaderSelectorListenerAdapter() { // nocommit extract
+        "/collections/" + collection + "/" + shardId + "/shard_leader", new LeaderSelectorListenerAdapter() { // nocommit extract
       private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
           @Override
@@ -90,6 +91,7 @@ public class ShardLeader implements Closeable {
               log.debug("$LeaderSelectorListenerAdapter.takeLeadership(CuratorFramework client={}) - start", client);
             }
 
+            
             // we are now the leader. This method should not return until we want to relinquish leadership
             leaderCount.incrementAndGet();
             boolean success = runLeaderProcess();
@@ -101,14 +103,13 @@ public class ShardLeader implements Closeable {
             }
             
             if (success) {
-              try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(Integer.MAX_VALUE));
-              } catch (InterruptedException e) {
-                log.info(zkController.getNodeName() + "-StateUpdate was interrupted.");
-                Thread.currentThread().interrupt();
-              } finally {
-                log.info(zkController.getNodeName() + "-StateUpdate relinquishing leadership.\n");
+              
+              synchronized (closeObject) {
+                while (!closed) {
+                  closeObject.wait();
+                }
               }
+              log.info(zkController.getNodeName() + "-ShardLeader relinquishing leadership.\n");
             }
             
             // give up leadership and requeue
@@ -143,10 +144,9 @@ public class ShardLeader implements Closeable {
     String coreName = leaderProps.getStr(ZkStateReader.CORE_NAME_PROP);
     ActionThrottle lt;
     try (SolrCore core = cc.getCore(coreName)) {
-      if (core == null) {
+      if (core == null || core.isClosed()) {
         // shutdown or removed
-
-        log.info("runLeaderProcess() - end - no core found");
+        log.info("runLeaderProcess() - end - no core found or core closed core={}", core);
         return false;
       }
       MDCLoggingContext.setCore(core);
@@ -184,8 +184,8 @@ public class ShardLeader implements Closeable {
       try (SyncStrategy syncStrategy = new SyncStrategy(cc)) {
         try (SolrCore core = cc.getCore(coreName)) {
 
-          if (core == null) {
-            log.info("runLeaderProcess() - end - no core found");
+          if (core == null || core.isClosed()) {
+            log.info("runLeaderProcess() - end - no core found or core closed core={}", core);
             return false;
           }
           CoreDescriptor cd = core.getCoreDescriptor();
@@ -196,8 +196,7 @@ public class ShardLeader implements Closeable {
           ZkShardTerms zkShardTerms = zkController.getShardTerms(collection, shardId);
           if (zkShardTerms.registered(coreNodeName) && !zkShardTerms.canBecomeLeader(coreNodeName)) {
             if (!waitForEligibleBecomeLeaderAfterTimeout(zkShardTerms, cd, leaderVoteWait)) {
-
-              log.debug("runLeaderProcess() - end - did not become eligable after timeout");
+              log.info("runLeaderProcess() - end - did not become eligable after timeout");
               return false;
             } else {
               // only log an error if this replica win the election
@@ -212,7 +211,7 @@ public class ShardLeader implements Closeable {
 
           log.info("I may be the new leader - try and sync");
 
-          // nocommit
+          // nocommit - review
           // we are going to attempt to be the leader
           // first cancel any current recovery
           core.getUpdateHandler().getSolrCoreState().cancelRecovery();
@@ -303,8 +302,8 @@ public class ShardLeader implements Closeable {
         // register as leader
         String leaderPath = ZkStateReader.getShardLeadersPath(collection, shardId);
       //  ops.add(Op.create(leaderPath, Utils.toJSON(leaderProps), zkClient.getZkACLProvider().getACLsToAdd(leaderPath), CreateMode.EPHEMERAL));
-        zkController.getZkClient().getCurator().createContainers(ZkStateReader.getShardLeadersParentPath(collection, shardId)); // nocommit - make efficient
-        zkController.getZkClient().getCurator().create().forPath(leaderPath, Utils.toJSON(leaderProps)); // nocommit - acl's an stuff
+     //   zkController.getZkClient().getCurator().createContainers(ZkStateReader.getShardLeadersParentPath(collection, shardId)); // nocommit - make efficient
+        zkController.getZkClient().getCurator().create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(leaderPath, Utils.toJSON(leaderProps)); // nocommit - acl's an stuff
 
         assert shardId != null;
 
@@ -467,8 +466,13 @@ public class ShardLeader implements Closeable {
     }
 
     this.closed = true;
+    
+    synchronized (closeObject) {
+      closeObject.notifyAll();
+    }
+    
     try (DW worker = new DW(this, true)) {
-      worker.add("ShardLeaderInterrupt", () -> {shardLeaderSelector.interruptLeadership();});
+    //  worker.add("ShardLeaderInterrupt", () -> {shardLeaderSelector.interruptLeadership();});
       worker.add("ShardLeaderInternals", shardLeaderSelector);
     }
 
