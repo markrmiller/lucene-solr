@@ -35,7 +35,7 @@ import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -259,7 +259,7 @@ public class UpdateShardHandler implements SolrMetricProducer, SolrInfoBean, Clo
     updateExecutor.shutdown();
     recoveryExecutor.shutdown();
 
-    try (DW closer = new DW(this)) {
+    try (SW closer = new SW(this)) {
       closer.add("Executors", updateExecutor, recoveryExecutor);
       closer.add("HttpClients", updateOnlyClient, () -> {
         HttpClientUtil.close(recoveryOnlyClient);

@@ -63,7 +63,7 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrConfig;
@@ -140,7 +140,7 @@ public final class ManagedIndexSchema extends IndexSchema {
       log.error(msg, e);
       throw new SolrException(ErrorCode.SERVER_ERROR, msg, e);
     } finally {
-      DW.close(writer);
+      SW.close(writer);
       try {
         FileUtils.sync(managedSchemaFile);
       } catch (IOException e) {

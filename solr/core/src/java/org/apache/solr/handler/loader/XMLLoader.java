@@ -16,17 +16,9 @@
  */
 package org.apache.solr.handler.loader;
 
-import javax.xml.parsers.SAXParserFactory;
-import javax.xml.stream.FactoryConfigurationError;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.dom.DOMResult;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.sax.SAXSource;
+import static org.apache.solr.common.params.CommonParams.ID;
+import static org.apache.solr.common.params.CommonParams.NAME;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +30,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.collect.Lists;
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.sax.SAXSource;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.EmptyEntityResolver;
 import org.apache.solr.common.SolrException;
@@ -49,11 +50,10 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.util.XMLErrorLogger;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.handler.RequestHandlerUtils;
 import org.apache.solr.handler.UpdateRequestHandler;
@@ -64,20 +64,22 @@ import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
 import org.apache.solr.update.RollbackUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
+import org.apache.solr.util.XMLFactorysAndParser;
 import org.apache.solr.util.xslt.TransformerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
-import static org.apache.solr.common.params.CommonParams.ID;
-import static org.apache.solr.common.params.CommonParams.NAME;
+import com.google.common.collect.Lists;
 
 
 public class XMLLoader extends ContentStreamLoader {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   private static final AtomicBoolean WARNED_ABOUT_INDEX_TIME_BOOSTS = new AtomicBoolean();
-  static final XMLErrorLogger xmllog = new XMLErrorLogger(log);
+  
+
   
   public static final String CONTEXT_TRANSFORMER_KEY = "xsltupdater.transformer";
 
@@ -85,39 +87,16 @@ public class XMLLoader extends ContentStreamLoader {
 
   public static final int XSLT_CACHE_DEFAULT = 60;
   
+
+  
   int xsltCacheLifetimeSeconds;
-  XMLInputFactory inputFactory;
-  SAXParserFactory saxFactory;
 
   @Override
   public XMLLoader init(SolrParams args) {
-    // Init StAX parser:
-    inputFactory = XMLInputFactory.newInstance();
-    EmptyEntityResolver.configureXMLInputFactory(inputFactory);
-    inputFactory.setXMLReporter(xmllog);
-    try {
-      // The java 1.6 bundled stax parser (sjsxp) does not currently have a thread-safe
-      // XMLInputFactory, as that implementation tries to cache and reuse the
-      // XMLStreamReader.  Setting the parser-specific "reuse-instance" property to false
-      // prevents this.
-      // All other known open-source stax parsers (and the bea ref impl)
-      // have thread-safe factories.
-      inputFactory.setProperty("reuse-instance", Boolean.FALSE);
-    } catch (IllegalArgumentException ex) {
-      // Other implementations will likely throw this exception since "reuse-instance"
-      // isimplementation specific.
-      log.debug("Unable to set the 'reuse-instance' property for the input chain: " + inputFactory);
-    }
-    
-    // Init SAX parser (for XSL):
-    saxFactory = SAXParserFactory.newInstance();
-    saxFactory.setNamespaceAware(true); // XSL needs this!
-    EmptyEntityResolver.configureSAXParserFactory(saxFactory);
-    
     xsltCacheLifetimeSeconds = XSLT_CACHE_DEFAULT;
-    if(args != null) {
-      xsltCacheLifetimeSeconds = args.getInt(XSLT_CACHE_PARAM,XSLT_CACHE_DEFAULT);
-      log.debug("xsltCacheLifetimeSeconds=" + xsltCacheLifetimeSeconds);
+    if (args != null) {
+      xsltCacheLifetimeSeconds = args.getInt(XSLT_CACHE_PARAM, XSLT_CACHE_DEFAULT);
+      if (log.isDebugEnabled()) log.debug("xsltCacheLifetimeSeconds=" + xsltCacheLifetimeSeconds); // nocommit
     }
     return this;
   }
@@ -151,19 +130,19 @@ public class XMLLoader extends ContentStreamLoader {
         is = stream.getStream();
         final InputSource isrc = new InputSource(is);
         isrc.setEncoding(charset);
-        final XMLReader xmlr = saxFactory.newSAXParser().getXMLReader();
-        xmlr.setErrorHandler(xmllog);
+        final XMLReader xmlr = XMLFactorysAndParser.docSaxParser.getXMLReader();
+        xmlr.setErrorHandler(XMLFactorysAndParser.xmllog);
         xmlr.setEntityResolver(EmptyEntityResolver.SAX_INSTANCE);
         final SAXSource source = new SAXSource(xmlr, isrc);
         t.transform(source, result);
       } catch(TransformerException te) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, te.getMessage(), te);
       } finally {
-        DW.close(is);
+        SW.close(is);
       }
       // second step: feed the intermediate DOM tree into StAX parser:
       try {
-        parser = inputFactory.createXMLStreamReader(new DOMSource(result.getNode()));
+        parser = XMLFactorysAndParser.inputFactory.createXMLStreamReader(new DOMSource(result.getNode()));
         this.processUpdate(req, processor, parser);
       } catch (XMLStreamException e) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e.getMessage(), e);
@@ -181,17 +160,17 @@ public class XMLLoader extends ContentStreamLoader {
           // determined by the XML parser, the content-type is only used as a hint!
           log.trace("body", new String(body, (charset == null) ?
             ContentStreamBase.DEFAULT_CHARSET : charset));
-          DW.close(is);
+          SW.close(is);
           is = new ByteArrayInputStream(body);
         }
         parser = (charset == null) ?
-          inputFactory.createXMLStreamReader(is) : inputFactory.createXMLStreamReader(is, charset);
+            XMLFactorysAndParser.inputFactory.createXMLStreamReader(is) : XMLFactorysAndParser.inputFactory.createXMLStreamReader(is, charset);
         this.processUpdate(req, processor, parser);
       } catch (XMLStreamException e) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e.getMessage(), e);
       } finally {
         if (parser != null) parser.close();
-        DW.close(is);
+        SW.close(is);
       }
     }
   }
@@ -210,7 +189,7 @@ public class XMLLoader extends ContentStreamLoader {
     if(result==null) {
       SolrConfig solrConfig = request.getCore().getSolrConfig();
       result = TransformerProvider.instance.getTransformer(solrConfig, xslt, xsltCacheLifetimeSeconds);
-      result.setErrorListener(xmllog);
+      result.setErrorListener(XMLFactorysAndParser.xmllog);
       ctx.put(CONTEXT_TRANSFORMER_KEY,result);
     }
     return result;

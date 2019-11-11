@@ -63,7 +63,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -357,7 +357,7 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
         }
       } finally { 
         if (defaultClient != null) {
-          DW.close(defaultClient);
+          SW.close(defaultClient);
         }
       }
     }

@@ -17,7 +17,7 @@
 package org.apache.solr.cloud;
 
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.quorum.QuorumPeer;
@@ -123,7 +123,7 @@ public class SolrZkServer {
           }
           log.info("ZooKeeper Server exited.");
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
     };

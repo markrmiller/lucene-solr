@@ -38,7 +38,7 @@ import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.JsonRecordReader;
 import org.apache.solr.handler.RequestHandlerUtils;
@@ -124,7 +124,7 @@ public class JsonLoader extends ContentStreamLoader {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Cannot parse provided JSON: " + e.getMessage());
       }
       finally {
-        DW.close(reader);
+        SW.close(reader);
       }
     }
 

@@ -45,7 +45,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -125,7 +125,7 @@ public class AnalyticsShardRequestManager {
         replicaUrls.add(url);
       }
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 

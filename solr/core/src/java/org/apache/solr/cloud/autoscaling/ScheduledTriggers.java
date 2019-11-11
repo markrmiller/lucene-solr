@@ -52,7 +52,7 @@ import org.apache.solr.client.solrj.response.RequestStatusState;
 import org.apache.solr.cloud.Stats;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrResourceLoader;
@@ -234,7 +234,7 @@ public class ScheduledTriggers implements Closeable {
         // the trigger wasn't actually modified so we do nothing
         return;
       }
-      DW.close(old);
+      SW.close(old);
       newTrigger.restoreState(old.trigger);
       triggerWrapper.setReplay(false);
       scheduledTriggerWrappers.replace(newTrigger.getName(), triggerWrapper);
@@ -452,7 +452,7 @@ public class ScheduledTriggers implements Closeable {
         }
       }
     } catch (Exception e) {
-      throw new DW.Exp("Unexpected exception while waiting for pending tasks to finish", e);
+      throw new SW.Exp("Unexpected exception while waiting for pending tasks to finish", e);
     }
   }
 
@@ -475,7 +475,7 @@ public class ScheduledTriggers implements Closeable {
    */
   public void remove(String triggerName) {
     TriggerWrapper removed = scheduledTriggerWrappers.remove(triggerName);
-    DW.close(removed);
+    SW.close(removed);
     removeTriggerZKData(triggerName);
   }
 
@@ -519,7 +519,7 @@ public class ScheduledTriggers implements Closeable {
     if (isClosed) return;
     // mark that we are closed
     isClosed = true;
-    scheduledTriggerWrappers.forEach((k, v) -> DW.close(v));
+    scheduledTriggerWrappers.forEach((k, v) -> SW.close(v));
 
     scheduledTriggerWrappers.clear();
 
@@ -656,7 +656,7 @@ public class ScheduledTriggers implements Closeable {
       if (scheduledFuture != null) {
         scheduledFuture.cancel(true);
       }
-      DW.close(trigger);
+      SW.close(trigger);
     }
   }
 
@@ -778,7 +778,7 @@ public class ScheduledTriggers implements Closeable {
                 listenersPerName.put(config.name, listener);
               } catch (Exception e) {
                 log.warn("Error initializing TriggerListener " + config, e);
-                DW.close(listener);
+                SW.close(listener);
                 listener = null;
               }
             }
@@ -822,7 +822,7 @@ public class ScheduledTriggers implements Closeable {
       try {
         listenersPerStage.clear();
         for (TriggerListener listener : listenersPerName.values()) {
-          DW.close(listener);
+          SW.close(listener);
         }
         listenersPerName.clear();
       } finally {

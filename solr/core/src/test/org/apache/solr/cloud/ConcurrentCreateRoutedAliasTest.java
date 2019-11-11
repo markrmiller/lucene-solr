@@ -25,7 +25,7 @@ import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.zookeeper.KeeperException;
 import org.junit.After;
@@ -214,7 +214,7 @@ public class ConcurrentCreateRoutedAliasTest extends SolrTestCaseJ4 {
       try {
         super.join(60000);
       } finally {
-        DW.close(solrClient);
+        SW.close(solrClient);
       }
     }
   }

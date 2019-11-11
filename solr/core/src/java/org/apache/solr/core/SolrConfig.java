@@ -54,7 +54,7 @@ import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.MapSerializable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.QueryResponseWriter;
@@ -451,8 +451,8 @@ public final class SolrConfig extends XmlConfigFile implements MapSerializable {
     } catch (Exception e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error reading config overlay", e);
     } finally {
-      DW.close(isr);
-      DW.close(in);
+      SW.close(isr);
+      SW.close(in);
     }
   }
 

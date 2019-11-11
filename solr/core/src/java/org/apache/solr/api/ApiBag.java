@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.JsonSchemaValidator;
@@ -61,7 +61,7 @@ public class ApiBag {
   private final boolean isCoreSpecific;
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final Map<String, PathTrie<Api>> apis = DW.concMapSmallO();
+  private final Map<String, PathTrie<Api>> apis = SW.concMapSmallO();
 
   public ApiBag(boolean isCoreSpecific) {
     this.isCoreSpecific = isCoreSpecific;
@@ -71,7 +71,7 @@ public class ApiBag {
     try {
       validateAndRegister(api, nameSubstitutes);
     } catch (Exception e) {
-      throw new DW.Exp("Unable to register plugin:" + api.getClass().getName() + "with spec :" + Utils.toJSONString(api.getSpec()), e);
+      throw new SW.Exp("Unable to register plugin:" + api.getClass().getName() + "with spec :" + Utils.toJSONString(api.getSpec()), e);
     }
   }
 
@@ -183,7 +183,7 @@ public class ApiBag {
       try {
         validators.put((String) cmd.getKey(), new JsonSchemaValidator((Map) cmd.getValue()));
       } catch (Exception e) {
-        throw new DW.Exp("Error in api spec", e);
+        throw new SW.Exp("Error in api spec", e);
       }
     }
     return validators;

@@ -26,7 +26,7 @@ import java.util.Optional;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 
 /**
  * SolrJ client class to communicate with SolrCloud using Http2SolrClient.
@@ -74,7 +74,7 @@ public class CloudHttp2SolrClient  extends BaseCloudSolrClient {
         try {
           this.stateProvider = new Http2ClusterStateProvider(builder.solrUrls, builder.httpClient);
         } catch (Exception e) {
-          throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
+          throw new SW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
               + "Solr server(s), "  + builder.solrUrls + ", down?)", e);
         }
       } else {
@@ -259,7 +259,7 @@ public class CloudHttp2SolrClient  extends BaseCloudSolrClient {
           try {
             stateProvider = new Http2ClusterStateProvider(solrUrls, httpClient);
           } catch (Exception e) {
-            throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
+            throw new SW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
                 + "Solr server(s), "  + solrUrls + ", down?)", e);
           }
         } else {

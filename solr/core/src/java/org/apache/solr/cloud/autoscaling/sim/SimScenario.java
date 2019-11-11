@@ -71,7 +71,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
@@ -354,7 +354,7 @@ public class SimScenario implements AutoCloseable {
       boolean disableMetricsHistory = Boolean.parseBoolean(params.get("disableMetricsHistory", "false"));
       String timeSourceStr = params.get("timeSource", "simTime:50");
       if (scenario.cluster != null) { // close & reset
-        DW.close(scenario.cluster);
+        SW.close(scenario.cluster);
         scenario.context.clear();
       }
       scenario.cluster = SimCloudManager.createCluster(numNodes, TimeSource.get(timeSourceStr));

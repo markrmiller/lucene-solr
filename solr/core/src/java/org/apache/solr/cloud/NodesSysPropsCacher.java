@@ -37,7 +37,7 @@ import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ShardParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.util.TestInjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +84,7 @@ public class NodesSysPropsCacher implements SolrCloseable {
               .map(r -> r.value)
               .collect(Collectors.toSet());
         } catch (Exception e) {
-          throw new DW.Exp("Error on parsing shards preference:{}", e);
+          throw new SW.Exp("Error on parsing shards preference:{}", e);
         }
       }
 

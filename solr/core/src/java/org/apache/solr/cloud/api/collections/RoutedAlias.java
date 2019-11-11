@@ -37,7 +37,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -265,7 +265,7 @@ public abstract class RoutedAlias {
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -363,7 +363,7 @@ public abstract class RoutedAlias {
         try {
           ensureCollection(targetCollectionDesc.creationCollection, coreContainer);
         } catch (Exception e) {
-          throw new DW.Exp("Async creation of a collection for routed Alias " + this.getAliasName() + " failed!", e);
+          throw new SW.Exp("Async creation of a collection for routed Alias " + this.getAliasName() + " failed!", e);
         }
       }, core);
     }
@@ -407,7 +407,7 @@ public abstract class RoutedAlias {
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 

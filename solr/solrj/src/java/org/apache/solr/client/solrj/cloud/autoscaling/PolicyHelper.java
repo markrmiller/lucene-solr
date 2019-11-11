@@ -48,7 +48,7 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.ReplicaPosition;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
@@ -127,7 +127,7 @@ public class PolicyHelper {
       try {
         SESSION_WRAPPPER_REF.set(sessionWrapper = getSession(delegatingManager));
       } catch (Exception e) {
-        throw new DW.Exp("unable to get autoscaling policy session", e);
+        throw new SW.Exp("unable to get autoscaling policy session", e);
       }
       session = sessionWrapper.session;
       Map<String, Double> diskSpaceReqd = new HashMap<>();
@@ -361,7 +361,7 @@ public class PolicyHelper {
             Utils.writeJson(loggingInfo(cloudManager.getDistribStateManager().getAutoScalingConfig().getPolicy(), cloudManager, suggester),
                 new StringWriter(), true).toString());
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }

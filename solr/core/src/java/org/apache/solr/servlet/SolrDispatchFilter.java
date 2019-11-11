@@ -57,7 +57,7 @@ import org.apache.solr.SolrResources.SolrResources;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
@@ -185,7 +185,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         // nocommit - sharble httpclient
         this.httpClient = solrResources.getCoreContainer().getUpdateShardHandler().getUpdateOnlyHttpClient().getHttpClient(); 
       } catch (Throwable t) {
-        DW.propegateInterrupt("Could not start Solr. Check solr/home property and the logs", t);
+        SW.propegateInterrupt("Could not start Solr. Check solr/home property and the logs", t);
       }
 
     } finally {
@@ -211,7 +211,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       if (e instanceof NullPointerException) {
         return specVer;
       }
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       return specVer;
     }
   }
@@ -241,7 +241,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
   public void close() {
     // nocommit httpclient?
-    try (DW closer = new DW(this, true)) {
+    try (SW closer = new SW(this, true)) {
       closer.add("FilterAndSolrResources", solrResources, GlobalTracer.get(), () -> {
         FileCleaningTracker fileCleaningTracker = null;
         try {
@@ -252,7 +252,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         } catch (NullPointerException e) {
           // okay
         } catch (Exception e) {
-          throw new DW.Exp("Exception closing FileCleaningTracker", e);
+          throw new SW.Exp("Exception closing FileCleaningTracker", e);
         } finally {
           SolrRequestParsers.fileCleaningTracker = null;
         }
@@ -426,7 +426,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           wrappedRequest.set((HttpServletRequest) req);
         });
       } catch (Exception e) {
-        throw new DW.Exp("Error during request authentication", e);
+        throw new SW.Exp("Error during request authentication", e);
       }
     }
     // requestContinues is an optional short circuit, thus we still need to check isAuthenticated.

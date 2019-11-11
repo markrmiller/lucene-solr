@@ -34,12 +34,8 @@ public class SSLSolrTestCase extends SolrTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   protected static SSLTestConfig sslConfig;
 
-  
-
   @BeforeClass
   public static void beforeSSLSolrTestCase() throws Exception {
-
-
     sslConfig = buildSSLConfig();
     // based on randomized SSL config, set SchemaRegistryProvider appropriately
     HttpClientUtil.setSchemaRegistryProvider(sslConfig.buildClientSchemaRegistryProvider());
@@ -60,7 +56,10 @@ public class SSLSolrTestCase extends SolrTestCase {
   }
   
   private static SSLTestConfig buildSSLConfig() {
-
+    if (Boolean.getBoolean("solr.tests.nossl")) {
+      return new SSLTestConfig(false, false);
+    }
+    
     SSLRandomizer sslRandomizer =
       SSLRandomizer.getSSLRandomizerForClass(RandomizedContext.current().getTargetClass());
     

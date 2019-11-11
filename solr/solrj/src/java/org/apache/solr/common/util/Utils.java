@@ -72,7 +72,7 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkOperation;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.server.ByteBufferInputStream;
 import org.noggit.CharArr;
@@ -91,13 +91,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 @SuppressWarnings("unchecked")
 public class Utils {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   public static final Function NEW_HASHMAP_FUN = o -> new HashMap<>();
   public static final Function NEW_LINKED_HASHMAP_FUN = o -> new LinkedHashMap<>();
   public static final Function NEW_ATOMICLONG_FUN = o -> new AtomicLong();
   public static final Function NEW_ARRAYLIST_FUN = o -> new ArrayList<>();
   public static final Function NEW_SYNCHRONIZED_ARRAYLIST_FUN = o -> Collections.synchronizedList(new ArrayList<>());
   public static final Function NEW_HASHSET_FUN = o -> new HashSet<>();
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static Map getDeepCopy(Map map, int maxDepth) {
     return getDeepCopy(map, maxDepth, true, false);
@@ -255,7 +256,7 @@ public class Utils {
     // convert directly from bytes to chars
     // and parse directly from that instead of going through
     // intermediate strings or readers
-    CharArr chars = new CharArr();
+    CharArr chars = new CharArr(utf8.length);
     ByteUtils.UTF8toUTF16(utf8, offset, length, chars);
     JSONParser parser = new JSONParser(chars.getArray(), chars.getStart(), chars.length());
     parser.setFlags(parser.getFlags() |
@@ -372,7 +373,7 @@ public class Utils {
     try {
       return STANDARDOBJBUILDER.apply(getJSONParser(new StringReader(json))).getValStrict();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -725,7 +726,7 @@ public class Utils {
     try {
       return c.call();
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       logger.error(e.getMessage(), e);
     }
     return def;

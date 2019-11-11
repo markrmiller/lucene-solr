@@ -41,7 +41,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.JsonSchemaValidator;
 import org.apache.solr.common.util.PathTrie;
 import org.apache.solr.common.util.ValidatingJsonMap;
@@ -156,7 +156,7 @@ public class V2HttpCall extends HttpSolrCall {
       action = PROCESS;
       // we are done with a valid handler
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     } finally {
       if (action == null && api == null) action = PROCESS;
       if (solrReq != null) solrReq.getContext().put(CommonParams.PATH, path);
@@ -217,7 +217,7 @@ public class V2HttpCall extends HttpSolrCall {
     try {
       zkStateReader.aliasesManager.update();
     } catch (Exception e) {
-      throw new DW.Exp("Error trying to update state while resolving collection.", e);
+      throw new SW.Exp("Error trying to update state while resolving collection.", e);
     }
     return logic.get();
   }
@@ -339,7 +339,7 @@ public class V2HttpCall extends HttpSolrCall {
     try {
       api.call(solrReq, solrResp);
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       solrResp.setException(e);
     }
   }
@@ -355,7 +355,7 @@ public class V2HttpCall extends HttpSolrCall {
         api.call(solrReq, rsp);
       } catch (Exception e) {
         rsp.setException(e);
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
     }
 

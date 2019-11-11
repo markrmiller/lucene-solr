@@ -49,7 +49,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SolrSeer  implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final String name;
+
   //private final LeaderSelector stateUpdateLeaderSelector;
   //private final AtomicInteger leaderCount = new AtomicInteger();
   private final DistributedQueue<ZkNodeProps> stateUpdateQueue;
@@ -75,12 +75,12 @@ public class SolrSeer  implements Closeable {
   private final ZkController zkController;
   private final OverseerCollectionMessageHandler collMessageHandler;
   
-  ExecutorService executor = new MDCAwareThreadPoolExecutor(1, 1,
+  private final ExecutorService executor = new MDCAwareThreadPoolExecutor(1, 1,
       60L, TimeUnit.SECONDS,
       new SynchronousQueue<>(true),
       new DefaultSolrThreadFactory("OverSeerBasicExec"));
   
-  private QueueSerializer<ZkNodeProps> serializer = new QueueSerializer<>() { // nocommit extract
+  private final QueueSerializer<ZkNodeProps> serializer = new QueueSerializer<>() { // nocommit extract
     private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public byte[] serialize(ZkNodeProps item) {
@@ -100,7 +100,7 @@ public class SolrSeer  implements Closeable {
   };
 
   
-  QueueConsumer<ZkNodeProps> stateUpdateConsumer = new QueueConsumer<>() { // nocommit extract
+  private final QueueConsumer<ZkNodeProps> stateUpdateConsumer = new QueueConsumer<>() { // nocommit extract
     private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public void consumeMessage(ZkNodeProps message) throws Exception {
@@ -108,10 +108,10 @@ public class SolrSeer  implements Closeable {
       try {
         final String operation = message.getStr(QUEUE_OPERATION);
         if (operation == null) {
-          throw new DW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
+          throw new SW.Exp("Message missing " + QUEUE_OPERATION + ":" + message);
         }
 
-          List<ZkWriteCommand> zkWriteOps = processMessage(zkController.getZkStateReader().getClusterState(), message, operation);
+        List<ZkWriteCommand> zkWriteOps = processMessage(zkController.getZkStateReader().getClusterState(), message, operation);
           
         executor.invokeAll(Collections.singleton(new Callable<Object>() {
 
@@ -133,7 +133,6 @@ public class SolrSeer  implements Closeable {
                 return null;
               } catch (KeeperException.BadVersionException e) {
                 // try again
-                Thread.sleep(250);
               }
 
               return null;
@@ -141,7 +140,7 @@ public class SolrSeer  implements Closeable {
           }}));
 
       } catch (Exception e) {
-        DW.propegateInterrupt("Failure processing message=" + message, e);
+        SW.propegateInterrupt("Failure processing message=" + message, e);
       }
     }
 
@@ -152,7 +151,7 @@ public class SolrSeer  implements Closeable {
   };
   
   
-  QueueConsumer<ZkNodeProps> adminOpConsumer = new QueueConsumer<>() { // nocommit extract
+  private final QueueConsumer<ZkNodeProps> adminOpConsumer = new QueueConsumer<>() { // nocommit extract
     private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     @Override
     public void consumeMessage(ZkNodeProps message) throws Exception {
@@ -171,7 +170,6 @@ public class SolrSeer  implements Closeable {
   
   public SolrSeer(ZkController zkController, SolrCloudManager cloudManager, ZkStateReader zkStateReader, CuratorFramework client, String path, String name) {
     this.zkController = zkController;
-    this.name = name;
     
     collMessageHandler = new OverseerCollectionMessageHandler(
         zkController, cloudManager, zkController.getNodeName(),
@@ -179,8 +177,8 @@ public class SolrSeer  implements Closeable {
         CommonParams.CORES_HANDLER_PATH, new Stats(), zkController.getCoreContainer(), this);
 
 
-    this.stateUpdateQueue = QueueBuilder.builder(client, stateUpdateConsumer, serializer, "/solrseer/queues/stateupdate").lockPath("/solrseer/queues/stateupdate_lock").buildQueue();
-    this.adminOperationQueue = QueueBuilder.builder(client, adminOpConsumer, serializer, "/solrseer/queues/adminop").lockPath("/solrseer/queues/adminop_lock").buildQueue();
+    this.stateUpdateQueue = QueueBuilder.builder(client, stateUpdateConsumer, serializer, "/solrseer/queues/stateupdate").lockPath("/solrseer/queues/stateupdate_lock").maxItems(1000).buildQueue();
+    this.adminOperationQueue = QueueBuilder.builder(client, adminOpConsumer, serializer, "/solrseer/queues/adminop").lockPath("/solrseer/queues/adminop_lock").maxItems(1000).buildQueue();
     
 //    // create a leader selector using the given path for management
 //    // all participants in a given leader selection must use the same path
@@ -246,7 +244,7 @@ public class SolrSeer  implements Closeable {
   @Override
   public void close() throws IOException {
 
-    try (DW worker = new DW(this, true)) {
+    try (SW worker = new SW(this, true)) {
       worker.add(executor);
       worker.add(stateUpdateQueue);
     }
@@ -265,7 +263,7 @@ public class SolrSeer  implements Closeable {
       stateUpdateQueue.put(msg);
    //   stateUpdateQueue.flushPuts(10, TimeUnit.SECONDS);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
   
@@ -274,7 +272,7 @@ public class SolrSeer  implements Closeable {
       adminOperationQueue.put(msg);
      // adminOperationQueue.flushPuts(10, TimeUnit.SECONDS);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
   

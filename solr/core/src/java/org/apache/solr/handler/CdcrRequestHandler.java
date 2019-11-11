@@ -55,7 +55,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -679,7 +679,7 @@ public class CdcrRequestHandler extends RequestHandlerBase implements SolrCoreAw
 
   private void handleCancelBootstrap(SolrQueryRequest req, SolrQueryResponse rsp) {
     BootstrapCallable callable = (BootstrapCallable)core.getSolrCoreState().getCdcrBootstrapCallable();
-    DW.close(callable);
+    SW.close(callable);
     rsp.add(RESPONSE_STATUS, "cancelled");
   }
 

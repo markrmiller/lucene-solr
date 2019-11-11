@@ -33,7 +33,7 @@ import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 
 /**
@@ -88,7 +88,7 @@ public class CloudSolrClient extends BaseCloudSolrClient {
         try {
           this.stateProvider = new HttpClusterStateProvider(builder.solrUrls, builder.httpClient);
         } catch (Exception e) {
-          throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
+          throw new SW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
               + "Solr server(s), "  + builder.solrUrls + ", down?)", e);
         }
       } else {
@@ -477,7 +477,7 @@ public class CloudSolrClient extends BaseCloudSolrClient {
           try {
             stateProvider = new HttpClusterStateProvider(solrUrls, httpClient);
           } catch (Exception e) {
-            throw new DW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
+            throw new SW.Exp("Couldn't initialize a HttpClusterStateProvider (is/are the "
                 + "Solr server(s), "  + solrUrls + ", down?)", e);
           }
         } else {

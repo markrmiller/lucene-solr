@@ -23,7 +23,7 @@ import java.lang.invoke.MethodHandles;
 
 import org.apache.lucene.index.IndexCommit;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
@@ -111,7 +111,7 @@ public class ReplicateFromLeader implements Closeable {
       if (commitVersion == null) return null;
       else return commitVersion;
     } catch (Exception e) {
-      throw new DW.Exp("Cannot get commit command version from index commit point ", e);
+      throw new SW.Exp("Cannot get commit command version from index commit point ", e);
     }
   }
 

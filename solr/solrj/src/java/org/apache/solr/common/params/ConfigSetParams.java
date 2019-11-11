@@ -18,7 +18,7 @@ package org.apache.solr.common.params;
 
 import java.util.Locale;
 
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 
 /**
  * ConfigSets API related parameters and actions.
@@ -38,7 +38,7 @@ public interface ConfigSetParams
         try {
           return ConfigSetAction.valueOf( p.toUpperCase(Locale.ROOT) );
         } catch (Exception ex) {
-          throw new DW.Exp(ex);
+          throw new SW.Exp(ex);
         }
       }
       return null;

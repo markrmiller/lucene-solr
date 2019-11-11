@@ -49,7 +49,7 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.io.stream.metrics.Metric;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 
@@ -492,12 +492,12 @@ public class GatherNodesStream extends TupleStream implements Expressible {
           edges.add(tuple);
         }
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       } finally {
         try {
           stream.close();
         } catch(Exception ce) {
-          throw new DW.Exp(ce);
+          throw new SW.Exp(ce);
         }
       }
       return edges;

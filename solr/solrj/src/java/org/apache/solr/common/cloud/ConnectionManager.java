@@ -22,8 +22,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
@@ -172,7 +172,7 @@ public class ConnectionManager implements Watcher, Closeable {
         } catch (Exception e) {
           log.error("process(WatchedEvent=" + event + ")", e);
 
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
 
@@ -196,7 +196,7 @@ public class ConnectionManager implements Watcher, Closeable {
                     } catch (Exception e) {
                       log.error("$ZkClientConnectionStrategy.ZkUpdate.update(SolrZooKeeper=" + keeper + ")", e);
 
-                      Exp exp = new DW.Exp(e);
+                      Exp exp = new SW.Exp(e);
                       try {
                         closeKeeper(keeper);
                       } catch (Exception e1) {
@@ -212,7 +212,7 @@ public class ConnectionManager implements Watcher, Closeable {
                     }
 
                   } catch (Exception e1) {
-                    Exp exp = new DW.Exp(e1);
+                    Exp exp = new SW.Exp(e1);
 
              
                     // if there was a problem creating the new SolrZooKeeper
@@ -221,7 +221,7 @@ public class ConnectionManager implements Watcher, Closeable {
                     try {
                     closeKeeper(keeper);
                     } catch (Exception e) {
-                      DW.propegateInterrupt(e);
+                      SW.propegateInterrupt(e);
                       exp.addSuppressed(e);
                     }
                     throw exp;
@@ -324,7 +324,7 @@ public class ConnectionManager implements Watcher, Closeable {
     try {
       wait(waitFor);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     if (log.isDebugEnabled()) {
@@ -344,7 +344,7 @@ public class ConnectionManager implements Watcher, Closeable {
       try {
         wait(500);
       } catch (InterruptedException e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
       left = expire - System.nanoTime();
     }
@@ -383,7 +383,7 @@ public class ConnectionManager implements Watcher, Closeable {
     try {
       keeper.close();
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     if (log.isDebugEnabled()) {

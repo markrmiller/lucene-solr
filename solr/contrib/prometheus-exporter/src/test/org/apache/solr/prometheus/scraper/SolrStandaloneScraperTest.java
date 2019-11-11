@@ -28,7 +28,7 @@ import io.prometheus.client.Collector;
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.NoOpResponseParser;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.prometheus.PrometheusExporterTestBase;
@@ -81,8 +81,8 @@ public class SolrStandaloneScraperTest extends RestTestBase {
 
   @AfterClass
   public static void cleanUp() throws Exception {
-    DW.close(solrScraper);
-    DW.close(solrClient);
+    SW.close(solrScraper);
+    SW.close(solrClient);
     cleanUpHarness();
     if (null != executor) {
       executor.shutdownNow();

@@ -33,7 +33,7 @@ import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.AutoScalingParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Op;
@@ -59,7 +59,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     try {
       return zkClient.exists(path, true);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -70,7 +70,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NoNodeException e) {
       throw new NoSuchElementException(path);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -90,7 +90,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NoNodeException e) {
       throw new NoSuchElementException(path);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -115,7 +115,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.NodeExistsException e) {
       throw new AlreadyExistsException(path);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -130,7 +130,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(version, path);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -143,7 +143,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(version, path);
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -158,7 +158,7 @@ public class ZkDistribStateManager implements DistribStateManager {
     } catch (KeeperException.BadVersionException e) {
       throw new BadVersionException(-1, ops.toString());
     } catch (InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 

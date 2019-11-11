@@ -35,7 +35,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.logging.MDCLoggingContext;
@@ -76,7 +76,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
   private final Set<String> runningTasks = ConcurrentHashMap.newKeySet(500);
 
   // List of completed tasks. This is used to clean up workQueue in zk.
-  private final Map<String, QueueEvent> completedTasks = DW.concMapSmallO();
+  private final Map<String, QueueEvent> completedTasks = SW.concMapSmallO();
 
   private final String myId;
 
@@ -158,7 +158,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     try {
       oldestItemInWorkQueue = workQueue.getTailId();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     if (oldestItemInWorkQueue == null)
@@ -169,7 +169,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     try {
       prioritizer.prioritizeOverseerNodes(myId);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     try {
@@ -204,7 +204,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
 
           taskBatch.batchId++;
           boolean tooManyTasks = false;
-          try (DW worker = new DW(this)) {
+          try (SW worker = new SW(this)) {
 
             for (QueueEvent head : heads) {
               if (!tooManyTasks) {
@@ -246,7 +246,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
                 markTaskAsRunning(head, asyncId);
                 log.debug("Marked task [{}] as running", head.getId());
               } catch (Exception e) {
-                throw new DW.Exp(e);
+                throw new SW.Exp(e);
               }
               log.debug(
                   messageHandler.getName() + ": Get the message id:" + head.getId() + " message:" + message.toString());
@@ -258,7 +258,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
           }
 
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
     } finally {
@@ -291,7 +291,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     completedTasks.forEach((k,v) -> {try {
       workQueue.remove(v);
     } catch (KeeperException | InterruptedException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     } runningTasks.remove(k);});
 
     completedTasks.clear();
@@ -307,7 +307,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     }
 
     isClosed = true;
-    DW.close(selector);
+    SW.close(selector);
 
     if (log.isDebugEnabled()) {
       log.debug("close() - end");
@@ -323,7 +323,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
     try {
       children = zk.getChildren(Overseer.OVERSEER_ELECT + LeaderElector.ELECTION_NODE, null, true);
     } catch (Exception e) {
-      throw new DW.Exp("getSortedOverseerNodeNames(SolrZkClient=" + zk + ")", e);
+      throw new SW.Exp("getSortedOverseerNodeNames(SolrZkClient=" + zk + ")", e);
     }
     LeaderElector.sortSeqs(children);
     ArrayList<String> nodeNames = new ArrayList<>(children.size());
@@ -350,7 +350,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
       }
       return children;
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
   }
@@ -472,7 +472,7 @@ public class OverseerTaskProcessor implements Runnable, Closeable {
             " complete, response:" + response.getResponse().toString());
         success = true;
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
 
       if (log.isDebugEnabled()) {

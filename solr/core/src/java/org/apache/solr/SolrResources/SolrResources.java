@@ -37,7 +37,7 @@ import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrInfoBean;
@@ -115,7 +115,7 @@ public class SolrResources implements Closeable {
         try {
           client.blockUntilConnected(startUpZkTimeOut, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
 
         zkClient = new SolrZkClient(client);
@@ -156,14 +156,16 @@ public class SolrResources implements Closeable {
         try {
           loadLock.wait();
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
       }
     }
     
     // nocommit
-    try (DW worker = new DW(this, true)) {
-      worker.add("SolrResourcesInternal",
+    
+    
+    try (SW solrCloseWorker = new SW(this, true)) {
+      solrCloseWorker.add("SolrResourcesInternal",
 
           () -> {
             SolrMetricManager mm = metricManager;
@@ -182,8 +184,8 @@ public class SolrResources implements Closeable {
             return "MetricManager";
           });
 
-      worker.add("CoreContainer", cores);
-      worker.add(zkClient);
+      solrCloseWorker.add("CoreContainer", cores);
+      solrCloseWorker.add(zkClient);
     }
   }
 
@@ -210,7 +212,7 @@ public class SolrResources implements Closeable {
       metricManager.registerGauge(null, registryName, sysprops, metricTag, true, "properties", "system");
       return registryName;
     } catch (Exception e) {
-      throw new DW.Exp("Error registering JVM metrics", e);
+      throw new SW.Exp("Error registering JVM metrics", e);
     }
   }
 

@@ -2,49 +2,49 @@
   "requestHandler": {
     "/update": {
       "useParams":"_UPDATE",
-      "class": "solr.UpdateRequestHandler"
+      "class": "org.apache.solr.handler.UpdateRequestHandler"
     },
     "/update/json": {
       "useParams":"_UPDATE_JSON",
-      "class": "solr.UpdateRequestHandler",
+      "class": "org.apache.solr.handler.UpdateRequestHandler",
       "invariants": {
         "update.contentType": "application/json"
       }
     },
     "/update/csv": {
       "useParams":"_UPDATE_CSV",
-      "class": "solr.UpdateRequestHandler",
+      "class": "org.apache.solr.handler.UpdateRequestHandler",
       "invariants": {
         "update.contentType": "application/csv"
       }
     },
     "/update/json/docs": {
       "useParams":"_UPDATE_JSON_DOCS",
-      "class": "solr.UpdateRequestHandler",
+      "class": "org.apache.solr.handler.UpdateRequestHandler",
       "invariants": {
         "update.contentType": "application/json",
         "json.command": "false"
       }
     },
     "update":{
-      "class":"solr.UpdateRequestHandlerApi",
+      "class":"org.apache.solr.handler.UpdateRequestHandlerApi",
       "useParams": "_UPDATE_JSON_DOCS"
     },
     "/config": {
       "useParams":"_CONFIG",
-      "class": "solr.SolrConfigHandler"
+      "class": "org.apache.solr.handler.SolrConfigHandler"
     },
     "/schema": {
-      "class": "solr.SchemaHandler",
+      "class": "org.apache.solr.handler.SchemaHandler",
       "useParams":"_SCHEMA"
 
     },
     "/replication": {
-      "class": "solr.ReplicationHandler",
+      "class": "org.apache.solr.handler.ReplicationHandler",
       "useParams":"_REPLICATION"
     },
     "/get": {
-      "class": "solr.RealTimeGetHandler",
+      "class": "org.apache.solr.handler.RealTimeGetHandler",
       "useParams":"_GET",
       "defaults": {
         "omitHeader": true,
@@ -53,7 +53,7 @@
       }
     },
     "/admin/ping": {
-      "class": "solr.PingRequestHandler",
+      "class": "org.apache.solr.handler.PingRequestHandler",
       "useParams":"_ADMIN_PING",
       "invariants": {
         "echoParams": "all",
@@ -61,46 +61,46 @@
       }
     },
     "/admin/segments": {
-      "class": "solr.SegmentsInfoRequestHandler",
+      "class": "org.apache.solr.handler.admin.SegmentsInfoRequestHandler",
       "useParams":"_ADMIN_SEGMENTS"
     },
     "/admin/luke": {
-      "class": "solr.LukeRequestHandler",
+      "class": "org.apache.solr.handler.admin.LukeRequestHandler",
       "useParams":"_ADMIN_LUKE"
     },
     "/admin/system": {
-      "class": "solr.SystemInfoHandler",
+      "class": "org.apache.solr.handler.admin.SystemInfoHandler",
       "useParams":"_ADMIN_SYSTEM"
     },
     "/admin/mbeans": {
-      "class": "solr.SolrInfoMBeanHandler",
+      "class": "org.apache.solr.handler.admin.SolrInfoMBeanHandler",
       "useParams":"_ADMIN_MBEANS"
     },
     "/admin/plugins": {
-      "class": "solr.PluginInfoHandler"
+      "class": "org.apache.solr.handler.admin.PluginInfoHandler"
     },
     "/admin/threads": {
-      "class": "solr.ThreadDumpHandler",
+      "class": "org.apache.solr.handler.admin.ThreadDumpHandler",
       "useParams":"_ADMIN_THREADS"
     },
     "/admin/properties": {
-      "class": "solr.PropertiesRequestHandler",
+      "class": "org.apache.solr.handler.admin.PropertiesRequestHandler",
       "useParams":"_ADMIN_PROPERTIES"
     },
     "/admin/logging": {
-      "class": "solr.LoggingHandler",
+      "class": "org.apache.solr.handler.admin.LoggingHandler",
       "useParams":"_ADMIN_LOGGING"
     },
     "/admin/health": {
-      "class": "solr.HealthCheckHandler",
+      "class": "org.apache.solr.handler.admin.HealthCheckHandler",
       "useParams":"_ADMIN_HEALTH"
     },
     "/admin/file": {
-      "class": "solr.ShowFileRequestHandler",
+      "class": "org.apache.solr.handler.admin.ShowFileRequestHandler",
       "useParams":"_ADMIN_FILE"
     },
     "/export": {
-      "class": "solr.ExportHandler",
+      "class": "org.apache.solr.handler.ExportHandler",
       "useParams":"_EXPORT",
       "components": [
         "query"
@@ -114,7 +114,7 @@
       }
     },
     "/graph": {
-      "class": "solr.GraphHandler",
+      "class": "org.apache.solr.handler.GraphHandler",
       "useParams":"_ADMIN_GRAPH",
       "invariants": {
         "wt": "graphml",
@@ -122,7 +122,7 @@
       }
     },
     "/stream": {
-      "class": "solr.StreamHandler",
+      "class": "org.apache.solr.handler.StreamHandler",
       "useParams":"_STREAM",
       "defaults": {
         "wt": "json"
@@ -132,7 +132,7 @@
       }
     },
     "/sql": {
-      "class": "solr.SQLHandler",
+      "class": "org.apache.solr.handler.SQLHandler",
       "useParams":"_SQL",
       "defaults": {
         "wt": "json"
@@ -142,24 +142,24 @@
       }
     },
     "/terms": {
-      "class": "solr.SearchHandler",
+      "class": "org.apache.solr.handler.component.SearchHandler",
       "useParams":"_TERMS",
       "components": [
         "terms"
       ]
     },
     "/analysis/document": {
-      "class": "solr.DocumentAnalysisRequestHandler",
+      "class": "org.apache.solr.handler.DocumentAnalysisRequestHandler",
       "startup": "lazy",
       "useParams": "_ANALYSIS_DOCUMENT"
     },
     "/analysis/field": {
-      "class": "solr.FieldAnalysisRequestHandler",
+      "class": "org.apache.solr.handler.FieldAnalysisRequestHandler",
       "startup": "lazy",
       "useParams": "_ANALYSIS_FIELD"
     },
     "/debug/dump": {
-      "class": "solr.DumpRequestHandler",
+      "class": "org.apache.solr.handler.DumpRequestHandler",
       "useParams": "_DEBUG_DUMP",
       "defaults": {
         "echoParams": "explicit",

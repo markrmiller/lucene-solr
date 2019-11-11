@@ -37,8 +37,8 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.InfoStream;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
@@ -191,7 +191,7 @@ public class SolrIndexWriter extends IndexWriter {
     try {
       dir = directoryFactory.get(path,  DirContext.DEFAULT, config.lockType);
     } catch (Exception e) {
-      Exp exp = new DW.Exp(e);
+      Exp exp = new SW.Exp(e);
       if (dir != null) try {
         directoryFactory.release(dir);
       } catch (IOException e1) {
@@ -350,7 +350,7 @@ public class SolrIndexWriter extends IndexWriter {
     try {
       super.close();
     } catch (Throwable e) {
-      DW.propegateInterrupt("Error closing IndexWriter", e);
+      SW.propegateInterrupt("Error closing IndexWriter", e);
     } finally {
       cleanup("close");
     }
@@ -366,7 +366,7 @@ public class SolrIndexWriter extends IndexWriter {
     try {
       super.rollback();
     } catch (Throwable e) {
-      DW.propegateInterrupt("Exception rolling back IndexWriter", e);
+      SW.propegateInterrupt("Exception rolling back IndexWriter", e);
     } finally {
       cleanup("rollback");
     }
@@ -385,7 +385,7 @@ public class SolrIndexWriter extends IndexWriter {
     log.info("SolrIndexWriter close {} numCloses={}", label, numCloses.get());
     
     if (infoStream != null) {
-      DW.close(infoStream, true);
+      SW.close(infoStream, true);
     }
 
     if (releaseDirectory) {

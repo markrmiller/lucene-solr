@@ -51,7 +51,7 @@ import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.metrics.SolrMetricProducer;
@@ -122,7 +122,7 @@ public class HdfsDirectoryFactory extends CachingDirectoryFactory implements Sol
       .expireAfterAccess(5, TimeUnit.MINUTES).removalListener(new RemovalListener<String,FileSystem>() {
         @Override
         public void onRemoval(RemovalNotification<String,FileSystem> rn) {
-          DW.close(rn.getValue());
+          SW.close(rn.getValue());
         }
       })
       .build();
@@ -138,7 +138,7 @@ public class HdfsDirectoryFactory extends CachingDirectoryFactory implements Sol
     super.close();
     Collection<FileSystem> values = tmpFsCache.asMap().values();
     for (FileSystem fs : values) {
-      DW.close(fs);
+      SW.close(fs);
     }
     tmpFsCache.invalidateAll();
     tmpFsCache.cleanUp();
@@ -447,7 +447,7 @@ public class HdfsDirectoryFactory extends CachingDirectoryFactory implements Sol
       log.error("Error checking if hdfs path exists", e);
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error checking if hdfs path exists", e);
     } finally {
-      DW.close(fileSystem);
+      SW.close(fileSystem);
     }
   }
 

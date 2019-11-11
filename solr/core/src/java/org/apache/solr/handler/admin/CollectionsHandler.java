@@ -16,98 +16,6 @@
  */
 package org.apache.solr.handler.admin;
 
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.solr.api.Api;
-import org.apache.solr.client.solrj.SolrResponse;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient.Builder;
-import org.apache.solr.client.solrj.request.CollectionAdminRequest;
-import org.apache.solr.client.solrj.request.CoreAdminRequest.RequestSyncShard;
-import org.apache.solr.client.solrj.response.RequestStatusState;
-import org.apache.solr.client.solrj.util.SolrIdentifierValidator;
-import org.apache.solr.cloud.OverseerSolrResponse;
-import org.apache.solr.cloud.OverseerTaskQueue;
-import org.apache.solr.cloud.OverseerTaskQueue.QueueEvent;
-import org.apache.solr.cloud.ZkController;
-import org.apache.solr.cloud.ZkController.NotInClusterStateException;
-import org.apache.solr.cloud.ZkShardTerms;
-import org.apache.solr.cloud.api.collections.AddReplicaCmd;
-import org.apache.solr.cloud.api.collections.CreateCollectionCmd;
-import org.apache.solr.cloud.api.collections.ReindexCollectionCmd;
-import org.apache.solr.cloud.api.collections.RoutedAlias;
-import org.apache.solr.cloud.overseer.SliceMutator;
-import org.apache.solr.cloud.rule.ReplicaAssigner;
-import org.apache.solr.cloud.rule.Rule;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.cloud.Aliases;
-import org.apache.solr.common.cloud.ClusterProperties;
-import org.apache.solr.common.cloud.ClusterState;
-import org.apache.solr.common.cloud.CollectionProperties;
-import org.apache.solr.common.cloud.CollectionStatePredicate;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.ImplicitDocRouter;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Replica.State;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkCmdExecutor;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
-import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.params.AutoScalingParams;
-import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.params.CollectionParams;
-import org.apache.solr.common.params.CollectionParams.CollectionAction;
-import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.params.CoreAdminParams;
-import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.common.util.Utils;
-import org.apache.solr.common.util.TimeSource.NanoTimeSource;
-import org.apache.solr.core.CloudConfig;
-import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.backup.repository.BackupRepository;
-import org.apache.solr.core.snapshots.CollectionSnapshotMetaData;
-import org.apache.solr.core.snapshots.SolrSnapshotManager;
-import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.logging.MDCLoggingContext;
-import org.apache.solr.request.LocalSolrQueryRequest;
-import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.security.AuthorizationContext;
-import org.apache.solr.security.PermissionNameProvider;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.solr.client.solrj.cloud.autoscaling.Policy.POLICY;
 import static org.apache.solr.client.solrj.response.RequestStatusState.COMPLETED;
 import static org.apache.solr.client.solrj.response.RequestStatusState.FAILED;
@@ -151,14 +59,55 @@ import static org.apache.solr.common.params.CollectionAdminParams.FOLLOW_ALIASES
 import static org.apache.solr.common.params.CollectionAdminParams.PROPERTY_NAME;
 import static org.apache.solr.common.params.CollectionAdminParams.PROPERTY_VALUE;
 import static org.apache.solr.common.params.CollectionAdminParams.WITH_COLLECTION;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.*;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICAPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDROLE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.ALIASPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.BACKUP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.BALANCESHARDUNIQUE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CLUSTERPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CLUSTERSTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.COLLECTIONPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.COLSTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATEALIAS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATESHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATESNAPSHOT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEALIAS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETENODE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETEREPLICAPROP;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETESHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETESNAPSHOT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETESTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.FORCELEADER;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.LIST;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.LISTALIASES;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.LISTSNAPSHOTS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MIGRATE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MIGRATESTATEFORMAT;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MODIFYCOLLECTION;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOVEREPLICA;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.OVERSEERSTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REBALANCELEADERS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REINDEXCOLLECTION;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REMOVEROLE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RENAME;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REPLACENODE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.REQUESTSTATUS;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RESTORE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.SPLITSHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.SYNCSHARD;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.UTILIZENODE;
 import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
 import static org.apache.solr.common.params.CommonAdminParams.IN_PLACE_MOVE;
 import static org.apache.solr.common.params.CommonAdminParams.NUM_SUB_SHARDS;
+import static org.apache.solr.common.params.CommonAdminParams.SPLIT_BY_PREFIX;
 import static org.apache.solr.common.params.CommonAdminParams.SPLIT_FUZZ;
 import static org.apache.solr.common.params.CommonAdminParams.SPLIT_METHOD;
 import static org.apache.solr.common.params.CommonAdminParams.WAIT_FOR_FINAL_STATE;
-import static org.apache.solr.common.params.CommonAdminParams.SPLIT_BY_PREFIX;
 import static org.apache.solr.common.params.CommonParams.NAME;
 import static org.apache.solr.common.params.CommonParams.TIMING;
 import static org.apache.solr.common.params.CommonParams.VALUE_LONG;
@@ -171,6 +120,95 @@ import static org.apache.solr.common.params.CoreAdminParams.INSTANCE_DIR;
 import static org.apache.solr.common.params.CoreAdminParams.ULOG_DIR;
 import static org.apache.solr.common.params.ShardParams._ROUTE_;
 import static org.apache.solr.common.util.StrUtils.formatString;
+
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.solr.api.Api;
+import org.apache.solr.client.solrj.SolrResponse;
+import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.HttpSolrClient.Builder;
+import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.client.solrj.request.CoreAdminRequest.RequestSyncShard;
+import org.apache.solr.client.solrj.response.RequestStatusState;
+import org.apache.solr.client.solrj.util.SolrIdentifierValidator;
+import org.apache.solr.cloud.OverseerSolrResponse;
+import org.apache.solr.cloud.OverseerTaskQueue;
+import org.apache.solr.cloud.ZkController;
+import org.apache.solr.cloud.ZkShardTerms;
+import org.apache.solr.cloud.api.collections.CreateCollectionCmd;
+import org.apache.solr.cloud.api.collections.DeleteCollectionCmd;
+import org.apache.solr.cloud.api.collections.ReindexCollectionCmd;
+import org.apache.solr.cloud.api.collections.RoutedAlias;
+import org.apache.solr.cloud.overseer.SliceMutator;
+import org.apache.solr.cloud.rule.ReplicaAssigner;
+import org.apache.solr.cloud.rule.Rule;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.Aliases;
+import org.apache.solr.common.cloud.ClusterProperties;
+import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.CollectionProperties;
+import org.apache.solr.common.cloud.CollectionStatePredicate;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.ImplicitDocRouter;
+import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Replica.State;
+import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkCmdExecutor;
+import org.apache.solr.common.cloud.ZkCoreNodeProps;
+import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.params.AutoScalingParams;
+import org.apache.solr.common.params.CollectionAdminParams;
+import org.apache.solr.common.params.CollectionParams;
+import org.apache.solr.common.params.CollectionParams.CollectionAction;
+import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.CoreAdminParams;
+import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.core.CloudConfig;
+import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.backup.repository.BackupRepository;
+import org.apache.solr.core.snapshots.CollectionSnapshotMetaData;
+import org.apache.solr.core.snapshots.SolrSnapshotManager;
+import org.apache.solr.handler.RequestHandlerBase;
+import org.apache.solr.logging.MDCLoggingContext;
+import org.apache.solr.request.LocalSolrQueryRequest;
+import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.security.AuthorizationContext;
+import org.apache.solr.security.PermissionNameProvider;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 public class CollectionsHandler extends RequestHandlerBase implements PermissionNameProvider {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -310,9 +348,6 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     ZkNodeProps zkProps = new ZkNodeProps(props);
     props.put(QUEUE_OPERATION, operation.action.toLower());
 
-    
-    
-
     Map<String,String> collectionParams = new HashMap<>();
     Map<String,Object> collectionProps = zkProps.getProperties();
     for (Map.Entry<String,Object> entry : collectionProps.entrySet()) {
@@ -323,8 +358,6 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       }
     }
     final String collectionName = zkProps.getStr(NAME);
-    CreateCollectionCmd.createCollectionZkNode(cores.getZkController().getSolrCloudManager().getDistribStateManager(),
-        collectionName, collectionParams);
 
    // cores.getZkController().sendStateUpdate(zkProps);
 
@@ -332,7 +365,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
   //  if (operation.sendToOCPQueue) {
 
-    // sendToOCPQueue(zkProps, operation.timeOut);
+    // sendToOCPQueue(zkProps, operation.timeOut); // nocommit - we should make this optional default false, but when false, we really don't send anything to the op queue now
 //      rsp.getValues().addAll(overseerResponse.getResponse());
 //      Exception exp = overseerResponse.getException();
 //      if (exp != null) {
@@ -340,22 +373,31 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 //      }
 
     
-      NamedList results = new NamedList<>();
-      new  CreateCollectionCmd(coreContainer, coreContainer.getZkController().getSolrCloudManager(), coreContainer.getZkController().getZkStateReader()).call(coreContainer.getZkController().getZkStateReader().getClusterState(), zkProps, results);
- //   new AddReplicaCmd(coreContainer, ADMIN_PATH).call(clusterState, props, results);
-    
-    
-    
-    
-      //TODO yuck; shouldn't create-collection at the overseer do this?  (conditionally perhaps)
-      //if (action.equals(CollectionAction.CREATE) && asyncId == null) {
-       // if (rsp.getException() == null) {
-       int nrtReplicas = zkProps.getInt(ZkStateReader.NRT_REPLICAS, 0);
-       int pullReplicas = zkProps.getInt(ZkStateReader.PULL_REPLICAS, 0);
-       int tlogReplicas = zkProps.getInt(ZkStateReader.TLOG_REPLICAS, 0);
-       int numShards = zkProps.getInt(ZkStateReader.NUM_SHARDS_PROP, 0);
-       waitForActiveCollection(zkProps.getStr(NAME), cores, numShards, numShards * (nrtReplicas + pullReplicas + tlogReplicas));
-      //  }
+    NamedList results = new NamedList<>();
+
+
+    // new AddReplicaCmd(coreContainer, ADMIN_PATH).call(clusterState, props, results);
+
+    if (action.equals(CollectionAction.CREATE)) {
+      // if (rsp.getException() == null) {
+      CreateCollectionCmd.createCollectionZkNode(cores.getZkController().getSolrCloudManager().getDistribStateManager(),
+          collectionName, collectionParams);
+      
+      new CreateCollectionCmd(coreContainer, coreContainer.getZkController().getSolrCloudManager(),
+          coreContainer.getZkController().getZkStateReader())
+              .call(coreContainer.getZkController().getZkStateReader().getClusterState(), zkProps, results);
+      
+      int nrtReplicas = zkProps.getInt(ZkStateReader.NRT_REPLICAS, 0);
+      int pullReplicas = zkProps.getInt(ZkStateReader.PULL_REPLICAS, 0);
+      int tlogReplicas = zkProps.getInt(ZkStateReader.TLOG_REPLICAS, 0);
+      int numShards = zkProps.getInt(ZkStateReader.NUM_SHARDS_PROP, 0);
+      waitForActiveCollection(zkProps.getStr(NAME), cores, numShards,
+          numShards * (nrtReplicas + pullReplicas + tlogReplicas));
+    } else {
+      if (action.equals(CollectionAction.DELETE)) {
+        new DeleteCollectionCmd(cores, ADMIN_PATH);
+      }
+    }
      // }
 //
 //    } else {
@@ -1597,10 +1639,12 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
         return predicate.matches(n, c);
       });
-    } catch (TimeoutException | InterruptedException e) {
-      DW.propegateInterrupt(e);
+    } catch (TimeoutException e) {
+      SW.propegateInterrupt(e);
       throw new RuntimeException("Failed while waiting for active collection" + "\n" + e.getMessage() + "\nLive Nodes: " + Arrays.toString(liveNodesLastSeen.get().toArray())
           + "\nLast available state: " + state.get());
+    } catch (InterruptedException e) {
+      throw new SW.Exp(e);
     }
 
   }
@@ -1643,9 +1687,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         try {
           new Rule(map);
         } catch (Exception e) {
-          log.error("verifyRuleParams(CoreContainer=" + cc + ", Map<String,Object>=" + m + ")", e);
-
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Error in rule " + m, e);
+          throw new SW.Exp("Error in rule " + m + " verifyRuleParams(CoreContainer=" + cc + ", Map<String,Object>=" + m + ")", e);
         }
       }
     }

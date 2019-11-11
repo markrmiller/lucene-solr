@@ -43,7 +43,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.TimeSource;
@@ -129,7 +129,7 @@ public class DeleteShardCmd implements OverseerCollectionMessageHandler.Cmd {
           cleanupLatch.countDown();
         } catch (Exception e) {
           cleanupLatch.countDown();
-          throw new DW.Exp("Error deleting replica: ", e);
+          throw new SW.Exp("Error deleting replica: ", e);
         }
       }
       log.debug("Waiting for delete shard action to complete");
@@ -146,7 +146,7 @@ public class DeleteShardCmd implements OverseerCollectionMessageHandler.Cmd {
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp("Error executing delete operation for collection: " + collectionName + " shard: " + sliceId, e);
+      throw new SW.Exp("Error executing delete operation for collection: " + collectionName + " shard: " + sliceId, e);
     }
   }
 

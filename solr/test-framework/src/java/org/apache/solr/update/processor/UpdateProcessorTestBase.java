@@ -18,7 +18,7 @@ package org.apache.solr.update.processor;
 
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.SolrInputDocument;
@@ -132,7 +132,7 @@ public class UpdateProcessorTestBase extends SolrTestCaseJ4 {
     try {
       processor.finish();
     } finally {
-      DW.close(processor);
+      SW.close(processor);
       req.close();
     }
   }

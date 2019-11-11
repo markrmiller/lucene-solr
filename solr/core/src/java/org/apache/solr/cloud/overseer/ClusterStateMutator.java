@@ -36,7 +36,7 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +98,7 @@ public class ClusterStateMutator {
           stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + cName + "/"
               + ZkStateReader.SHARD_LEADERS_ZKNODE + "/" + sliceName , null, CreateMode.PERSISTENT, false);
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
     }

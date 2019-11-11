@@ -47,8 +47,8 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.rule.ImplicitSnitch;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
@@ -306,7 +306,7 @@ public class Policy implements MapWriter {
             return p.compare(r1, r2, false);
           });
         } catch (Exception e) {
-          Exp exp = new DW.Exp(e);
+          Exp exp = new SW.Exp(e);
           try {
             Map m = Collections.singletonMap("diagnostics", (MapWriter) ew -> {
               PolicyHelper.writeNodes(ew, matrixCopy);
@@ -318,7 +318,7 @@ public class Policy implements MapWriter {
                 lastComparison[1].node,
                 Utils.writeJson(m, new StringWriter(), true).toString());
           } catch (IOException e1) {
-            DW.propegateInterrupt(e1);
+            SW.propegateInterrupt(e1);
             exp.addSuppressed(e1);
           }
           
@@ -545,7 +545,7 @@ public class Policy implements MapWriter {
         state = cloudManager.getClusterStateProvider().getClusterState();
         log.trace("-- session created with cluster state: {}", state);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
       this.znodeVersion = state != null ? state.getZNodeVersion() : -1;
       this.nodes = new ArrayList<>(cloudManager.getClusterStateProvider().getLiveNodes());

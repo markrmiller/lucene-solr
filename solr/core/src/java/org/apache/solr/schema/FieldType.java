@@ -487,11 +487,13 @@ public abstract class FieldType extends FieldProperties {
    * Default analyzer for types that only produce 1 verbatim token...
    * A maximum size of chars to be read must be specified
    */
-  protected final class DefaultAnalyzer extends SolrAnalyzer {
+  protected final static class DefaultAnalyzer extends SolrAnalyzer {
     final int maxChars;
+    private FieldType fieldType;
 
-    DefaultAnalyzer(int maxChars) {
+    DefaultAnalyzer(int maxChars, FieldType fieldType) {
       this.maxChars=maxChars;
+      this.fieldType = fieldType;
     }
 
     @Override
@@ -499,18 +501,18 @@ public abstract class FieldType extends FieldProperties {
       Tokenizer ts = new Tokenizer() {
         final char[] cbuf = new char[maxChars];
         final CharTermAttribute termAtt = addAttribute(CharTermAttribute.class);
-        final BytesTermAttribute bytesAtt = isPointField() ? addAttribute(BytesTermAttribute.class) : null;
+        final BytesTermAttribute bytesAtt = fieldType.isPointField() ? addAttribute(BytesTermAttribute.class) : null;
         final OffsetAttribute offsetAtt = addAttribute(OffsetAttribute.class);
         @Override
         public boolean incrementToken() throws IOException {
           clearAttributes();
           int n = input.read(cbuf,0,maxChars);
           if (n<=0) return false;
-          if (isPointField()) {
-            BytesRef b = ((PointField)FieldType.this).toInternalByteRef(new String(cbuf, 0, n));
+          if (fieldType.isPointField()) {
+            BytesRef b = ((PointField)fieldType).toInternalByteRef(new String(cbuf, 0, n));
             bytesAtt.setBytesRef(b);
           } else {
-            String s = toInternal(new String(cbuf, 0, n));
+            String s = fieldType.toInternal(new String(cbuf, 0, n));
             termAtt.setEmpty().append(s);
           }
           offsetAtt.setOffset(correctOffset(0),correctOffset(n));
@@ -522,7 +524,7 @@ public abstract class FieldType extends FieldProperties {
     }
   }
 
-  private Analyzer indexAnalyzer = new DefaultAnalyzer(256);
+  private Analyzer indexAnalyzer = new DefaultAnalyzer(256, this);
 
   private Analyzer queryAnalyzer = indexAnalyzer;
 

@@ -29,7 +29,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.common.params.CoreAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.prometheus.collector.MetricSamples;
@@ -102,7 +102,7 @@ public class SolrStandaloneScraper extends SolrScraper {
 
   @Override
   public void close() {
-    DW.close(solrClient);
+    SW.close(solrClient);
   }
 
 }

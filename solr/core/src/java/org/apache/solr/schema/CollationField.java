@@ -41,7 +41,7 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermRangeQuery;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.response.TextResponseWriter;
 import org.apache.solr.search.QParser;
@@ -180,7 +180,7 @@ public class CollationField extends FieldType {
       // io error or invalid rules
       throw new RuntimeException(e);
     } finally {
-      DW.close(input);
+      SW.close(input);
     }
   }
 

@@ -43,7 +43,7 @@ import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
@@ -98,7 +98,7 @@ public class TestRecoveryHdfs extends SolrTestCaseJ4 {
   
   @AfterClass
   public static void afterClass() throws Exception {
-    DW.close(fs);
+    SW.close(fs);
     fs = null;
     try {
       deleteCore();

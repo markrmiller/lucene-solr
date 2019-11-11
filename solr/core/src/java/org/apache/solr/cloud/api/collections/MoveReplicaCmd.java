@@ -37,7 +37,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CoreAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
@@ -255,7 +255,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
       try {
         ocmh.addReplica(ocmh.zkStateReader.getClusterState(), addReplicasProps, rollback, null);
       } catch (Exception e) {
-        throw new DW.Exp("Fatal error during MOVEREPLICA of " + replica
+        throw new SW.Exp("Fatal error during MOVEREPLICA of " + replica
             + ", collection may be inconsistent!", e);
       }
       if (rollback.get("failure") != null) {

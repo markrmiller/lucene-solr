@@ -34,7 +34,7 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.prometheus.PrometheusExporterTestBase;
@@ -92,7 +92,7 @@ public class SolrCloudScraperTest extends PrometheusExporterTestBase {
   @After
   public void tearDown() throws Exception {
     super.tearDown();
-    DW.close(solrCloudScraper);
+    SW.close(solrCloudScraper);
     if (null != executor) {
       executor.shutdownNow();
       executor = null;

@@ -38,7 +38,7 @@ import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.junit.BeforeClass;
@@ -195,7 +195,7 @@ public class XmlInterpolationTest extends TaggerTestCase {
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
-      DW.close(ts);
+      SW.close(ts);
     }
     return result;
   }
@@ -217,7 +217,7 @@ public class XmlInterpolationTest extends TaggerTestCase {
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
-      DW.close(ts);
+      SW.close(ts);
     }
     return result.toArray(new String[result.size()]);
   }

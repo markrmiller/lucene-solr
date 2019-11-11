@@ -29,7 +29,7 @@ import org.apache.solr.cloud.ZkController.ContextKey;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZooKeeperException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -75,7 +75,7 @@ public  class LeaderElector {
   public LeaderElector(SolrZkClient zkClient) {
     this.zkClient = zkClient;
     this.contextKey = null;
-    this.electionContexts = DW.concMapSmallO();
+    this.electionContexts = SW.concMapSmallO();
   }
   
   public LeaderElector(SolrZkClient zkClient, ContextKey key, Map<ContextKey,ElectionContext> electionContexts) {
@@ -311,7 +311,7 @@ public  class LeaderElector {
           log.info("No znode found to delete at {}", myNode);
           // expected . don't do anything
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
         return;
       }
@@ -319,7 +319,7 @@ public  class LeaderElector {
         // am I the next leader?
         checkIfIamLeader(context, true);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }

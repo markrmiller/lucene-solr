@@ -25,14 +25,14 @@
   <str name="configSetBaseDir">${configSetBaseDir:configsets}</str>
   <str name="coreRootDirectory">${coreRootDirectory:.}</str>
 
-  <shardHandlerFactory name="shardHandlerFactory" class="HttpShardHandlerFactory">
+  <shardHandlerFactory name="shardHandlerFactory" class="org.apache.solr.handler.component.HttpShardHandlerFactory">
     <str name="urlScheme">${urlScheme:}</str>
     <int name="socketTimeout">${socketTimeout:15000}</int>
     <int name="connTimeout">${connTimeout:15000}</int>
     <str name="shardsWhitelist">${solr.tests.shardsWhitelist:}</str>
   </shardHandlerFactory>
 
-  <transientCoreCacheFactory name="transientCoreCacheFactory" class="TransientSolrCoreCacheFactoryDefault">
+  <transientCoreCacheFactory name="transientCoreCacheFactory" class="org.apache.solr.core.TransientSolrCoreCacheFactoryDefault">
     <int name="transientCacheSize">4</int>
   </transientCoreCacheFactory>
 

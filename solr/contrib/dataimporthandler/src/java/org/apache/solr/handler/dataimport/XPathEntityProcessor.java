@@ -21,7 +21,7 @@ import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrap
 import org.apache.solr.core.SolrCore;
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.solr.util.SystemIdResolver;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.XMLErrorLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,7 +136,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
           xslTransformer = transFact.newTransformer(xsltSource);
         } finally {
           // some XML parsers are broken and don't close the byte stream (but they should according to spec)
-          DW.close(xsltSource.getInputStream());
+          SW.close(xsltSource.getInputStream());
         }
         log.info("Using xslTransformer: "
                         + xslTransformer.getClass().getName());

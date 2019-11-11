@@ -83,7 +83,7 @@ public final class FieldTypePluginLoader
                               String className,
                               Node node ) throws Exception {
 
-    FieldType ft = loader.newInstance(className, FieldType.class);
+    FieldType ft = loader.newInstance(className, FieldType.class, "org.apache.solr.schema");
     ft.setTypeName(name);
     
     String expression = "./analyzer[@type='query']";

@@ -43,7 +43,7 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -143,14 +143,14 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
 
     this.scheduler.shutdown();
     if (bootstrapExecutor != null)  {
-      DW.close(bootstrapStatusRunnable);
+      SW.close(bootstrapStatusRunnable);
       ExecutorUtil.shutdownAndAwaitTermination(bootstrapExecutor);
     }
     this.closeLogReaders();
     Callable callable = core.getSolrCoreState().getCdcrBootstrapCallable();
     if (callable != null)  {
       CdcrRequestHandler.BootstrapCallable bootstrapCallable = (CdcrRequestHandler.BootstrapCallable) callable;
-      DW.close(bootstrapCallable);
+      SW.close(bootstrapCallable);
     }
   }
 
@@ -221,7 +221,7 @@ class CdcrReplicatorManager implements CdcrStateManager.CdcrStateObserver {
   void shutdown() {
     this.scheduler.shutdown();
     if (bootstrapExecutor != null)  {
-      DW.close(bootstrapStatusRunnable);
+      SW.close(bootstrapStatusRunnable);
       ExecutorUtil.shutdownAndAwaitTermination(bootstrapExecutor);
     }
     for (CdcrReplicatorState state : replicatorStates) {

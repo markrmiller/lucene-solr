@@ -32,7 +32,7 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.prometheus.collector.MetricSamples;
 import org.apache.solr.prometheus.exporter.MetricsQuery;
@@ -46,7 +46,7 @@ public class SolrCloudScraper extends SolrScraper {
   private Cache<String, HttpSolrClient> hostClientCache = CacheBuilder.newBuilder()
       .maximumSize(100)
       .removalListener((RemovalListener<String, HttpSolrClient>)
-          removalNotification -> DW.close(removalNotification.getValue()))
+          removalNotification -> SW.close(removalNotification.getValue()))
       .build();
 
   public SolrCloudScraper(CloudSolrClient solrClient, Executor executor, SolrClientFactory solrClientFactory) {
@@ -148,7 +148,7 @@ public class SolrCloudScraper extends SolrScraper {
 
   @Override
   public void close() {
-    try (DW closer = new DW(this)) {
+    try (SW closer = new SW(this)) {
       closer.add("SolrClients", solrClient, hostClientCache);
     }
   }

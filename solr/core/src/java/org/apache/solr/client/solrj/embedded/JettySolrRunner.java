@@ -21,10 +21,8 @@ import java.lang.invoke.MethodHandles;
 import java.net.BindException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -49,7 +47,7 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
@@ -96,7 +94,7 @@ public class JettySolrRunner {
   // NOTE: needs to be larger than HttpClientUtil.SolrHttpClient.EVICT_IDLE_CONNECTIONS
   private static final int THREAD_POOL_MAX_IDLE_TIME_MS = HttpClientUtil.EVICT_IDLE_CONNECTIONS_DEFAULT + 10000;
 
-  Server server;
+  private volatile Server server;
 
   private volatile FilterHolder dispatchFilter;
   private volatile FilterHolder debugFilter;
@@ -230,11 +228,10 @@ public class JettySolrRunner {
 
     private AtomicLong nRequests = new AtomicLong();
 
-    List<Delay> delays = new ArrayList<>();
+    private Set<Delay> delays = SW.concSetSmallO();
 
     public long getTotalRequests() {
       return nRequests.get();
-
     }
 
     /**
@@ -271,21 +268,21 @@ public class JettySolrRunner {
 
     private void executeDelay() {
       int delayMs = 0;
-      for (Delay delay: delays) {
-        this.log.info("Delaying "+delay.delayValue+", for reason: "+delay.reason);
+      for (Delay delay : delays) {
+        if (log.isDebugEnabled()) log.info("Delaying " + delay.delayValue + ", for reason: " + delay.reason);
         if (delay.counter.decrementAndGet() == 0) {
           delayMs += delay.delayValue;
         }
       }
 
       if (delayMs > 0) {
-        this.log.info("Pausing this socket connection for " + delayMs + "ms...");
+        if (log.isDebugEnabled()) log.info("Pausing this socket connection for " + delayMs + "ms...");
         try {
           Thread.sleep(delayMs);
         } catch (InterruptedException e) {
-          throw new RuntimeException(e);
+          SW.propegateInterrupt(e);
         }
-        this.log.info("Waking up after the delay of " + delayMs + "ms...");
+        if (log.isDebugEnabled()) log.info("Waking up after the delay of " + delayMs + "ms...");
       }
     }
 
@@ -350,7 +347,7 @@ public class JettySolrRunner {
       try {
         proxy = new SocketProxy(0, config.sslConfig != null && config.sslConfig.isSSLMode());
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
       setProxyPort(proxy.getListenPort());
     } else {
@@ -382,6 +379,8 @@ public class JettySolrRunner {
     // the server as well as any client actions taken by this JVM in
     // talking to that server, but for the purposes of testing that should
     // be good enough
+    
+    // nocommit - there is some SSL init stuff that blocks that seems like we could maybe preload in corecontainer...
     final SslContextFactory sslcontext = SSLConfig.createContextFactory(config.sslConfig);
 
     HttpConfiguration configuration = new HttpConfiguration();
@@ -398,7 +397,12 @@ public class JettySolrRunner {
       } else {
         sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
 
-        connector = new ServerConnector(server, 1, 1);
+        connector = new ServerConnector(server, 3, 6); // acceptors and selectors
+        
+        // acceptors accept new connections from client - set in proportion to load - more connection open/closes needs more acceptors
+        // selectors detects activity on socket (read/write available) and hands to off to handle event - up to 64k connections each
+        // 5k clients on http server, maybe 1 selector.
+        
         SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
         connector.addConnectionFactory(sslConnectionFactory);
         connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
@@ -439,8 +443,6 @@ public class JettySolrRunner {
     {
       // Initialize the servlets
       final ServletContextHandler root = new ServletContextHandler(server, config.context,ServletContextHandler.NO_SESSIONS);
-    //  FilterHolder guiceFilter = new FilterHolder(injector.getInstance(GuiceFilter.class));
-    //  root.addFilter(guiceFilter, "/*", EnumSet.allOf(DispatcherType.class)); // nocommit
 
       server.addLifeCycleListener(new LifeCycle.Listener() {
 
@@ -720,7 +722,7 @@ public class JettySolrRunner {
 
         server.join();
       } catch (InterruptedException e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
 
     } finally {

@@ -31,7 +31,7 @@ import org.apache.solr.common.cloud.CollectionProperties;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -126,7 +126,7 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
               try {
                 deleteTargetCollection(clusterState, results, aliasName, aliasesManager, action);
               } catch (Exception e) {
-                throw new DW.Exp(e);
+                throw new SW.Exp(e);
               }
             });
           }

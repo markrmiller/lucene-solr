@@ -48,6 +48,8 @@ import org.slf4j.LoggerFactory;
 public abstract class DirectoryFactory implements NamedListInitializedPlugin,
     Closeable {
 
+  public static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   // Estimate 10M docs, 100GB size, to avoid caching by NRTCachingDirectory
   // Stayed away from upper bounds of the int/long in case any other code tried to aggregate these numbers.
   // A large estimate should currently have no other side effects.
@@ -60,8 +62,6 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
 
   // hint about what the directory contains - default is index directory
   public enum DirContext {DEFAULT, META_DATA}
-
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // Available lock types
   public final static String LOCK_TYPE_SIMPLE = "simple";

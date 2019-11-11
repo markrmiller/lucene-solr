@@ -66,7 +66,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -106,7 +106,7 @@ public class SolrZkClient implements Closeable {
     try {
       transformer = transformerFactory.newTransformer();
     } catch (TransformerConfigurationException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     
     transformerFactory.setAttribute("indent-number", 2);
@@ -175,7 +175,7 @@ public class SolrZkClient implements Closeable {
     } catch (Exception e) {
       log.error("SolrZkClient(CuratorFramework=" + curator + ")", e);
 
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     
     this.zkClientTimeout = keeper.getSessionTimeout();
@@ -365,7 +365,7 @@ public class SolrZkClient implements Closeable {
       } catch (Throwable t) {
         log.error("createZkCredentialsToAddAutomatically()", t);
 
-        throw new DW.Exp(t);
+        throw new SW.Exp(t);
       }
     }
     //log.debug("Using default ZkCredentialsProvider");
@@ -394,7 +394,7 @@ public class SolrZkClient implements Closeable {
       } catch (Throwable t) {
         log.error("createZkACLProvider()", t);
 
-        throw new DW.Exp("VM param zkACLProvider does not point to a class implementing ZkACLProvider and with a non-arg constructor", t);
+        throw new SW.Exp("VM param zkACLProvider does not point to a class implementing ZkACLProvider and with a non-arg constructor", t);
       }
     }
     //log.debug("Using default ZkACLProvider");
@@ -852,7 +852,7 @@ public class SolrZkClient implements Closeable {
         // things change ...
         return;
       }
-      throw new DW.Exp(e1);
+      throw new SW.Exp(e1);
     }
     StringBuilder dent = new StringBuilder();
     for (int i = 0; i < indent; i++) {
@@ -900,7 +900,7 @@ public class SolrZkClient implements Closeable {
     try {
       Files.writeString(file, sb.toString(), StandardOpenOption.CREATE);
     } catch (IOException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
   
@@ -913,12 +913,12 @@ public class SolrZkClient implements Closeable {
           return writer.toString();
         }
       } finally {
-        DW.close(((StreamSource) xmlInput).getInputStream());
+        SW.close(((StreamSource) xmlInput).getInputStream());
       }
     } catch (Exception e) {
       log.error("prettyPrint(path={}, dataString={})", dataString, indent, e);
 
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       return "XML Parsing Failure";
     }
   }
@@ -936,7 +936,7 @@ public class SolrZkClient implements Closeable {
     if (isClosed) return; // it's okay if we over close - same as solrcore
     isClosed = true;
     
-    try (DW worker = new DW(this, true)) {
+    try (SW worker = new SW(this, true)) {
       worker.add("ZkClientExecutors&ConnMgr", connManager, zkCallbackExecutor, zkConnManagerCallbackExecutor, curator);
     }
 
@@ -995,7 +995,7 @@ public class SolrZkClient implements Closeable {
       } catch (InterruptedException e) {
         log.error("closeKeeper(SolrZooKeeper=" + keeper + ")", e);
 
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
 
@@ -1014,7 +1014,7 @@ public class SolrZkClient implements Closeable {
     } catch (Exception e) {
       log.error("closeCallbackExecutor()", e);
 
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     try {
@@ -1022,7 +1022,7 @@ public class SolrZkClient implements Closeable {
     } catch (Exception e) {
       log.error("closeCallbackExecutor()", e);
 
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     if (log.isDebugEnabled()) {
@@ -1369,7 +1369,7 @@ public class SolrZkClient implements Closeable {
     } catch (InterruptedException e) {
       log.error("mkDirs(String=" + paths + ")", e);
 
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     
     if (!success) {
@@ -1385,7 +1385,7 @@ public class SolrZkClient implements Closeable {
     try {
       mkdirs(znode, FileUtils.readFileToByteArray(file));
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -1393,7 +1393,7 @@ public class SolrZkClient implements Closeable {
     return curator;
   }
   
-  public AsyncCuratorFramework getAsynCurator() {
+  public AsyncCuratorFramework getAsyncCurator() {
     return asyncCurator;
   }
   
@@ -1404,7 +1404,7 @@ public class SolrZkClient implements Closeable {
     try {
       client.blockUntilConnected(10000, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
     }
 
     try (SolrZkClient zkClient = new SolrZkClient(client)) {

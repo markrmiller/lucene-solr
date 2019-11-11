@@ -43,7 +43,7 @@ import org.apache.solr.cloud.hdfs.HdfsTestUtil;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.backup.BackupManager;
 import org.apache.solr.core.backup.repository.HdfsBackupRepository;
@@ -152,7 +152,7 @@ public class TestHdfsCloudBackupRestore extends AbstractCloudBackupRestoreTestCa
 
   @AfterClass
   public static void teardownClass() throws Exception {
-    DW.close(fs);
+    SW.close(fs);
     fs = null;
     try {
       HdfsTestUtil.teardownClass(dfsCluster);

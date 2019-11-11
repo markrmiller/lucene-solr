@@ -42,7 +42,7 @@ import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -128,7 +128,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
         ops.add(Op.delete(leaderPath, -1));
         zkClient.multi(ops, true);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       } finally {
         version = null;
       }
@@ -179,7 +179,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       assert leaderZkNodeParentVersion != null;
 
     } catch (Throwable t) {
-      throw new DW.Exp("Could not register as the leader because creating the ephemeral registration node in ZooKeeper failed: " + errors, t);
+      throw new SW.Exp("Could not register as the leader because creating the ephemeral registration node in ZooKeeper failed: " + errors, t);
     }
   }
 
@@ -280,7 +280,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
       try {
         zkController.getOverseer().offerStateUpdate(m);
       } catch (Exception e1) {
-        throw new DW.Exp(e1);
+        throw new SW.Exp(e1);
       }
 
       if (isClosed) {
@@ -331,7 +331,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
           result = syncStrategy.sync(zkController, core, leaderProps, weAreReplacement);
           success = result.isSuccess();
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
 
         UpdateLog ulog = core.getUpdateHandler().getUpdateLog();
@@ -373,7 +373,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               searchHolder.decref();
             }
           } catch (Exception e) {
-            throw new DW.Exp(e);
+            throw new SW.Exp(e);
           }
         }
         if (!success) {
@@ -449,11 +449,11 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
               try {
                 rejoinLeaderElection(core);
               } catch (Exception exc) {
-                throw new DW.Exp(e);
+                throw new SW.Exp(e);
               }
             }
           } else {
-            throw new DW.Exp(e);
+            throw new SW.Exp(e);
           }
         }
       }

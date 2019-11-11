@@ -130,7 +130,7 @@ public final class RequestHandlers implements Closeable {
     }
     handlers.init(Collections.emptyMap(),core, modifiedInfos);
     handlers.alias(handlers.getDefault(), "");
-    log.debug("Registered paths: {}" , StrUtils.join(new ArrayList<>(handlers.keySet()) , ',' ));
+    if (log.isDebugEnabled()) log.debug("Registered paths: {}" , StrUtils.join(new ArrayList<>(handlers.keySet()) , ',' ));
     if (handlers.get("") == null && !handlers.alias("/select", "")) {
       if (handlers.get("") == null && !handlers.alias("standard", "")) {
         log.warn("no default request handler is registered (either '/select' or 'standard')");

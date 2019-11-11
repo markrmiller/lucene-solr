@@ -26,7 +26,7 @@ import java.util.Map;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +57,7 @@ public class ConfigSetProperties {
       log.info("Did not find ConfigSet properties, assuming default properties");
       return new NamedList();
     } catch (Exception ex) {
-      throw new DW.Exp(ex);
+      throw new SW.Exp(ex);
     }
 
   }
@@ -74,7 +74,7 @@ public class ConfigSetProperties {
       }
       return new NamedList();
     } catch (Exception ex) {
-      throw new DW.Exp("Did not find ConfigSet properties", ex);
+      throw new SW.Exp("Did not find ConfigSet properties", ex);
     }
   }
 }

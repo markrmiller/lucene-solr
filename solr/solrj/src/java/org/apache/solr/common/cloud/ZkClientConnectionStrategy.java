@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.solr.common.cloud.ZkCredentialsProvider.ZkCredentials;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.Watcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +52,7 @@ public abstract class ZkClientConnectionStrategy {
       try {
         listener.disconnected();
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }
@@ -62,7 +62,7 @@ public abstract class ZkClientConnectionStrategy {
       try {
         listener.connected();
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }

@@ -40,7 +40,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.rule.ImplicitSnitch;
 import org.apache.solr.common.cloud.rule.Snitch;
 import org.apache.solr.common.cloud.rule.SnitchContext;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -341,7 +341,7 @@ public class ReplicaAssigner {
       try {
         snitches.put(c, new SnitchInfoImpl(Collections.EMPTY_MAP, (Snitch) c.getConstructor().newInstance(), cloudManager));
       } catch (Exception e) {
-        throw new DW.Exp("Error instantiating Snitch " + c.getName(), e);
+        throw new SW.Exp("Error instantiating Snitch " + c.getName(), e);
       }
     }
     for (String tagName : tagNames) {
@@ -368,7 +368,7 @@ public class ReplicaAssigner {
           try {
             info.snitch.getTags(node, info.myTags, context);
           } catch (Exception e) {
-            throw new DW.Exp(e);
+            throw new SW.Exp(e);
           }
         }
       }
@@ -437,7 +437,7 @@ public class ReplicaAssigner {
             (Snitch) Snitch.class.getClassLoader().loadClass(klas).getConstructor().newInstance() ;
         snitches.put(inst.getClass(), new SnitchInfoImpl(map, inst, cloudManager));
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
 
     }

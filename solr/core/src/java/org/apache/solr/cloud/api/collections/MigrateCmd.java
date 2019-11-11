@@ -40,7 +40,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
@@ -153,7 +153,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
         ocmh.commandMap.get(DELETE).call(zkStateReader.getClusterState(), new ZkNodeProps(props), results);
         clusterState = zkStateReader.getClusterState();
       } catch (Exception e) {
-        throw new DW.Exp("Unable to clean up existing temporary collection: " + tempSourceCollectionName, e);
+        throw new SW.Exp("Unable to clean up existing temporary collection: " + tempSourceCollectionName, e);
       }
     }
 
@@ -363,7 +363,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
           NAME, tempSourceCollectionName);
       ocmh.commandMap.get(DELETE). call(zkStateReader.getClusterState(), new ZkNodeProps(props), results);
     } catch (Exception e) {
-      throw new DW.Exp("Unable to delete temporary collection: " + tempSourceCollectionName
+      throw new SW.Exp("Unable to delete temporary collection: " + tempSourceCollectionName
           + ". Please remove it manually", e);
     }
   }

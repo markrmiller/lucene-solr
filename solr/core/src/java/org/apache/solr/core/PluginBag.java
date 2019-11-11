@@ -16,6 +16,10 @@
  */
 package org.apache.solr.core;
 
+import static java.util.Collections.singletonMap;
+import static org.apache.solr.api.ApiBag.HANDLER_NAME;
+import static org.apache.solr.common.params.CommonParams.NAME;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -41,6 +45,7 @@ import org.apache.solr.api.ApiBag;
 import org.apache.solr.api.ApiSupport;
 import org.apache.solr.cloud.CloudUtil;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.handler.component.SearchComponent;
@@ -56,10 +61,6 @@ import org.apache.solr.util.plugin.PluginInfoInitialized;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.Collections.singletonMap;
-import static org.apache.solr.api.ApiBag.HANDLER_NAME;
-import static org.apache.solr.common.params.CommonParams.NAME;
 
 /**
  * This manages the lifecycle of a set of plugin of the same type .
@@ -296,7 +297,7 @@ public class PluginBag<T> implements AutoCloseable {
       PluginHolder<T> old = put(name, o);
       if (old != null) log.warn("Multiple entries of {} with name {}", meta.getCleanTag(), name);
     }
-    if (infos.size() > 0) { // Aggregate logging
+    if (log.isDebugEnabled() && infos.size() > 0) { // Aggregate logging
       log.debug("[{}] Initialized {} plugins of type {}: {}", solrCore.getName(), infos.size(), meta.getCleanTag(),
           infos.stream().map(i -> i.name).collect(Collectors.toList()));
     }
@@ -331,12 +332,13 @@ public class PluginBag<T> implements AutoCloseable {
    */
   @Override
   public void close() {
-    for (Map.Entry<String, PluginHolder<T>> e : registry.entrySet()) {
-      try {
-        e.getValue().close();
-      } catch (Exception exp) {
-        log.error("Error closing plugin " + e.getKey() + " of type : " + meta.getCleanTag(), exp);
+    try (SW worker = new SW(this)) {
+
+      for (Map.Entry<String,PluginHolder<T>> e : registry.entrySet()) {
+        worker.collect(e.getValue());
       }
+      
+      worker.addCollect("Plugins");
     }
   }
 

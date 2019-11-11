@@ -81,7 +81,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrSingleThreaded;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.CommandOperation;
@@ -633,7 +633,7 @@ public class HttpSolrCall {
         cores.getAuditLoggerPlugin().doAudit(new AuditEvent(EventType.ERROR, ex, req));
       }
       
-      DW.propegateInterrupt(ex);
+      SW.propegateInterrupt(ex);
       
       sendError(solrReq, ex);
       // walk the the entire cause chain to search for an Error
@@ -887,7 +887,7 @@ public class HttpSolrCall {
       QueryResponseWriter writer = getResponseWriter(solrReq);
       writeResponse(solrResp, solrReq, writer, Method.GET);
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       ex.addSuppressed(e);
     } finally {
       try {

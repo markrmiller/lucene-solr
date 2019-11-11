@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.patterns.SolrSingleThreaded;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.JsonSchemaValidator;
@@ -51,10 +52,11 @@ import org.apache.solr.util.RefCounted;
  *
  *
  */
+@SolrSingleThreaded
 public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeable {
   protected final SolrCore core;
   protected final SolrParams origParams;
-  protected volatile IndexSchema schema;
+  protected IndexSchema schema;
   protected SolrParams params;
   protected Map<Object,Object> context;
   protected Iterable<ContentStream> streams;
@@ -212,6 +214,6 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
   }
 
   protected Map<String, JsonSchemaValidator> getValidators(){
-    return Collections.EMPTY_MAP;
+    return Collections.emptyMap();
   }
 }

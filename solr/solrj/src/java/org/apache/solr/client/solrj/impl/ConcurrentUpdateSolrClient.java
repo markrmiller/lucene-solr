@@ -52,7 +52,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -381,7 +381,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
                 }
               }
             } catch (Exception exc) {
-              DW.propegateInterrupt(exc);
+              SW.propegateInterrupt(exc);
               // don't want to fail to report error if parsing the response fails
               log.warn("Failed to parse error response from " + client.getBaseURL() + " due to: " + exc);
             } finally {
@@ -402,7 +402,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
               Utils.consumeFully(response.getEntity());
             }
           } catch (Exception e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
             log.error("Error consuming and closing http response stream.", e);
           }
           notifyQueueAndRunnersIfEmptyQueue();
@@ -697,7 +697,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
         interruptRunnerThreadsPolling();
       }
     } finally {
-      if (internalHttpClient) DW.close(client);
+      if (internalHttpClient) SW.close(client);
       if (log.isDebugEnabled()) {
         log.debug("STATS pollInteruppts={} pollExists={} blockLoops={} emptyQueueLoops={}", pollInterrupts.get(), pollExits.get(), blockLoops.get(), emptyQueueLoops.get());
       }
@@ -753,7 +753,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
         interruptRunnerThreadsPolling();
       }
     } finally {
-      if (internalHttpClient) DW.close(client);
+      if (internalHttpClient) SW.close(client);
     }
   }
   

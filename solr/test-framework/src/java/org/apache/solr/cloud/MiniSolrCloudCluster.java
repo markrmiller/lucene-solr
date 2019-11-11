@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -57,7 +56,6 @@ import org.apache.solr.client.solrj.request.ConfigSetAdminRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.Aliases;
-import org.apache.solr.common.cloud.CloudCollectionsListener;
 import org.apache.solr.common.cloud.CollectionStatePredicate;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
@@ -65,7 +63,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
 import org.apache.solr.common.util.TimeOut;
@@ -105,9 +103,9 @@ public class MiniSolrCloudCluster {
       "  <str name=\"shareSchema\">${shareSchema:false}</str>\n" +
       "  <str name=\"configSetBaseDir\">${configSetBaseDir:configsets}</str>\n" +
       "  <str name=\"coreRootDirectory\">${coreRootDirectory:.}</str>\n" +
-      "  <str name=\"collectionsHandler\">${collectionsHandler:solr.CollectionsHandler}</str>\n" +
+      "  <str name=\"collectionsHandler\">${collectionsHandler:org.apache.solr.handler.admin.CollectionsHandler}</str>\n" +
       "\n" +
-      "  <shardHandlerFactory name=\"shardHandlerFactory\" class=\"HttpShardHandlerFactory\">\n" +
+      "  <shardHandlerFactory name=\"shardHandlerFactory\" class=\"org.apache.solr.handler.component.HttpShardHandlerFactory\">\n" +
       "    <str name=\"urlScheme\">${urlScheme:}</str>\n" +
       "    <int name=\"socketTimeout\">${socketTimeout:90000}</int>\n" +
       "    <int name=\"connTimeout\">${connTimeout:15000}</int>\n" +
@@ -336,7 +334,7 @@ public class MiniSolrCloudCluster {
       // build the client when cluster is known to be created
       solrClient = buildSolrClient();
     } catch (Throwable t) {
-      throw new DW.Exp(t);
+      throw new SW.Exp(t);
     }
   }
 
@@ -575,49 +573,24 @@ public class MiniSolrCloudCluster {
   /** Delete all collections (and aliases) */
   public void deleteAllCollections() throws Exception {
     ZkStateReader reader = solrClient.getZkStateReader();
-    final CountDownLatch latch = new CountDownLatch(1);
-    reader.registerCloudCollectionsListener(new CloudCollectionsListener() {
-
-      @Override
-      public void onChange(Set<String> oldCollections, Set<String> newCollections) {
-        if (newCollections != null && newCollections.size() == 0) {
-          latch.countDown();
-        }
-      }
-    });
 
     reader.aliasesManager.applyModificationAndExportToZk(aliases -> Aliases.EMPTY);
     for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
       CollectionAdminRequest.deleteCollection(collection).process(solrClient);
     }
 
-    boolean success = latch.await(60, TimeUnit.SECONDS);
-    if (!success) {
-      throw new IllegalStateException("Still waiting to see all collections removed from clusterstate.");
-    }
+    // nocommit universal timeouts
 
     for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
-      reader.waitForState(collection, 15, TimeUnit.SECONDS,
+      reader.waitForState(collection, 10, TimeUnit.SECONDS,
           (collectionState) -> collectionState == null ? true : false);
     }
 
     // may be deleted, but may not be gone yet - we only wait to not see it in ZK, not for core unloads
-    TimeOut timeout = new TimeOut(30, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-    while (true) {
-
-      if (timeout.hasTimedOut()) {
-        throw new TimeoutException("Timed out waiting for all collections to be fully removed.");
-      }
-
-      boolean allContainersEmpty = true;
-      for (JettySolrRunner jetty : jettys) {
-        CoreContainer cc = jetty.getCoreContainer();
-        if (cc != null && cc.getCores().size() != 0) {
-          allContainersEmpty = false;
-        }
-      }
-      if (allContainersEmpty) {
-        break;
+    for (JettySolrRunner jetty : jettys) {
+      CoreContainer cc = jetty.getCoreContainer();
+      if (cc != null) {
+        cc.waitForCoresToFinish();
       }
     }
 
@@ -643,7 +616,7 @@ public class MiniSolrCloudCluster {
   public void shutdown() throws Exception {
     try {
        // no commiit - do it ourselves
-      DW.close(solrClient);
+      SW.close(solrClient);
       List<Callable<JettySolrRunner>> shutdowns = new ArrayList<>(jettys.size());
       for (final JettySolrRunner jetty : jettys) {
         shutdowns.add(() -> stopJettySolrRunner(jetty));
@@ -703,8 +676,7 @@ public class MiniSolrCloudCluster {
         ok = false;
       }
       catch (InterruptedException e) {
-        Thread.interrupted();
-        throw e;
+        SW.propegateInterrupt(e);
       }
     }
     return ok ? null : parsed;
@@ -798,7 +770,7 @@ public class MiniSolrCloudCluster {
         return predicate.matches(n, c);
       });
     } catch (TimeoutException | InterruptedException e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       throw new RuntimeException("Failed while waiting for active collection" + "\n" + e.getMessage() + "\nLive Nodes: " + Arrays.toString(liveNodesLastSeen.get().toArray())
           + "\nLast available state: " + state.get());
     }
@@ -860,7 +832,7 @@ public class MiniSolrCloudCluster {
     try {
       reader.waitForLiveNodes(10, TimeUnit.SECONDS, (o, n) -> !n.contains(nodeName));
     } catch (InterruptedException e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
     }
   }
   

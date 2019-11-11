@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.CreateMode;
@@ -101,7 +101,7 @@ public class ClusterProperties {
   public Map<String, Object> getClusterProperties() throws IOException {
     try {
       Map<String, Object> properties = (Map<String, Object>) Utils.fromJSON(client.getData(ZkStateReader.CLUSTER_PROPS, null, new Stat(), true));
-      Map<String,Object> threadSafeProps = DW.concMapSmallO();
+      Map<String,Object> threadSafeProps = SW.concMapSmallO();
       threadSafeProps.putAll(properties);
       return convertCollectionDefaultsToNestedFormat(threadSafeProps);
     } catch (KeeperException.NoNodeException e) {

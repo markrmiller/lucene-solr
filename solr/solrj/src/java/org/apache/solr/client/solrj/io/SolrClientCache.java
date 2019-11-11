@@ -29,7 +29,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +94,7 @@ public class SolrClientCache implements Serializable {
     }
     solrClients.clear();
 
-    try (DW closer = new DW(this)) {
+    try (SW closer = new SW(this)) {
       closer.add("solrClients", closes);
     }
   }

@@ -26,7 +26,7 @@ import java.io.Serializable;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 
 
@@ -68,7 +68,7 @@ public abstract class SolrResponse implements Serializable, MapWriter {
       outputStream.writeObject(response);
       return byteStream.toByteArray();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
   
@@ -78,7 +78,7 @@ public abstract class SolrResponse implements Serializable, MapWriter {
       ObjectInputStream inputStream = new ObjectInputStream(byteStream);
       return (SolrResponse) inputStream.readObject();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 }

@@ -93,12 +93,11 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CoreAdminParams;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.URLUtil;
 import org.apache.solr.common.util.Utils;
@@ -110,11 +109,9 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrCoreInitializationException;
 import org.apache.solr.handler.admin.ConfigSetsHandlerApi;
 import org.apache.solr.logging.MDCLoggingContext;
-import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.servlet.SolrDispatchFilter;
 import org.apache.solr.update.UpdateLog;
 import org.apache.solr.util.RTimer;
-import org.apache.solr.util.RefCounted;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
@@ -217,12 +214,12 @@ public class ZkController implements Closeable {
 
   private volatile LeaderElector overseerElector;
 
-  private final Map<ContextKey,ElectionContext> electionContexts = DW.concMapSmallO();
+  private final Map<ContextKey,ElectionContext> electionContexts = SW.concMapSmallO();
   
-  private final Set<ShardLeader> shardLeaders = DW.concSetSmallO();
+  private final Set<ShardLeader> shardLeaders = SW.concSetSmallO();
   
-  private final Map<String,ReplicateFromLeader> replicateFromLeaders = DW.concMapSmallO();
-  private final Map<String,ZkCollectionTerms> collectionToTerms = DW.concMapSmallO();
+  private final Map<String,ReplicateFromLeader> replicateFromLeaders = SW.concMapSmallO();
+  private final Map<String,ZkCollectionTerms> collectionToTerms = SW.concMapSmallO();
 
   // for now, this can be null in tests, in which case recovery will be inactive, and other features
   // may accept defaults or use mocks rather than pulling things from a CoreContainer
@@ -239,7 +236,7 @@ public class ZkController implements Closeable {
 
   private volatile boolean isClosed;
 
-  private final ConcurrentHashMap<String,Throwable> replicasMetTragicEvent = DW.concMapSmallO();
+  private final ConcurrentHashMap<String,Throwable> replicasMetTragicEvent = SW.concMapSmallO();
 
   @Deprecated
   // keeps track of replicas that have been asked to recover by leaders running on this node
@@ -247,7 +244,7 @@ public class ZkController implements Closeable {
 
   // keeps track of a list of objects that need to know a new ZooKeeper session was created after expiration occurred
   // ref is held as a HashSet since we clone the set before notifying to avoid synchronizing too long
-  final Set<OnReconnect> reconnectListeners = DW.concSetSmallO();
+  final Set<OnReconnect> reconnectListeners = SW.concSetSmallO();
   final CurrentCoreDescriptorProvider registerOnReconnect;
   private volatile SolrSeer solrSeer;
   private final InterProcessReadWriteLock clusterWriteLock;
@@ -430,20 +427,20 @@ public class ZkController implements Closeable {
           log.info("Creating cluster znodes done");
           created = true;
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       } else {
         log.info("Cluster layout found in ZooKeeper");
       }
 
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     } finally {
       try {
         log.info("release cluster write lock");
         writeLock.release();
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
 
@@ -458,14 +455,12 @@ public class ZkController implements Closeable {
 
           log.info("Got event on live node watcher {}", event.toString());
           if (event.getType() == EventType.NodeCreated) {
-            if (getZkClient().getCurator().checkExists().forPath("/solrseer") != null) {
               latch.countDown();
-            }
           }
 
         }).forPath("/solrseer");
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
       if (stat == null) {
         log.info("Collections znode not found, waiting on latch");
@@ -473,7 +468,7 @@ public class ZkController implements Closeable {
           latch.await();
           log.info("Done waiting on latch");
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
       }
     }
@@ -487,7 +482,7 @@ public class ZkController implements Closeable {
     try {
       solrSeer.start();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     this.overseerRunningMap = Overseer.getRunningMap(zkClient);
@@ -527,7 +522,7 @@ public class ZkController implements Closeable {
       publishAndWaitForDownStates(); // nocommit do on recconect
 
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
   }
@@ -591,14 +586,14 @@ public class ZkController implements Closeable {
     }
     this.isClosed = true;
 
-    try (DW closer = new DW(this, true)) {
+    try (SW closer = new SW(this, true)) {
       closer.add("PublishNodeAsDown&RemoveEmphem", () -> {
         // if (getZkClient().getConnectionManager().isConnected()) { // nocommit
         try {
           log.info("Publish this node as DOWN...");
           publishNodeAsDown(getNodeName());
         } catch (Exception e) {
-          DW.propegateInterrupt("Error publishing nodes as down. Continuing to close CoreContainer", e);
+          SW.propegateInterrupt("Error publishing nodes as down. Continuing to close CoreContainer", e);
         }
         return "PublishDown";
         // }
@@ -606,7 +601,7 @@ public class ZkController implements Closeable {
         try {
           removeEphemeralLiveNode();
         } catch (Exception e) {
-          DW.propegateInterrupt("Error publishing nodes as down. Continuing to close CoreContainer", e);
+          SW.propegateInterrupt("Error publishing nodes as down. Continuing to close CoreContainer", e);
         }
         return "RemoveEphemNode";
 
@@ -667,7 +662,7 @@ public class ZkController implements Closeable {
           props.put(CoreAdminParams.NODE, getNodeName());
           getOverseerCollectionQueue().offer(Utils.toJSON(new ZkNodeProps(props)));
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
     }
@@ -738,7 +733,7 @@ public class ZkController implements Closeable {
             }
           }
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
       host = hostaddress;
@@ -784,16 +779,11 @@ public class ZkController implements Closeable {
   public static void createClusterZkNodes(SolrZkClient zkClient)
       throws KeeperException, InterruptedException, IOException {
     // nocommit
-    AsyncCuratorFramework asyncClient = zkClient.getAsynCurator();
+    AsyncCuratorFramework asyncClient = zkClient.getAsyncCurator();
 
     List<CuratorOp> operations = new ArrayList<>(30);
     
-
-    asyncClient.create().forPath("/mark").thenAccept(stat -> log.info("SUCCESS"));
-    
-    
     operations.add(asyncClient.transactionOp().create().forPath(ZkStateReader.LIVE_NODES_ZKNODE));
-    
     operations.add(asyncClient.transactionOp().create().forPath(ZkStateReader.CONFIGS_ZKNODE));
     operations.add(asyncClient.transactionOp().create().forPath(ZkStateReader.ALIASES, emptyJson));
 
@@ -846,13 +836,13 @@ public class ZkController implements Closeable {
     } catch(NodeExistsException e  ) {
     
     }catch (Exception e2) {
-      throw new DW.Exp(e2);
+      throw new SW.Exp(e2);
     }
   
     try {
-      zkClient.getCurator().createContainers(ZkStateReader.COLLECTIONS_ZKNODE);
+      zkClient.getCurator().create().forPath(ZkStateReader.COLLECTIONS_ZKNODE);
     } catch (Exception e1) {
-      throw new DW.Exp(e1);
+      throw new SW.Exp(e1);
     }
     log.info("Create new base SolrCloud znodes in ZooKeeper ({})", operations.size());
     
@@ -886,11 +876,11 @@ public class ZkController implements Closeable {
     
     try {
       boolean success = future.get();
-//      if (!success) { nocommittttt
-//        throw new SolrException(ErrorCode.SERVER_ERROR, "Multi Request failed");
-//      }
+      if (!success) {
+        throw new SolrException(ErrorCode.SERVER_ERROR, "Multi Request failed");
+      }
     } catch (ExecutionException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 //    
  //   zkClient.printLayout();
@@ -974,7 +964,7 @@ public class ZkController implements Closeable {
       try {
         createNodes = zkStateReader.getAutoScalingConfig().hasTriggerForEvents(TriggerEventType.NODELOST);
       } catch (KeeperException | InterruptedException e1) {
-        DW.propegateInterrupt("Unable to read autoscaling.json", e1);
+        SW.propegateInterrupt("Unable to read autoscaling.json", e1);
       }
       if (createNodes) {
         byte[] json = Utils.toJSON(Collections.singletonMap("timestamp", cloudManager.getTimeSource().getEpochTimeNs()));
@@ -986,7 +976,7 @@ public class ZkController implements Closeable {
           } catch (KeeperException.NodeExistsException e) {
             // someone else already created this node - ignore
           } catch (KeeperException | InterruptedException e1) {
-            DW.propegateInterrupt("Unable to register nodeLost path for " + n, e1);
+            SW.propegateInterrupt("Unable to register nodeLost path for " + n, e1);
           }
         }
       }
@@ -1096,7 +1086,7 @@ public class ZkController implements Closeable {
       //zkClient.multi(ops, true);
 
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -1219,7 +1209,7 @@ public class ZkController implements Closeable {
           }
         }).forPath(leaderRegPath);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
       if (stat == null) {
         try {
@@ -1228,7 +1218,7 @@ public class ZkController implements Closeable {
            throw new TimeoutException("Timeout waiting to see registered leader path=" + leaderRegPath);
          }
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
       }
       
@@ -1292,11 +1282,11 @@ public class ZkController implements Closeable {
         }
         core.getCoreDescriptor().getCloudDescriptor().setHasRegistered(true);
       } catch (Exception e) {
-        Exp exp = new DW.Exp(e);
+        Exp exp = new SW.Exp(e);
         try {
           unregister(coreName, desc, false);
         } catch (Exception e1) {
-          DW.propegateInterrupt(e1);
+          SW.propegateInterrupt(e1);
           exp.addSuppressed(e1);           
         }
         throw exp;
@@ -1375,7 +1365,7 @@ public class ZkController implements Closeable {
       zkStateReader.waitForState(collection, timeoutms * 2, TimeUnit.MILLISECONDS, (n, c) -> checkLeaderUrl(cloudDesc, leaderUrl, collection, shardId, leaderConflictResolveWait));
 
     } catch (Exception e) {
-      throw new DW.Exp("Error getting leader from zk", e);
+      throw new SW.Exp("Error getting leader from zk", e);
     }
     return leaderUrl;
   }
@@ -1389,7 +1379,7 @@ public class ZkController implements Closeable {
 
      // leaderUrl = getLeaderProps(collection, cloudDesc.getShardId(), timeoutms).getCoreUrl();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     return clusterStateLeaderUrl != null;
   }
@@ -1442,7 +1432,7 @@ public class ZkController implements Closeable {
 
       }).forPath(ZkStateReader.getShardLeadersPath(collection, slice));
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     if (stat == null) {
       log.info("Shard leader znode not found, waiting on latch");
@@ -1450,7 +1440,7 @@ public class ZkController implements Closeable {
         latch.await(); // nocommit timeout
         log.info("Done waiting on latch");
       } catch (InterruptedException e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
     }
   
@@ -1458,7 +1448,7 @@ public class ZkController implements Closeable {
     try {
       data = zkClient.getData(ZkStateReader.getShardLeadersPath(collection, slice), null, null, true);
     } catch (KeeperException e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     ZkCoreNodeProps leaderProps = new ZkCoreNodeProps(ZkNodeProps.load(data));
     return leaderProps;
@@ -1783,7 +1773,7 @@ public class ZkController implements Closeable {
             return false;
         });
       } catch (InterruptedException e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     } catch (TimeoutException e1) {
       log.error("waitForShardId(CoreDescriptor=" + cd + ")", e1);
@@ -1841,7 +1831,7 @@ public class ZkController implements Closeable {
               "Registering watch for collection {}",
           collectionName);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     } 
 
     doGetShardIdAndNodeNameProcess(cd);
@@ -2123,7 +2113,7 @@ public class ZkController implements Closeable {
         overseerElector.retryElection(overseerElector.getContext(), joinAtHead);
       }
     } catch (Exception e) {
-      throw new DW.Exp("Unable to rejoin election", e);
+      throw new SW.Exp("Unable to rejoin election", e);
     }
 
   }
@@ -2258,7 +2248,7 @@ public class ZkController implements Closeable {
               Stat stat = zkClient.exists(resourceLocation, null, true);
               log.debug("failed to set data version in zk is {} and expected version is {} ", stat.getVersion(), znodeVersion);
             } catch (Exception e1) {
-              throw new DW.Exp(e1);
+              throw new SW.Exp(e1);
             }
 
             log.info(StrUtils.formatString(errMsg, resourceLocation, znodeVersion));
@@ -2273,14 +2263,14 @@ public class ZkController implements Closeable {
         Stat stat = zkClient.exists(resourceLocation, null, true);
         v = stat.getVersion();
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
       log.info(StrUtils.formatString(errMsg + " zkVersion= " + v, resourceLocation, znodeVersion));
       throw new ResourceModifiedInZkException(ErrorCode.CONFLICT, StrUtils.formatString(errMsg, resourceLocation, znodeVersion) + ", retry.");
     } catch (ResourceModifiedInZkException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     return latestVersion;
   }
@@ -2290,7 +2280,7 @@ public class ZkController implements Closeable {
     try {
       zkClient.setData(zkLoader.getConfigSetZkPath(), new byte[]{0}, true);
     } catch (Exception e) {
-      throw new DW.Exp("Error 'touching' conf location " + zkLoader.getConfigSetZkPath(), e);
+      throw new SW.Exp("Error 'touching' conf location " + zkLoader.getConfigSetZkPath(), e);
     }
   }
 
@@ -2350,7 +2340,7 @@ public class ZkController implements Closeable {
       Set<Runnable> confDirListeners = confDirectoryListeners.get(confDir);
       if (confDirListeners == null) {
         if (log.isDebugEnabled()) log.debug("watch zkdir {}", confDir);
-        confDirListeners = DW.concSetSmallO();
+        confDirListeners = SW.concSetSmallO();
         confDirectoryListeners.put(confDir, confDirListeners);
         setConfWatcher(confDir, new WatcherImpl(confDir), null);
       }
@@ -2358,7 +2348,7 @@ public class ZkController implements Closeable {
     }
   }
 
-  private final Map<String, Set<Runnable>> confDirectoryListeners = DW.concMapSmallO();
+  private final Map<String, Set<Runnable>> confDirectoryListeners = SW.concMapSmallO();
 
   private class WatcherImpl implements Watcher {
     private final String zkDir;
@@ -2378,7 +2368,7 @@ public class ZkController implements Closeable {
       try {
         stat = zkClient.exists(zkDir, null, true);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
 
       boolean resetWatcher = false;
@@ -2411,7 +2401,7 @@ public class ZkController implements Closeable {
 
       // run these in a separate thread because this can be long running
 
-      try (DW worker = new DW(this, true)) {
+      try (SW worker = new SW(this, true)) {
         listeners.forEach((it) -> worker.collect(() -> {
           it.run();
           return it;
@@ -2431,7 +2421,7 @@ public class ZkController implements Closeable {
         fireEventListeners(zkDir);
       }
     } catch (Exception e) {
-      throw new DW.Exp("failed to set watcher for conf dir" + zkDir, e);
+      throw new SW.Exp("failed to set watcher for conf dir" + zkDir, e);
     } 
   }
 
@@ -2584,7 +2574,7 @@ public class ZkController implements Closeable {
           waitSearcher[0].get();
           success = true;
         } catch (Exception e) {
-          throw new DW.Exp(
+          throw new SW.Exp(
               "Wait for a searcher to be registered for core " + core.getName() + ", id: " + core + " failed due to: ",
               e);
         }

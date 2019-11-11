@@ -71,7 +71,7 @@ public final class CoreDescriptor {
    * vulnerabilities, when the configSet was not uploaded from a trusted
    * user.
    */
-  private boolean trustedConfigSet = true;
+  private volatile boolean trustedConfigSet = true;
 
   /**
    * Get the standard properties in persistable form

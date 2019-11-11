@@ -27,7 +27,7 @@ import java.util.Properties;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZooKeeperException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.SolrResourceNotFoundException;
 import org.apache.solr.schema.ZkIndexSchemaReader;
@@ -92,7 +92,7 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
         throw new SolrResourceNotFoundException("Resource not foundr esource=" + resource, e);
       }
       
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
   }
@@ -124,7 +124,7 @@ public class ZkSolrResourceLoader extends SolrResourceLoader {
     try {
       list = zkController.getZkClient().getChildren(configSetZkPath, null, true);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     return list.toArray(new String[0]);
   }

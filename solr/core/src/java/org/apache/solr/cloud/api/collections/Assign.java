@@ -53,7 +53,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.NumberUtils;
@@ -392,7 +392,7 @@ public class Assign {
           nodesList);
       return replicaPositions;
     } catch (Exception e) {
-      throw new DW.Exp("Error getting replica locations", e);
+      throw new SW.Exp("Error getting replica locations", e);
     } finally {
       if (log.isTraceEnabled()) {
         if (replicaPositions != null)

@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 
 /**
  * Takes a prefix notation expression and returns a tokenized expression
@@ -59,7 +59,7 @@ public class StreamExpressionParser {
         }
       }
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
     return builder.toString();

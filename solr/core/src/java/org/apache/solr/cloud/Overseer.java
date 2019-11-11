@@ -65,8 +65,8 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Pair;
@@ -799,19 +799,19 @@ public class Overseer implements SolrCloseable {
       log.debug("doClose() - start");
     }
 
-    try (DW closer = new DW(this)) {
+    try (SW closer = new SW(this)) {
       closer.collect(() -> {
-        DW.close(ccThread);
+        SW.close(ccThread);
         ccThread.interrupt();
       });
 
       closer.collect(() -> {
-        DW.close(updaterThread);
+        SW.close(updaterThread);
         updaterThread.interrupt();
       });
 
       closer.collect(() -> {
-        DW.close(triggerThread);
+        SW.close(triggerThread);
         triggerThread.interrupt();
       });
 
@@ -819,14 +819,14 @@ public class Overseer implements SolrCloseable {
         try {
           updaterThread.join();
         } catch (InterruptedException e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       });
       closer.collect(() -> {
         try {
           ccThread.join();
         } catch (InterruptedException e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       });
 
@@ -834,7 +834,7 @@ public class Overseer implements SolrCloseable {
         try {
           triggerThread.join();
         } catch (InterruptedException e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       });
       

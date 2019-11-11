@@ -32,7 +32,7 @@ import com.codahale.metrics.Timer;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.Pair;
 import org.apache.zookeeper.CreateMode;
@@ -71,7 +71,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
       try {
         Thread.sleep(250);
       } catch (InterruptedException e) {
-        throw new DW.Exp("Exception while waiting for overseer queue to drain before shutdown!", e);
+        throw new SW.Exp("Exception while waiting for overseer queue to drain before shutdown!", e);
         
       }
     }

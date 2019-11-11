@@ -36,8 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocketFactory;
 
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,7 +197,7 @@ public class SocketProxy {
       serverSocket.bind(new InetSocketAddress(proxyUrl.getPort()));
       doOpen();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -232,7 +232,7 @@ public class SocketProxy {
     try {
       c.close();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -240,7 +240,7 @@ public class SocketProxy {
     try {
       c.halfClose();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -375,7 +375,7 @@ public class SocketProxy {
               out.write(buf, 0, len);
           }
         } catch (Exception e) {
-          Exp exp = new DW.Exp(e);
+          Exp exp = new SW.Exp(e);
           try {
             if (!receiveSocket.isClosed()) {
               // for halfClose, on read/write failure if we close the
@@ -383,7 +383,7 @@ public class SocketProxy {
               close();
             }
           } catch (Exception e1) {
-            DW.propegateInterrupt(e1);
+            SW.propegateInterrupt(e1);
             exp.addSuppressed(e1);
           } 
           
@@ -394,7 +394,7 @@ public class SocketProxy {
             try {
               in.close();
             } catch (Exception exc) {
-              DW.propegateInterrupt(exc);
+              SW.propegateInterrupt(exc);
               log.debug(exc+" when closing InputStream on socket: "+src);
             }
           }
@@ -402,7 +402,7 @@ public class SocketProxy {
             try {
               out.close();
             } catch (Exception exc) {
-              DW.propegateInterrupt(exc);
+              SW.propegateInterrupt(exc);
               log.debug(exc+" when closing OutputStream on socket: "+destination);
             }
           }
@@ -450,7 +450,7 @@ public class SocketProxy {
           } catch (SocketTimeoutException expected) {}
         }
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
     }
 

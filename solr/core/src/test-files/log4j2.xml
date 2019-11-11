@@ -37,11 +37,11 @@
     <AsyncLogger name="org.apache.directory" level="WARN"/>
     <AsyncLogger name="org.apache.solr.hadoop" level="INFO"/>
     <AsyncLogger name="org.eclipse.jetty" level="INFO"/>
-    <AsyncLogger name="org.apache.solr.handler.admin.CollectionsHandler" level="INFO"/>
+    <AsyncLogger name="org.apache.solr.handler.admin.CollectionsHandler" level="DEBUG"/>
     <AsyncLogger name="org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler" level="INFO"/>
     <AsyncLogger name="org.apache.solr.cloud.api.collections.CreateCollectionCmd" level="INFO"/>
-   <!--  <AsyncLogger name="org.apache.solr.common.patterns.DW" level="DEBUG"/> -->
-    <AsyncLogger name="org.apache.solr.cloud.overseer.ZkStateWriter" level="INFO"/>
+   <!--  <AsyncLogger name="org.apache.solr.common.patterns.SW" level="DEBUG"/> -->
+    <AsyncLogger name="org.apache.solr.cloud.overseer.ZkStateWriter" level="DEBUG"/>
     <AsyncLogger name="org.apache.solr.cloud.Overseer" level="INFO"/>
     <AsyncLogger name="org.apache.solr.cloud.OverseerTaskProcessor" level="INFO"/>
     <AsyncLogger name="org.apache.solr.cloud.ZkDistributedQueue" level="INFO"/>
@@ -49,6 +49,8 @@
     <AsyncLogger name="org.apache.solr.cloud.overseer.SliceMutator" level="INFO"/>
     <AsyncLogger name="org.apache.solr.client.solrj.impl.LBSolrClient" level="INFO"/>
     <AsyncLogger name="org.apache.solr.cloud.ZkController" level="INFO"/>
+    <AsyncLogger name="org.apache.solr.cloud.ZkStateReader" level="DEBUG"/>
+    
     <AsyncLogger name="org.apache.solr.common.cloud.ZkMaintenanceUtils" level="INFO"/>
     <AsyncLogger name="org.apache.solr.update.processor.DistributedZkUpdateProcessor" level="INFO"/>
     <AsyncLogger name="com.google.inject.servlet" level="INFO"/>

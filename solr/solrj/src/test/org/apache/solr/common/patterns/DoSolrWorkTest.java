@@ -63,7 +63,7 @@ public class DoSolrWorkTest extends SolrTestCase {
   @Test
   public void testBasicClose() throws Exception {
     CloseMe closeMe = new CloseMe();
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       worker.add(closeMe);
     }
     
@@ -73,7 +73,7 @@ public class DoSolrWorkTest extends SolrTestCase {
   @Test
   public void testNestedClose() throws Exception {
     CloseMe2 closeMe2 = new CloseMe2();
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       worker.add(closeMe2);
     }
    
@@ -83,7 +83,7 @@ public class DoSolrWorkTest extends SolrTestCase {
 
   @Test(expected = SolrException.class)
   public void testUnknownObject() throws Exception {
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       worker.add(new Object());
     }
   }
@@ -94,7 +94,7 @@ public class DoSolrWorkTest extends SolrTestCase {
     ExecutorService executor = ExecutorUtil.newMDCAwareCachedThreadPool(3, new DefaultSolrThreadFactory("smartWorkTest"));
 
     
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       worker.add(executor);
     }
    

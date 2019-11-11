@@ -59,7 +59,7 @@ import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.Utils;
@@ -272,7 +272,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
             try {
               ocmh.commandMap.get(DELETESHARD).call(clusterState, m, new NamedList());
             } catch (Exception e) {
-              throw new DW.Exp("Unable to delete already existing sub shard: " + subSlice, e);
+              throw new SW.Exp("Unable to delete already existing sub shard: " + subSlice, e);
             }
 
             oldShardsDeleted = true;
@@ -598,7 +598,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp("Error executing split operation for collection: " + collectionName + " parent shard: " + slice, e);
+      throw new SW.Exp("Error executing split operation for collection: " + collectionName + " parent shard: " + slice, e);
     } finally {
       if (sessionWrapper != null) sessionWrapper.release();
       if (!success) {
@@ -697,7 +697,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         ZkNodeProps m = new ZkNodeProps(propMap);
         ocmh.solrSeer.sendUpdate(m);
       } catch (Exception e) {
-        throw new DW.Exp("Cleanup failed after failed split of " + collectionName + "/" + parentShard + ": (slice state changes)", e);
+        throw new SW.Exp("Cleanup failed after failed split of " + collectionName + "/" + parentShard + ": (slice state changes)", e);
       }
     }
 
@@ -716,7 +716,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
       try {
         ocmh.commandMap.get(DELETESHARD).call(clusterState, m, new NamedList<Object>());
       } catch (Exception e) {
-        throw new DW.Exp("Cleanup failed after failed split of " + collectionName + "/" + parentShard + ": (deleting existing sub shard " + subSlice + ")", e);
+        throw new SW.Exp("Cleanup failed after failed split of " + collectionName + "/" + parentShard + ": (deleting existing sub shard " + subSlice + ")", e);
       }
     }
   }
@@ -767,7 +767,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
     try {
       fuzz = Float.parseFloat(fuzzStr);
     } catch (Exception e) {
-      throw new DW.Exp("Invalid numeric value of 'fuzz': " + fuzzStr, e);
+      throw new SW.Exp("Invalid numeric value of 'fuzz': " + fuzzStr, e);
     }
 
     DocRouter.Range range = parentSlice.getRange();
@@ -785,7 +785,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
           try {
             subRanges.add(DocRouter.DEFAULT.fromString(r));
           } catch (Exception e) {
-            throw new DW.Exp("Exception in parsing hexadecimal hash range: " + r, e);
+            throw new SW.Exp("Exception in parsing hexadecimal hash range: " + r, e);
           }
           if (!subRanges.get(i).isSubsetOf(range)) {
             throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
@@ -862,7 +862,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
       try {
         cloudManager.getDistribStateManager().makePath(path, data, CreateMode.EPHEMERAL, true);
       } catch (Exception e) {
-        throw new DW.Exp("Can't lock parent slice for splitting (another split operation running?): " +
+        throw new SW.Exp("Can't lock parent slice for splitting (another split operation running?): " +
             collection + "/" + shard, e);
       }
       return true;

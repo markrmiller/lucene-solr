@@ -37,7 +37,7 @@ import com.codahale.metrics.Gauge;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.LucenePackage;
 import org.apache.lucene.util.Constants;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
@@ -264,9 +264,9 @@ public class SystemInfoHandler extends RequestHandlerBase
       throw err;
     } finally {
       if (process != null) {
-        DW.close( process.getOutputStream() );
-        DW.close( process.getInputStream() );
-        DW.close( process.getErrorStream() );
+        SW.close( process.getOutputStream() );
+        SW.close( process.getInputStream() );
+        SW.close( process.getErrorStream() );
       }
     }
   }

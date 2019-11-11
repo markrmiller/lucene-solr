@@ -36,7 +36,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.solr.client.solrj.cloud.DistributedQueue;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
 import org.apache.solr.common.util.Pair;
@@ -133,7 +133,7 @@ public class ZkDistributedQueue implements DistributedQueue {
     } catch (KeeperException | InterruptedException e) {
       log.error("ZkDistributedQueue(SolrZkClient=" + zookeeper + ", String=" + dir + ", Stats=" + stats + ", int=" + maxQueueSize + ", IsClosed=" + higherLevelIsClosed + ")", e);
 
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -736,7 +736,7 @@ public class ZkDistributedQueue implements DistributedQueue {
       try {
         zookeeper.exists(dir, this, true);
       } catch (KeeperException | InterruptedException e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
 
       if (log.isDebugEnabled()) {

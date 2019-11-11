@@ -37,7 +37,7 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermRangeQuery;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.response.TextResponseWriter;
 import org.apache.solr.search.QParser;
@@ -207,9 +207,9 @@ public class ICUCollationField extends FieldType {
      String rules = IOUtils.toString(input, "UTF-8");
      return new RuleBasedCollator(rules);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     } finally {
-      DW.close(input);
+      SW.close(input);
     }
   }
 

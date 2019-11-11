@@ -51,7 +51,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.StrUtils;
@@ -234,7 +234,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
         });
       }
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       log.warn("could not get tags from node " + solrNode, e);
     }
 
@@ -365,7 +365,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
           if (n != null) ctx.getTags().put(HEAPUSAGE, n.doubleValue() * 100.0d);
         }
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error getting remote info", e);
       }
     }

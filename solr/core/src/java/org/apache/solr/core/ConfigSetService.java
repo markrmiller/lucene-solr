@@ -31,7 +31,7 @@ import org.apache.solr.cloud.CloudConfigSetService;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.IndexSchemaFactory;
@@ -92,7 +92,7 @@ public abstract class ConfigSetService {
       IndexSchema schema = createIndexSchema(dcore, solrConfig);
       return new ConfigSet(configName(dcore), solrConfig, schema, properties, trusted);
     } catch (Exception e) {
-      throw new DW.Exp("Could not load conf for core " + dcore.getName(), e);
+      throw new SW.Exp("Could not load conf for core " + dcore.getName(), e);
     }
 
   }
@@ -132,7 +132,7 @@ public abstract class ConfigSetService {
       try {
         return ConfigSetProperties.readFromResourceLoader(loader, ".");
       } catch (Exception ex) {
-        throw new DW.Exp(ex);
+        throw new SW.Exp(ex);
       }
     } else {
       return null;

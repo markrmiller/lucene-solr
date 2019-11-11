@@ -27,7 +27,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -109,7 +109,7 @@ public class SyncStrategy implements Closeable {
           shardId, peerSyncOnlyWithActive);
       success = result.isSuccess();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     try {
       if (isClosed) {
@@ -128,7 +128,7 @@ public class SyncStrategy implements Closeable {
       }
       
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     log.info("Sync result={}", result);
     return result == null ? PeerSync.PeerSyncResult.failure() : result;
@@ -193,7 +193,7 @@ public class SyncStrategy implements Closeable {
         requestSync(node.getBaseUrl(), node.getCoreUrl(), zkLeader.getCoreUrl(), node.getCoreName(), nUpdates);
         
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
     

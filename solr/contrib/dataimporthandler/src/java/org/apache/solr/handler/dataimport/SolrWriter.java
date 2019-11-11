@@ -19,7 +19,7 @@ package org.apache.solr.handler.dataimport;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
@@ -117,7 +117,7 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
       CommitUpdateCommand commit = new CommitUpdateCommand(req,optimize);
       processor.processCommit(commit);
     } catch (Exception e) {
-      throw new DW.Exp("Exception while solr commit.", e);
+      throw new SW.Exp("Exception while solr commit.", e);
     }
   }
 

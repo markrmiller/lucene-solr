@@ -49,7 +49,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -147,7 +147,7 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
 
   @AfterClass
   public static void teardownClass() throws Exception {
-    DW.close(fs);
+    SW.close(fs);
     fs = null;
     try {
       SolrTestCaseJ4.resetFactory();

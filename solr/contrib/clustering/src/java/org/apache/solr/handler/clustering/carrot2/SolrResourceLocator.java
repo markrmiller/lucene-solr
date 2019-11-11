@@ -25,7 +25,7 @@ import java.lang.invoke.MethodHandles;
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 import org.carrot2.util.resource.IResource;
@@ -134,7 +134,7 @@ class SolrResourceLocator implements IResourceLocator {
     try {
       configDir = "configDir=" + new File(resourceLoader.getConfigDir()).getAbsolutePath() + ", ";
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     
     return "SolrResourceLocator, " + configDir

@@ -40,7 +40,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.namenode.ha.HATestUtil;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.DirectoryFactory;
@@ -205,11 +205,11 @@ public class HdfsTestUtil {
 
   public static void teardownClass(MiniDFSCluster dfsCluster) throws Exception {
     if (badTlogOutStream != null) {
-      DW.close(badTlogOutStream);
+      SW.close(badTlogOutStream);
     }
 
     if (badTlogOutStreamFs != null) {
-      DW.close(badTlogOutStreamFs);
+      SW.close(badTlogOutStreamFs);
     }
 
     try {

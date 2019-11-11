@@ -133,13 +133,15 @@ public class SolrTestCase extends LuceneTestCase {
     
     // nocommit need to turn on per test method system prop reset again
     
+    System.setProperty("solr.tests.nossl", "true");
+    
     System.setProperty(SolrTestCaseJ4.USE_NUMERIC_POINTS_SYSPROP, "true");
-    System.setProperty("solr.tests.IntegerFieldType", "solr.IntPointField");
-    System.setProperty("solr.tests.FloatFieldType", "solr.FloatPointField");
-    System.setProperty("solr.tests.LongFieldType", "solr.LongPointField");
-    System.setProperty("solr.tests.DoubleFieldType", "solr.DoublePointField");
-    System.setProperty("solr.tests.DateFieldType", "solr.DatePointField");
-    System.setProperty("solr.tests.EnumFieldType", "solr.EnumFieldType");
+    System.setProperty("solr.tests.IntegerFieldType", "org.apache.solr.schema.IntPointField");
+    System.setProperty("solr.tests.FloatFieldType", "org.apache.solr.schema.FloatPointField");
+    System.setProperty("solr.tests.LongFieldType", "org.apache.solr.schema.LongPointField");
+    System.setProperty("solr.tests.DoubleFieldType", "org.apache.solr.schema.DoublePointField");
+    System.setProperty("solr.tests.DateFieldType", "org.apache.solr.schema.DatePointField");
+    System.setProperty("solr.tests.EnumFieldType", "org.apache.solr.schema.EnumFieldType");
     
     System.setProperty("solr.test.useFilterForSortedQuery", "true");
     
@@ -165,7 +167,7 @@ public class SolrTestCase extends LuceneTestCase {
     System.setProperty("tests.shardhandler.randomSeed", Long.toString(random().nextLong()));
     System.setProperty("solr.clustering.enabled", "false");
     System.setProperty("solr.peerSync.useRangeVersions", String.valueOf(random().nextBoolean()));
-    System.setProperty("solr.cloud.wait-for-updates-with-stale-state-pause", "500");
+    System.setProperty("solr.cloud.wait-for-updates-with-stale-state-pause", "0");
     System.setProperty(ZK_WHITELIST_PROPERTY, "*");
     
     if (!TEST_NIGHTLY) {
@@ -223,7 +225,7 @@ public class SolrTestCase extends LuceneTestCase {
       System.setProperty("solr.retries.on.forward", "1");
       System.setProperty("solr.retries.to.followers", "1"); 
 
-      useFactory("solr.RAMDirectoryFactory");
+      useFactory("org.apache.solr.core.RAMDirectoryFactory");
     }
     
     
@@ -231,6 +233,7 @@ public class SolrTestCase extends LuceneTestCase {
     
   }
   
+  // nocommit have the TestProperties thing now started ...
   public static void enableMetricsForNonNightly() {
     System.setProperty("solr.disableJvmMetrics", "false");
   }

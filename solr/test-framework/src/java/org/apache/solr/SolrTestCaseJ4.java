@@ -112,7 +112,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.ExecutorUtil;
@@ -396,7 +396,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
     if (xmlStr == null)
       xmlStr = "<solr></solr>";
     Files.write(solrHome.resolve(SolrXmlConfig.SOLR_XML_FILE), xmlStr.getBytes(StandardCharsets.UTF_8));
-    DW.close(h);
+    SW.close(h);
     h = new TestHarness(SolrXmlConfig.fromSolrHome(solrHome));
     lrf = h.getRequestFactory("/select", 0, 20, CommonParams.VERSION, "2.2");
   }
@@ -659,7 +659,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
   public static void createCore() {
     assertNotNull(testSolrHome);
     solrConfig = TestHarness.createConfig(testSolrHome, coreName, getSolrConfigFile());
-    DW.close(h);
+    SW.close(h);
     h = new TestHarness( coreName, hdfsDataDir == null ? initAndGetDataDir().getAbsolutePath() : hdfsDataDir,
             solrConfig,
             getSchemaFile());
@@ -669,7 +669,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
 
   public static CoreContainer createCoreContainer(Path solrHome, String solrXML) {
     testSolrHome = requireNonNull(solrHome);
-    DW.close(h);
+    SW.close(h);
     h = new TestHarness(solrHome, solrXML);
     lrf = h.getRequestFactory("", 0, 20, CommonParams.VERSION, "2.2");
     return h.getCoreContainer();
@@ -677,7 +677,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
 
   public static CoreContainer createCoreContainer(NodeConfig config, CoresLocator locator) {
     testSolrHome = config.getSolrResourceLoader().getInstancePath();
-    DW.close(h);
+    SW.close(h);
     h = new TestHarness(config, locator);
     lrf = h.getRequestFactory("", 0, 20, CommonParams.VERSION, "2.2");
     return h.getCoreContainer();
@@ -693,7 +693,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
 
   public static CoreContainer createDefaultCoreContainer(Path solrHome) {
     testSolrHome = requireNonNull(solrHome);
-    DW.close(h);
+    SW.close(h);
     h = new TestHarness("collection1", initAndGetDataDir().getAbsolutePath(), "solrconfig.xml", "schema.xml");
     lrf = h.getRequestFactory("", 0, 20, CommonParams.VERSION, "2.2");
     return h.getCoreContainer();
@@ -766,7 +766,7 @@ public abstract class SolrTestCaseJ4 extends SSLSolrTestCase {
         System.clearProperty(UPDATELOG_SYSPROP);
       }
 
-      DW.close(h);
+      SW.close(h);
       
       solrConfig = null;
       h = null;

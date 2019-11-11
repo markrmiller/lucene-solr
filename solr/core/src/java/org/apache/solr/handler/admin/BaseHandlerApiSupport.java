@@ -63,7 +63,7 @@ public abstract class BaseHandlerApiSupport implements ApiSupport {
   }
 
   @Override
-  public synchronized Collection<Api> getApis() {
+  public Collection<Api> getApis() {
     ImmutableList.Builder<Api> l = ImmutableList.builder();
     for (V2EndPoint op : getEndPoints()) l.add(getApi(op));
     return l.build();

@@ -89,7 +89,7 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CommonParams.EchoParamStyle;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
@@ -409,7 +409,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         try {
           getDirectoryFactory().release(dir);
         } catch (IOException e) {
-          DW.propegateInterrupt( "Error releasing directory", e);
+          SW.propegateInterrupt( "Error releasing directory", e);
         }
       }
     }
@@ -543,7 +543,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           getSolrConfig().indexConfig.lockType);
       return new SolrSnapshotMetaDataManager(this, snapshotDir);
     } catch (Throwable e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
 
       // nocommit have to get this wwriter and writer close
       try {
@@ -725,7 +725,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       } finally {
         // close the new core on any errors that have occurred.
         if (!success) {
-          DW.close(core); // this should decref the core state
+          SW.close(core); // this should decref the core state
         }
         // TODO: bring this into core close and only decref there if you know you should
         if (decRefOnFail) {
@@ -860,7 +860,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       
       // The JVM likes to wrap our helpful SolrExceptions in things like
       // "InvocationTargetException" that have no useful getMessage
@@ -891,7 +891,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       // The JVM likes to wrap our helpful SolrExceptions in things like
       // "InvocationTargetException" that have no useful getMessage
       if (null != e.getCause() && e.getCause() instanceof SolrException) {
@@ -1080,14 +1080,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       // release the latch, otherwise we block trying to do the close. This
       // should be fine, since counting down on a latch of 0 is still fine
       latch.countDown();
-      DW.propegateInterrupt("Error while creating SolrCore", e);
+      SW.propegateInterrupt("Error while creating SolrCore", e);
 
       try {
         // close down the searcher and any other resources, if it exists, as this
         // is not recoverable
         close();
       } catch (Throwable t) {
-        DW.propegateInterrupt("Error while closing", t);
+        SW.propegateInterrupt("Error while closing", t);
       }
 
       throw new SolrException(ErrorCode.SERVER_ERROR, e.getMessage(), e);
@@ -1372,9 +1372,9 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         p.load(new InputStreamReader(is, StandardCharsets.UTF_8));
       } catch (Exception e) {
-        DW.propegateInterrupt("Unable to load {}", e);
+        SW.propegateInterrupt("Unable to load {}", e);
       } finally {
-        DW.close(is);
+        SW.close(is);
       }
     } catch (IOException e) {
       // ignore; file does not exist
@@ -1390,9 +1390,9 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       p.store(os, IndexFetcher.INDEX_PROPERTIES);
       dir.sync(Collections.singleton(tmpFileName));
     } catch (Exception e) {
-      throw new DW.Exp("Unable to write " + IndexFetcher.INDEX_PROPERTIES);
+      throw new SW.Exp("Unable to write " + IndexFetcher.INDEX_PROPERTIES);
     } finally {
-      DW.close(os);
+      SW.close(os);
     }
   }
 
@@ -1590,13 +1590,13 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
     try {
       coreAsyncTaskExecutor.shutdown();
     } catch (Throwable e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
     }
     
     System.out.println("shutdown " + count);
 
     
-    try (DW closer = new DW(this, true)) {
+    try (SW closer = new SW(this, true)) {
       List<Callable<?>> closeHookCalls = new ArrayList<>();
 
       if (closeHooks != null) {
@@ -1622,7 +1622,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             try {
               searcherLock.wait(250); // nocommit
             } catch (InterruptedException e) {
-              DW.propegateInterrupt(e);
+              SW.propegateInterrupt(e);
             } // nocommit
           }
         }
@@ -1632,35 +1632,35 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
 
       List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
       closeCalls.add(() -> {
-        DW.close(coreMetricManager);
+        SW.close(coreMetricManager);
         return "SolrCoreMetricManager";
       });
       closeCalls.add(() -> {
-        DW.close(reqHandlers);
+        SW.close(reqHandlers);
         return "reqHandlers";
       });
       closeCalls.add(() -> {
-        DW.close(responseWriters);
+        SW.close(responseWriters);
         return "responseWriters";
       });
       closeCalls.add(() -> {
-        DW.close(searchComponents);
+        SW.close(searchComponents);
         return "searchComponents";
       });
       closeCalls.add(() -> {
-        DW.close(qParserPlugins);
+        SW.close(qParserPlugins);
         return "qParserPlugins";
       });
       closeCalls.add(() -> {
-        DW.close(valueSourceParsers);
+        SW.close(valueSourceParsers);
         return "valueSourceParsers";
       });
       closeCalls.add(() -> {
-        DW.close(transformerFactories);
+        SW.close(transformerFactories);
         return "transformerFactories";
       });
       closeCalls.add(() -> {
-        DW.close(memClassLoader);
+        SW.close(memClassLoader);
         return "memClassLoader";
       });
 
@@ -1727,7 +1727,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       });
 
       closer.add("directoryFactory", () -> {
-        if (coreStateClosed.get()) DW.close(directoryFactory);
+        if (coreStateClosed.get()) SW.close(directoryFactory);
       });
 
       
@@ -1947,13 +1947,13 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   private void closeInternals(ExecutorService closeThreadPool, CloseTimeTracker tracker) {
     List<Callable<Object>> closeCalls = new ArrayList<Callable<Object>>();
 
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - requestHandlers");DW.close(reqHandlers);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - responseWriters");DW.close(responseWriters);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - searchComponents");DW.close(searchComponents);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - qParserPlugins");DW.close(qParserPlugins);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - valueSourceParsers");DW.close(valueSourceParsers);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - transformerFactories");DW.close(transformerFactories);subTracker.doneClose(); return null;});
-    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - memClassLoader");DW.close(memClassLoader);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - requestHandlers");SW.close(reqHandlers);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - responseWriters");SW.close(responseWriters);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - searchComponents");SW.close(searchComponents);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - qParserPlugins");SW.close(qParserPlugins);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - valueSourceParsers");SW.close(valueSourceParsers);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - transformerFactories");SW.close(transformerFactories);subTracker.doneClose(); return null;});
+    closeCalls.add(() -> {CloseTimeTracker subTracker = tracker.startSubClose(" - memClassLoader");SW.close(memClassLoader);subTracker.doneClose(); return null;});
     try {
       closeThreadPool.invokeAll(closeCalls);
     } catch (InterruptedException e1) {
@@ -2450,7 +2450,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return newSearcher;
 
     } catch (Exception e) {
-      throw new DW.Exp("Error opening new searcher", e);
+      throw new SW.Exp("Error opening new searcher", e);
     } finally {
       openSearcherLock.unlock();
       if (newestSearcher != null) {
@@ -2458,7 +2458,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       } 
       
      if (!success && tmp != null) {
-        DW.close(tmp);
+        SW.close(tmp);
       }
     }
   }
@@ -2542,7 +2542,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           try {
             searcherLock.wait();
           } catch (InterruptedException e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
           }
         }
 
@@ -2578,7 +2578,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           try {
             searcherLock.wait();
           } catch (InterruptedException e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
           }
           continue; // go back to the top of the loop and retry
         } else if (onDeckSearchers > 1) {
@@ -2644,7 +2644,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             try {
               newSearcher.warm(currSearcher);
             } catch (Throwable e) {
-              DW.propegateInterrupt(e);
+              SW.propegateInterrupt(e);
             } finally {
               warmupContext.close();
             }
@@ -2659,7 +2659,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 listener.newSearcher(newSearcher, null);
               }
             } catch (Throwable e) {
-              DW.propegateInterrupt(e);
+              SW.propegateInterrupt(e);
             }
             return null;
           });
@@ -2672,7 +2672,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 listener.newSearcher(newSearcher, currSearcher);
               }
             } catch (Throwable e) {
-              DW.propegateInterrupt(e);
+              SW.propegateInterrupt(e);
             }
             return null;
           });
@@ -2692,7 +2692,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
                 registerSearcher(newSearchHolder);
                 registered.set(true);
               } catch (Throwable e) {
-                DW.propegateInterrupt(e);
+                SW.propegateInterrupt(e);
               } finally {
                 // we are all done with the old searcher we used
                 // for warming...
@@ -2718,7 +2718,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       return returnRefCounted;
 
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       if (e instanceof RuntimeException) throw (RuntimeException) e;
       throw new SolrException(ErrorCode.SERVER_ERROR, e);
     } finally {
@@ -2764,7 +2764,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
             try {
               waitSearcher[0].get(); // nocommit if we don't wait we dont know if it fails
             } catch (Exception e) {
-              throw new DW.Exp(e);
+              throw new SW.Exp(e);
             }
             
             if (registered.get()) {
@@ -2799,7 +2799,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         } catch (Exception e) {
           // do not allow decref() operations to fail since they are typically called in finally blocks
           // and throwing another exception would be very unexpected.
-          DW.propegateInterrupt("Error opening new searcher", e);
+          SW.propegateInterrupt("Error opening new searcher", e);
         }
       }
     };
@@ -2891,7 +2891,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         realtimeSearcher = null;
       }
       if (_searcher != null) {
-        DW.close(_searcher.get());   // close this._searcher
+        SW.close(_searcher.get());   // close this._searcher
         _searcher = null; // isClosed() does check this
       }
     }
@@ -3032,7 +3032,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   }
 
   final public static void log(Throwable e) {
-    DW.propegateInterrupt(e);
+    SW.propegateInterrupt(e);
   }
 
   public PluginBag<QueryResponseWriter> getResponseWriters() {
@@ -3064,7 +3064,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       m.put("xlsx",
           (QueryResponseWriter) Class.forName("org.apache.solr.handler.extraction.XLSXResponseWriter").getConstructor().newInstance());
     } catch (Exception e) {
-      DW.propegateInterrupt(e, true);
+      SW.propegateInterrupt(e, true);
       //don't worry; solrcell contrib not in class path
     }
   }
@@ -3149,7 +3149,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
         Object o = getResourceLoader().newInstance(e.getValue().getName(), e.getValue());
         result.put(e.getKey(), (T) o);
       } catch (Exception exp) {
-        throw new DW.Exp("Unable to instantiate class", exp);
+        throw new SW.Exp("Unable to instantiate class", exp);
         //should never happen
       }
     }
@@ -3307,14 +3307,14 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         directoryFactory.remove(getIndexDir());
       } catch (Exception e) {
-        DW.propegateInterrupt("Failed to flag index dir for removal for core:" + name + " dir:" + getIndexDir(), e);
+        SW.propegateInterrupt("Failed to flag index dir for removal for core:" + name + " dir:" + getIndexDir(), e);
       }
     }
     if (deleteDataDir) {
       try {
         directoryFactory.remove(getDataDir(), true);
       } catch (Exception e) {
-        DW.propegateInterrupt("Failed to flag data dir for removal for core:" + name + " dir:" + getDataDir(), e);
+        SW.propegateInterrupt("Failed to flag data dir for removal for core:" + name + " dir:" + getDataDir(), e);
       }
     }
     if (deleteInstanceDir) {
@@ -3447,7 +3447,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
           try {
             listener.run();
           } catch (Exception e) {
-            DW.propegateInterrupt("Error in listener ", e);
+            SW.propegateInterrupt("Error in listener ", e);
           }
         }
       }
@@ -3497,7 +3497,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         myDirFactory.cleanupOldIndexDirectories(myDataDir, myIndexDir, reload);
       } catch (Exception exc) {
-        DW.propegateInterrupt("Failed to cleanup old index directories for core name=" + coreName, exc);
+        SW.propegateInterrupt("Failed to cleanup old index directories for core name=" + coreName, exc);
       }
     }
   }

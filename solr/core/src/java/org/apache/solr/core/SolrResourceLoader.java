@@ -16,13 +16,8 @@
  */
 package org.apache.solr.core;
 
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
-import javax.naming.NoInitialContextException;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -36,14 +31,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,12 +44,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.naming.NoInitialContextException;
+
 import org.apache.lucene.analysis.WordlistLoader;
 import org.apache.lucene.analysis.util.CharFilterFactory;
 import org.apache.lucene.analysis.util.ResourceLoader;
@@ -68,7 +64,7 @@ import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.handler.admin.CoreAdminHandler;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.handler.component.ShardHandlerFactory;
@@ -80,9 +76,11 @@ import org.apache.solr.schema.ManagedIndexSchemaFactory;
 import org.apache.solr.schema.SimilarityFactory;
 import org.apache.solr.search.QParserPlugin;
 import org.apache.solr.update.processor.UpdateRequestProcessorFactory;
+import org.apache.solr.util.SystemIdResolver;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.EntityResolver;
 
 /**
  * @since solr 1.3
@@ -103,10 +101,10 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
 
-  private String name = "";
-  protected URLClassLoader classLoader;
+  private volatile String name = "";
+  protected volatile URLClassLoader classLoader;
   private final Path instanceDir;
-  private String dataDir;
+  private volatile String dataDir;
 
   private final Set<SolrCoreAware> waitingForCore = ConcurrentHashMap.newKeySet(5000);
   private final Set<SolrInfoBean> infoMBeans = ConcurrentHashMap.newKeySet(5000);
@@ -121,6 +119,8 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   // initialize themselves. This two-step process is required because not all resources are available
   // (such as the SolrZkClient) when XML docs are being parsed.    
   private RestManager.Registry managedResourceRegistry;
+
+  private final EntityResolver systemIdResolver = new SystemIdResolver(this);
 
   public synchronized RestManager.Registry getManagedResourceRegistry() {
     if (managedResourceRegistry == null) {
@@ -504,7 +504,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
   /*
    * A static map of short class name to fully qualified class name
    */
-  private final Map<String, String> classNameCache = new ConcurrentHashMap<>(2000, .75f, 100);
+  //private final Map<String, String> classNameCache = new ConcurrentHashMap<>(2000, .75f, 100);
 
 //  @VisibleForTesting
 //  static void clearCache() {
@@ -532,19 +532,19 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
    * @return the loaded class. An exception is thrown if it fails
    */
   public <T> Class<? extends T> findClass(String cname, Class<T> expectedType, String... subpackages) {
-    if (subpackages == null || subpackages.length == 0 || subpackages == packages) {
-      subpackages = packages;
-      String c = classNameCache.get(cname);
-      if (c != null) {
-        try {
-          return Class.forName(c, true, classLoader).asSubclass(expectedType);
-        } catch (ClassNotFoundException | ClassCastException e) {
-          // this can happen if the legacyAnalysisPattern below caches the wrong thing
-          log.warn( name + " Unable to load cached class, attempting lookup. name={} shortname={} reason={}", c, cname, e);
-          classNameCache.remove(cname);
-        }
-      }
-    }
+//    if (subpackages == null || subpackages.length == 0 || subpackages == packages) {
+//      subpackages = packages;
+//      String c = classNameCache.get(cname);
+//      if (c != null) {
+//        try {
+//          return Class.forName(c, true, classLoader).asSubclass(expectedType);
+//        } catch (ClassNotFoundException | ClassCastException e) {
+//          // this can happen if the legacyAnalysisPattern below caches the wrong thing
+//          log.warn( name + " Unable to load cached class, attempting lookup. name={} shortname={} reason={}", c, cname, e);
+//          classNameCache.remove(cname);
+//        }
+//      }
+//    }
 
     Class<? extends T> clazz = null;
     try {
@@ -597,7 +597,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
             !cname.equals(clazz.getName()) &&
             (subpackages.length == 0 || subpackages == packages)) {
           //store in the cache
-          classNameCache.put(cname, clazz.getName());
+        //  classNameCache.put(cname, clazz.getName());
         }
 
         // print warning if class is deprecated
@@ -682,8 +682,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
       throw err;
 
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Error instantiating class: '" + clazz.getName() + "'", e);
+      throw new SW.Exp("Error instantiating class: '" + clazz.getName() + "'", e);
     }
 
     if (!live) {
@@ -727,7 +726,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
 
@@ -756,7 +755,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         } 
       }
       
@@ -788,7 +787,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         try {
           Thread.sleep(50); // lttle throttle
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         } 
       }
       
@@ -1001,6 +1000,11 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
         log.error(msg, e);
       }
     }
+  }
+  
+
+  public EntityResolver getSystemIdResolver() {
+    return systemIdResolver;
   }
 
 }

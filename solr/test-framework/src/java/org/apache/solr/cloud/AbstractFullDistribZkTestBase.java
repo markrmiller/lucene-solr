@@ -79,7 +79,7 @@ import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -1717,23 +1717,23 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     ExecutorService customThreadPool = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrjNamedThreadFactory("closeThreadPool"));
     
     customThreadPool.submit(() -> Collections.singleton(commonCloudSolrClient).parallelStream().forEach(c -> {
-      DW.close(c);
+      SW.close(c);
     }));
     
     customThreadPool.submit(() -> Collections.singleton(controlClient).parallelStream().forEach(c -> {
-      DW.close(c);
+      SW.close(c);
     }));
     
     customThreadPool.submit(() -> coreClients.parallelStream().forEach(c -> {
-      DW.close(c);
+      SW.close(c);
     }));
 
     customThreadPool.submit(() -> Collections.singletonList(controlClientCloud).parallelStream().forEach(c -> {
-      DW.close(c);
+      SW.close(c);
     }));
 
     customThreadPool.submit(() -> Collections.singletonList(cloudClient).parallelStream().forEach(c -> {
-      DW.close(c);
+      SW.close(c);
     }));
 
     ExecutorUtil.shutdownAndAwaitTermination(customThreadPool);

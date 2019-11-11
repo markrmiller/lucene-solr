@@ -41,7 +41,7 @@ import org.apache.curator.framework.api.transaction.CuratorOp;
 import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
 import org.apache.curator.x.async.AsyncCuratorFramework;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -295,7 +295,7 @@ public class ZkMaintenanceUtils {
       path = path.substring(0, path.length() - 1);
     }
 
-    AsyncCuratorFramework asyncClient = zkClient.getAsynCurator();
+    AsyncCuratorFramework asyncClient = zkClient.getAsyncCurator();
 
     List<CuratorOp> operations = new ArrayList<>(30);
     

@@ -58,7 +58,7 @@ import org.apache.lucene.util.FixedBitSet;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -151,7 +151,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
      dr = core.getIndexReaderFactory().newReader(dir, core);
      return dr;
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening Reader", e);
     } finally {
       if (dir != null) {
@@ -487,14 +487,14 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
         rawReader.decRef();
       }
     } catch (Exception e) {
-      DW.propegateInterrupt("Problem dec ref'ing reader", e);
+      SW.propegateInterrupt("Problem dec ref'ing reader", e);
     }
 
     if (releaseCommitPoint && directoryFactory.searchersReserveCommitPoints()) {
       core.getDeletionPolicy().releaseCommitPoint(cpg);
     }
 
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       for (SolrCache cache : cacheList) {
         worker.collect(cache);
         worker.addCollect("Caches");
@@ -508,7 +508,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     try {
       SolrMetricProducer.super.close();
     } catch (Exception e) {
-      DW.propegateInterrupt("Exception closing", e);
+      SW.propegateInterrupt("Exception closing", e);
     }
 
     // do this at the end so it only gets done if there are no exceptions
@@ -2328,7 +2328,7 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
         }
         return total;
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
         return -1;
       }
     }, true, "indexCommitSize", Category.SEARCHER.toString(), scope);

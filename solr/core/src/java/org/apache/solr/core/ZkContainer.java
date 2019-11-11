@@ -34,9 +34,9 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkConfigManager;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,7 +156,7 @@ public class ZkContainer implements Closeable {
         }
         
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
 
 
@@ -185,7 +185,7 @@ public class ZkContainer implements Closeable {
             zkController.register(core.getName(), cd, skipRecovery);
           }
         } catch (Exception e) {
-          Exp exp = new DW.Exp(e);
+          Exp exp = new SW.Exp(e);
           try {
            // if (!zkController.getZkClient().isClosed() && zkController.isConnected()) { // nocommit
               zkController.publish(cd, Replica.State.DOWN);
@@ -215,7 +215,7 @@ public class ZkContainer implements Closeable {
   
   @Override
   public void close() {
-    try (DW closer = new DW(this, true)) {
+    try (SW closer = new SW(this, true)) {
       closer.add(zkController);
       closer.add(zkServer);
     }

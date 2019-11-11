@@ -20,7 +20,7 @@ import java.lang.invoke.MethodHandles;
 
 import java.util.concurrent.TimeUnit;
 
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.TimeSource;
 import org.slf4j.Logger;
@@ -111,7 +111,7 @@ public class ActionThrottle {
         timeSource.sleep(sleep);
       } catch (InterruptedException e) {
         log.error("minimumWaitBetweenActions()", e);
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
     }
 

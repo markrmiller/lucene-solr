@@ -37,7 +37,7 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
@@ -166,7 +166,7 @@ public class ShardLeader implements Closeable {
       try {
         zkController.sendStateUpdate(m);
       } catch (Exception e1) {
-        throw new DW.Exp(e1);
+        throw new SW.Exp(e1);
       }
 
       if (closed) {
@@ -222,7 +222,7 @@ public class ShardLeader implements Closeable {
             result = syncStrategy.sync(zkController, core, leaderProps);
             success = result.isSuccess();
           } catch (Exception e) {
-            throw new DW.Exp(e);
+            throw new SW.Exp(e);
           }
 
           UpdateLog ulog = core.getUpdateHandler().getUpdateLog();
@@ -264,7 +264,7 @@ public class ShardLeader implements Closeable {
                 searchHolder.decref();
               }
             } catch (Exception e) {
-              throw new DW.Exp(e);
+              throw new SW.Exp(e);
             }
           }
           if (!success) {
@@ -333,7 +333,7 @@ public class ShardLeader implements Closeable {
         log.info("I am the new leader: " + ZkCoreNodeProps.getCoreUrl(leaderProps) + " " + shardId);
         return true;
       } catch (Throwable e) {
-        DW.propegateInterrupt("There was a problem trying to register as the leader", e);
+        SW.propegateInterrupt("There was a problem trying to register as the leader", e);
 
         if (e instanceof IOException
             || (e instanceof KeeperException && (!(e instanceof SessionExpiredException)))) {
@@ -354,7 +354,7 @@ public class ShardLeader implements Closeable {
             // }
           }
         } else {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
 
@@ -471,7 +471,7 @@ public class ShardLeader implements Closeable {
       closeObject.notifyAll();
     }
     
-    try (DW worker = new DW(this, true)) {
+    try (SW worker = new SW(this, true)) {
     //  worker.add("ShardLeaderInterrupt", () -> {shardLeaderSelector.interruptLeadership();});
       worker.add("ShardLeaderInternals", shardLeaderSelector);
     }

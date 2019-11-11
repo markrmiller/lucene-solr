@@ -61,7 +61,7 @@ import org.apache.http.protocol.HttpRequestExecutor;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,12 +171,12 @@ public class HttpClientUtil {
       // don't synchronize traversal - can lead to deadlock - CopyOnWriteArrayList is critical
       // we also do not want to have to acquire the mutex when the list is empty or put a global
       // mutex around the process calls
-      try (DW worker = new DW(this)) {
+      try (SW worker = new SW(this)) {
         interceptors.forEach((it) -> worker.collect(() -> {
           try {
             it.process(request, context);
           } catch (HttpException | IOException e) {
-            throw new DW.Exp(e);
+            throw new SW.Exp(e);
           }
         }));
 
@@ -370,7 +370,7 @@ public class HttpClientUtil {
 
   public static void close(HttpClient httpClient) { 
 
-    DW.close((CloseableHttpClient) httpClient);
+    SW.close((CloseableHttpClient) httpClient);
 
     assert ObjectReleaseTracker.release(httpClient);
   }

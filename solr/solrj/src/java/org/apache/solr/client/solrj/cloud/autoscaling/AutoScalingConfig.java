@@ -31,7 +31,7 @@ import java.util.Set;
 
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.params.AutoScalingParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +83,7 @@ public class AutoScalingConfig implements MapWriter {
           TriggerEventProcessorStage stage = TriggerEventProcessorStage.valueOf(String.valueOf(stageName).toUpperCase(Locale.ROOT));
           stages.add(stage);
         } catch (Exception e) {
-          throw new DW.Exp("Invalid stage name '{}' for '{}' in listener config, skipping it in: {}", e);
+          throw new SW.Exp("Invalid stage name '{}' for '{}' in listener config, skipping it in: {}", e);
         }
       }
       listenerClass = (String)this.properties.get(AutoScalingParams.CLASS);
@@ -173,7 +173,7 @@ public class AutoScalingConfig implements MapWriter {
         try {
           type = TriggerEventType.valueOf(event.toUpperCase(Locale.ROOT));
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
         if (type == null) {
           this.event = TriggerEventType.INVALID;
@@ -319,7 +319,7 @@ public class AutoScalingConfig implements MapWriter {
       try {
         version = (Integer)jsonMap.get(AutoScalingParams.ZK_VERSION);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
     zkVersion = version;

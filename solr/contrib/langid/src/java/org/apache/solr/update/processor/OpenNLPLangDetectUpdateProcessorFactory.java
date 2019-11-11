@@ -21,7 +21,7 @@ import java.io.InputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
@@ -119,7 +119,7 @@ public class OpenNLPLangDetectUpdateProcessorFactory extends UpdateRequestProces
       }
     }
     finally{
-      DW.close(is);
+      SW.close(is);
     }
   }
 

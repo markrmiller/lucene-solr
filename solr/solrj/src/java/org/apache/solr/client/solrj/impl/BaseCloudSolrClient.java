@@ -75,7 +75,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.NamedList;
@@ -551,7 +551,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           NamedList<Object> rsp = getLbClient().request(lbRequest).getResponse();
           shardResponses.add(url, rsp);
         } catch (Exception e) {
-          throw new DW.Exp(e);
+          throw new SW.Exp(e);
         }
       }
     }
@@ -582,7 +582,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         LBSolrClient.Rsp rsp = getLbClient().request(req);
         shardResponses.add(urlList.get(0), rsp.getResponse());
       } catch (Exception e) {
-        throw new DW.Exp(urlList.get(0), e);
+        throw new SW.Exp(urlList.get(0), e);
       }
     }
 
@@ -895,7 +895,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
       }
     } catch (Exception exc) {
-      DW.propegateInterrupt(exc);
+      SW.propegateInterrupt(exc);
       Throwable rootCause = SolrException.getRootCause(exc);
       // don't do retry support for admin requests
       // or if the request doesn't have a collection specified

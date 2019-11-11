@@ -65,13 +65,13 @@ import static org.apache.solr.common.params.CommonParams.ID;
  */
 public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, PermissionNameProvider {
 
-  static SolrClientCache clientCache = new SolrClientCache();
-  static ModelCache modelCache = null;
-  static ConcurrentMap objectCache = new ConcurrentHashMap();
-  private SolrDefaultStreamFactory streamFactory = new SolrDefaultStreamFactory();
+  static final SolrClientCache clientCache = new SolrClientCache();
+  static volatile ModelCache modelCache = null;
+  static final ConcurrentMap objectCache = new ConcurrentHashMap();
+  private final SolrDefaultStreamFactory streamFactory = new SolrDefaultStreamFactory();
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private String coreName;
-  private Map<String,DaemonStream> daemons = Collections.synchronizedMap(new HashMap());
+  private volatile String coreName;
+  private final Map<String,DaemonStream> daemons = Collections.synchronizedMap(new HashMap());
 
   @Override
   public PermissionNameProvider.Name getPermissionName(AuthorizationContext request) {

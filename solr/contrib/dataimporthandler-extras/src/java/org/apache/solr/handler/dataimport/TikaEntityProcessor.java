@@ -17,7 +17,7 @@
 package org.apache.solr.handler.dataimport;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -172,7 +172,7 @@ public class TikaEntityProcessor extends EntityProcessorBase {
       }
       wrapAndThrow(SEVERE, e, "Unable to read content");
     }
-    DW.close(is);
+    SW.close(is);
     for (Map<String, String> field : context.getAllEntityFields()) {
       if (!"true".equals(field.get("meta"))) continue;
       String col = field.get(COLUMN);

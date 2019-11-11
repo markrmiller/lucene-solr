@@ -16,6 +16,21 @@
  */
 package org.apache.solr.core;
 
+import static java.util.Objects.requireNonNull;
+import static org.apache.solr.common.params.CommonParams.AUTHC_PATH;
+import static org.apache.solr.common.params.CommonParams.AUTHZ_PATH;
+import static org.apache.solr.common.params.CommonParams.AUTOSCALING_HISTORY_PATH;
+import static org.apache.solr.common.params.CommonParams.COLLECTIONS_HANDLER_PATH;
+import static org.apache.solr.common.params.CommonParams.CONFIGSETS_HANDLER_PATH;
+import static org.apache.solr.common.params.CommonParams.CORES_HANDLER_PATH;
+import static org.apache.solr.common.params.CommonParams.INFO_HANDLER_PATH;
+import static org.apache.solr.common.params.CommonParams.METRICS_HISTORY_PATH;
+import static org.apache.solr.common.params.CommonParams.METRICS_PATH;
+import static org.apache.solr.common.params.CommonParams.ZK_PATH;
+import static org.apache.solr.common.params.CommonParams.ZK_STATUS_PATH;
+import static org.apache.solr.core.CorePropertiesLocator.PROPERTIES_FILENAME;
+import static org.apache.solr.security.AuthenticationPlugin.AUTHENTICATION_PLUGIN_PROP;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -38,10 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import com.google.inject.Inject;
 
 import org.apache.http.auth.AuthSchemeProvider;
 import org.apache.http.client.CredentialsProvider;
@@ -75,8 +86,8 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Replica.State;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ObjectReleaseTracker;
@@ -124,24 +135,14 @@ import org.apache.solr.util.DefaultSolrThreadFactory;
 import org.apache.solr.util.OrderedExecutor;
 import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.SolrFileCleaningTracker;
+import org.apache.solr.util.XMLFactorysAndParser;
 import org.apache.solr.util.stats.MetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Objects.requireNonNull;
-import static org.apache.solr.common.params.CommonParams.AUTHC_PATH;
-import static org.apache.solr.common.params.CommonParams.AUTHZ_PATH;
-import static org.apache.solr.common.params.CommonParams.AUTOSCALING_HISTORY_PATH;
-import static org.apache.solr.common.params.CommonParams.COLLECTIONS_HANDLER_PATH;
-import static org.apache.solr.common.params.CommonParams.CONFIGSETS_HANDLER_PATH;
-import static org.apache.solr.common.params.CommonParams.CORES_HANDLER_PATH;
-import static org.apache.solr.common.params.CommonParams.INFO_HANDLER_PATH;
-import static org.apache.solr.common.params.CommonParams.METRICS_HISTORY_PATH;
-import static org.apache.solr.common.params.CommonParams.METRICS_PATH;
-import static org.apache.solr.common.params.CommonParams.ZK_PATH;
-import static org.apache.solr.common.params.CommonParams.ZK_STATUS_PATH;
-import static org.apache.solr.core.CorePropertiesLocator.PROPERTIES_FILENAME;
-import static org.apache.solr.security.AuthenticationPlugin.AUTHENTICATION_PLUGIN_PROP;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.inject.Inject;
 
 /**
  * @since solr 1.3
@@ -151,6 +152,13 @@ public class CoreContainer implements Closeable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  static {
+    // init statics early to block less on core create
+    XMLFactorysAndParser.log.info("Pre init XML factories and parser");
+    // loadDirectoryFactory
+    DirectoryFactory.log.info("Pre init DirectoryFactory#loadDirectoryFactory");
+  }
+  
   final SolrCores solrCores = new SolrCores(this);
 
   public static class CoreLoadFailure {
@@ -184,6 +192,7 @@ public class CoreContainer implements Closeable {
 
   private volatile UpdateShardHandler updateShardHandler;
 
+  // nocommit: unlimited cores loading ... maybe not - this should be tracked anyway, move again to SolrWork
   private volatile ExecutorService coreContainerWorkExecutor = ExecutorUtil.newMDCAwareCachedThreadPool(
       new DefaultSolrThreadFactory("coreContainerWorkExecutor"));
 
@@ -391,7 +400,7 @@ public class CoreContainer implements Closeable {
       try {
         old.plugin.close();
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }
@@ -425,7 +434,7 @@ public class CoreContainer implements Closeable {
       try {
         old.plugin.close();
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }
@@ -479,7 +488,7 @@ public class CoreContainer implements Closeable {
     try {
       if (old != null) old.plugin.close();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
 
   }
@@ -570,7 +579,7 @@ public class CoreContainer implements Closeable {
     try {
       cc.load();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     return cc;
   }
@@ -642,8 +651,10 @@ public class CoreContainer implements Closeable {
     }
 
     packageStoreAPI = new PackageStoreAPI(this);
-    containerHandlers.getApiBag().register(new AnnotatedApi(packageStoreAPI.readAPI), Collections.emptyMap());
-    containerHandlers.getApiBag().register(new AnnotatedApi(packageStoreAPI.writeAPI), Collections.emptyMap());
+    
+    // nocommit BLOCKING AND SLOW
+//    containerHandlers.getApiBag().register(new AnnotatedApi(packageStoreAPI.readAPI), Collections.emptyMap());
+//    containerHandlers.getApiBag().register(new AnnotatedApi(packageStoreAPI.writeAPI), Collections.emptyMap());
 
     metricManager = new SolrMetricManager(loader, cfg.getMetricsConfig());
     String registryName = SolrMetricManager.getRegistryName(SolrInfoBean.Group.node);
@@ -794,7 +805,7 @@ public class CoreContainer implements Closeable {
       }
       checkForDuplicateCoreNames(cds);
       status |= CORE_DISCOVERY_COMPLETE;
-      try (DW register = new DW(this)) {
+      try (SW register = new SW(this)) {
         for (final CoreDescriptor cd : cds) {
           if (cd.isTransient() || !cd.isLoadOnStartup()) {
             solrCores.addCoreDescriptor(cd);
@@ -944,7 +955,7 @@ public class CoreContainer implements Closeable {
       throw new AlreadyClosedException();
     }
     
-    try (DW closer = new DW(this, true)) {
+    try (SW closer = new SW(this, true)) {
 
       ZkController zkController = getZkController();
       if (zkController != null) {
@@ -966,7 +977,7 @@ public class CoreContainer implements Closeable {
         try {
           cancelCoreRecoveries();
         } catch (Exception e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
           log.error("Exception trying to cancel recoveries on shutdown", e);
         }
       }
@@ -1050,6 +1061,10 @@ public class CoreContainer implements Closeable {
     assert ObjectReleaseTracker.release(this);
   }
 
+  public void waitForCoresToFinish() {
+    solrCores.waitForLoadingAndOps();
+  }
+  
   public void cancelCoreRecoveries() {
 
     List<SolrCore> cores = solrCores.getCores();
@@ -1060,7 +1075,7 @@ public class CoreContainer implements Closeable {
       try {
         core.getSolrCoreState().cancelRecovery();
       } catch (Exception e) {
-        throw new DW.Exp("Error canceling recovery for core", e);
+        throw new SW.Exp("Error canceling recovery for core", e);
       }
     }
   }
@@ -1181,15 +1196,14 @@ public class CoreContainer implements Closeable {
     } catch (Exception ex) {
       // First clean up any core descriptor, there should never be an existing core.properties file for any core that
       // failed to be created on-the-fly.
-      Exp exp = new DW.Exp("Error CREATEing SolrCore '" + coreName, ex);
+      Exp exp = null;
       try {
         coresLocator.delete(this, cd);
         if (isZooKeeperAware() && !preExisitingZkEntry) {
           try {
             getZkController().unregister(coreName, cd);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            SolrException.log(log, null, e);
+            SW.propegateInterrupt(e);
           }
         }
 
@@ -1206,9 +1220,14 @@ public class CoreContainer implements Closeable {
         if (c != null) {
           rootMsg = " Caused by: " + c.getMessage();
         }
+        exp = new SW.Exp("Error CREATEing SolrCore '" + coreName + " " + rootMsg, ex);
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
-        exp.addSuppressed(e);
+        SW.propegateInterrupt(e);
+        if (exp != null) {
+          exp.addSuppressed(e);
+        } else {
+          throw new SolrException(ErrorCode.SERVER_ERROR, e);
+        }
       }
       throw exp;
     }
@@ -1277,7 +1296,7 @@ public class CoreContainer implements Closeable {
 
       return core;
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       coreInitFailures.put(dcore.getName(), new CoreLoadFailure(dcore, e));
       if (e instanceof ZkController.NotInClusterStateException && !newCollection) {
         // this mostly happen when the core is deleted when this node is down
@@ -1288,17 +1307,17 @@ public class CoreContainer implements Closeable {
       final SolrException solrException = new SolrException(ErrorCode.SERVER_ERROR,
           "Unable to create core [" + dcore.getName() + "]", e);
       if (core != null && !core.isClosed())
-        DW.close(core);
+        SW.close(core);
       throw solrException;
     } catch (Throwable t) {
-      Exp exp = new DW.Exp(t);
+      Exp exp = new SW.Exp(t);
       try {
         SolrException e = new SolrException(ErrorCode.SERVER_ERROR,
             "JVM Error creating core [" + dcore.getName() + "]: " + t.getMessage(), t);
         coreInitFailures.put(dcore.getName(), new CoreLoadFailure(dcore, e));
         solrCores.removeCoreDescriptor(dcore);
         if (core != null && !core.isClosed())
-          DW.close(core);
+          SW.close(core);
       } catch (Exception e) {
         exp.addSuppressed(e);
       }
@@ -1517,6 +1536,8 @@ public class CoreContainer implements Closeable {
     SolrCore core = solrCores.getCoreFromAnyList(name, false);
     if (core != null) {
 
+      // nocommit there are failures here ive fixed before - especially around fail cases and cleanup
+      
       // The underlying core properties files may have changed, we don't really know. So we have a (perhaps) stale
       // CoreDescriptor and we need to reload it from the disk files
       CoreDescriptor cd = reloadCoreDescriptor(core.getCoreDescriptor());
@@ -1576,7 +1597,7 @@ public class CoreContainer implements Closeable {
       } catch (AlreadyClosedException.CoreIsClosedException e) {
         throw e;
       } catch (Exception e) {
-        Exp exp = new DW.Exp("Unable to reload core [" + cd.getName() + "]", e);
+        Exp exp = new SW.Exp("Unable to reload core [" + cd.getName() + "]", e);
         try {
           coreInitFailures.put(cd.getName(), new CoreLoadFailure(cd, e));
           
@@ -1586,7 +1607,7 @@ public class CoreContainer implements Closeable {
         throw exp;
       } finally {
         if (!success) {
-          DW.close(newCore);
+          SW.close(newCore);
         }
         solrCores.removeFromPendingOps(cd.getName());
       }
@@ -1693,7 +1714,7 @@ public class CoreContainer implements Closeable {
       try {
         zkSys.getZkController().unregister(name, cd);
       } catch (Exception e) {
-        throw new DW.Exp("Error unregistering core [" + name + "] from cloud state", e);
+        throw new SW.Exp("Error unregistering core [" + name + "] from cloud state", e);
       }
     }
   }
@@ -1812,7 +1833,7 @@ public class CoreContainer implements Closeable {
   // ---------------- CoreContainer request handlers --------------
 
   protected <T> T createHandler(String path, String handlerClass, Class<T> clazz) {
-    T handler = loader.newInstance(handlerClass, clazz, null, new Class[]{CoreContainer.class}, new Object[]{this});
+    T handler = loader.newInstance(handlerClass, clazz, new String[0], new Class[]{CoreContainer.class}, new Object[]{this});
     if (handler instanceof SolrRequestHandler) {
       containerHandlers.put(path, (SolrRequestHandler) handler);
     }

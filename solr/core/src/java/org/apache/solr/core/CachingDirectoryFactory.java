@@ -35,7 +35,7 @@ import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
@@ -217,7 +217,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
           }
           assert val.refCnt == 0 : val.refCnt;
         } catch (Exception e) {
-          DW.propegateInterrupt("Error closing directory", e);
+          SW.propegateInterrupt("Error closing directory", e);
         }
       }
 
@@ -234,7 +234,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
             }
           }
         } catch (Exception e) {
-          DW.propegateInterrupt("Error closing directory", e);
+          SW.propegateInterrupt("Error closing directory", e);
         }
       }
 
@@ -243,7 +243,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         try {
           removeDirectory(val);
         } catch (Exception e) {
-          DW.propegateInterrupt("Error removing directory", e);
+          SW.propegateInterrupt("Error removing directory", e);
         }
       }
 
@@ -287,7 +287,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         } catch (Exception e) {
           log.error("closeCacheValue(CacheValue=" + cacheValue + ")", e);
 
-          DW.propegateInterrupt("Error executing preClose for directory", e);
+          SW.propegateInterrupt("Error executing preClose for directory", e);
         }
       }
     }
@@ -348,7 +348,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
         } catch (Exception e) {
           log.error("closeCacheValue(CacheValue=" + cacheValue + ")", e);
 
-          DW.propegateInterrupt("Error executing postClose for directory", e);
+          SW.propegateInterrupt("Error executing postClose for directory", e);
         }
       }
     }
@@ -377,7 +377,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
     } catch (Exception e) {
       log.error("close(CacheValue=" + val + ")", e);
 
-      DW.propegateInterrupt("Error closing directory", e);
+      SW.propegateInterrupt("Error closing directory", e);
     }
 
     if (log.isDebugEnabled()) {

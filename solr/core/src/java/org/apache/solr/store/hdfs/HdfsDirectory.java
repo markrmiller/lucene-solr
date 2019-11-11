@@ -38,7 +38,7 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.store.blockcache.CustomBufferedIndexInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +90,7 @@ public class HdfsDirectory extends BaseDirectory {
         }
       }
     } catch (Exception e) {
-      DW.close(fileSystem);
+      SW.close(fileSystem);
       
       throw new RuntimeException("Problem creating directory: " + hdfsDirPath, e);
     }

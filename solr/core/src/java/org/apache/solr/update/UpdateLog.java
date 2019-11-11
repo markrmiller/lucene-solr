@@ -57,7 +57,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
 
@@ -119,7 +119,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
       try{
         return SyncLevel.valueOf(level.toUpperCase(Locale.ROOT));
       } catch(Exception ex){
-        DW.propegateInterrupt("There was an error reading the SyncLevel - default to " + SyncLevel.FLUSH, ex);
+        SW.propegateInterrupt("There was an error reading the SyncLevel - default to " + SyncLevel.FLUSH, ex);
         return SyncLevel.FLUSH;
       }
     }
@@ -688,7 +688,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
         RefCounted<SolrIndexSearcher> holder = uhandler.core.openNewSearcher(true, true);
         holder.decref();
       } catch (Exception e) {
-        DW.propegateInterrupt("Error opening realtime searcher", e);
+        SW.propegateInterrupt("Error opening realtime searcher", e);
         return;
       }
 
@@ -706,7 +706,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
         RefCounted<SolrIndexSearcher> holder = uhandler.core.openNewSearcher(true, true);
         holder.decref();
       } catch (Exception e) {
-        DW.propegateInterrupt("Error opening realtime searcher for deleteByQuery", e);
+        SW.propegateInterrupt("Error opening realtime searcher for deleteByQuery", e);
       }
 
       if (map != null) map.clear();
@@ -1970,7 +1970,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
           recoveryInfo.errors++;
           loglog.error("Replay exception: finish()", ex);
         } finally {
-          DW.close(proc);
+          SW.close(proc);
         }
 
       } finally {

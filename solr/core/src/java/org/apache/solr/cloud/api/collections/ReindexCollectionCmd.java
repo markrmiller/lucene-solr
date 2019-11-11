@@ -56,7 +56,7 @@ import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.Utils;
@@ -414,7 +414,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
       try {
         rsp = ocmh.cloudManager.request(new QueryRequest(q));
       } catch (Exception e) {
-        throw new DW.Exp("Unable to copy documents from " +
+        throw new SW.Exp("Unable to copy documents from " +
             collection + " to " + targetCollection, e);
       }
       daemonUrl = getDaemonUrl(rsp, coll);
@@ -501,7 +501,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
       reindexingState.put(PHASE, "done");
       removeReindexingState(collection);
     } catch (Exception e) {
-      throw new DW.Exp("Error during reindexing of " + extCollection, e);
+      throw new SW.Exp("Error during reindexing of " + extCollection, e);
     } finally {
       solrClientCache.close();
       if (aborted) {
@@ -557,7 +557,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
       QueryResponse rsp = solrClient.query(collection, params);
       return rsp.getResults().getNumFound();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 
@@ -663,7 +663,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
             }
           }
         } catch (Exception e) {
-          throw new DW.Exp("Exception waiting for daemon " +
+          throw new SW.Exp("Exception waiting for daemon " +
               daemonName + " at " + daemonUrl, e);
         }
         if (statusCheck % 5 == 0) {

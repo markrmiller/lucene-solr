@@ -38,7 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.common.util.ValidatingJsonMap;
@@ -239,7 +239,7 @@ public class AnnotatedApi extends Api implements PermissionNameProvider {
           }
         }
       } catch (Exception se) {
-        throw new DW.Exp("Error executing command", se);
+        throw new SW.Exp("Error executing command", se);
       }
 
     }

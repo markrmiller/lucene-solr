@@ -40,7 +40,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -179,7 +179,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
           sendUpdateStream();
 
         } catch (Throwable e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
           handleError(e);
         } finally {
           synchronized (runners) {
@@ -267,7 +267,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
         
                 String result = IOUtils.toString(rspBody, "UTF-8");
                 log.error("Problem parsing response={} status={} {} {}", result, statusCode, basePath, update.getRequest(),exc);
-                throw new DW.Exp("Failed to parse error response from " + basePath + " " + result, exc);
+                throw new SW.Exp("Failed to parse error response from " + basePath + " " + result, exc);
               } finally {
                 solrExc = new HttpSolrClient.RemoteSolrException(basePath , statusCode, msg.toString(), null);
                 if (metadata != null) {

@@ -30,7 +30,7 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.CreateMode;
@@ -93,7 +93,7 @@ public class OverseerRoleCmd implements OverseerCollectionMessageHandler.Cmd {
       try {
         overseerPrioritizer.prioritizeOverseerNodes(ocmh.myId);
       } catch (Exception e) {
-        throw new DW.Exp("Error in prioritizing Overseer", e);
+        throw new SW.Exp("Error in prioritizing Overseer", e);
       }
 
     }).start();

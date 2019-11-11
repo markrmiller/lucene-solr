@@ -63,7 +63,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ExecutorUtil;
@@ -222,7 +222,7 @@ public class Http2SolrClient extends SolrClient {
     try {
       httpClient.start();
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     return httpClient;
   }
@@ -237,7 +237,7 @@ public class Http2SolrClient extends SolrClient {
         httpClient.stop();
         ExecutorUtil.shutdownAndAwaitTermination(executor);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
 
@@ -388,7 +388,7 @@ public class Http2SolrClient extends SolrClient {
                 parser, is, getEncoding(), isV2ApiRequest(solrRequest));
             onComplete.onSuccess(rsp);
           } catch (Exception e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
             onComplete.onFailure(e);
           }
         }
@@ -703,7 +703,7 @@ public class Http2SolrClient extends SolrClient {
       try {
         rsp = processor.processResponse(is, encoding);
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
         throw new RemoteSolrException(serverBaseUrl, httpStatus, e.getMessage(), e);
       }
 
@@ -724,7 +724,7 @@ public class Http2SolrClient extends SolrClient {
             metadata = (NamedList<String>) err.get("metadata");
           }
         } catch (Exception ex) {
-          throw new DW.Exp(ex);
+          throw new SW.Exp(ex);
         }
         if (reason == null) {
           StringBuilder msg = new StringBuilder();

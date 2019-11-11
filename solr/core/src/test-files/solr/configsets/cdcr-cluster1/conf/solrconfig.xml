@@ -72,7 +72,7 @@
     </lst>
   </initParams>
 
-  <requestHandler name="/update" class="solr.UpdateRequestHandler">
+  <requestHandler name="/update" class="org.apache.solr.update.UpdateRequestHandler">
     <lst name="defaults">
       <str name="update.chain">cdcr-processor-chain</str>
     </lst>

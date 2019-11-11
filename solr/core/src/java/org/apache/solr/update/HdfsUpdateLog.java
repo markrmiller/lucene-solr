@@ -34,7 +34,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
@@ -300,7 +300,7 @@ public class HdfsUpdateLog extends UpdateLog {
     try {
       super.close(committed, deleteOnClose);
     } finally {
-      DW.close(fs);
+      SW.close(fs);
     }
   }
 

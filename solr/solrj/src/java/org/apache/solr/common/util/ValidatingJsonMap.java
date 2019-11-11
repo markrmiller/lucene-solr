@@ -33,7 +33,7 @@ import java.util.Set;
 
 import org.apache.solr.common.NavigableObject;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.noggit.JSONParser;
 import org.noggit.ObjectBuilder;
 
@@ -317,7 +317,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
   }
 
   public static ValidatingJsonMap parse(String resourceName, String includeLocation) {
-    final URL resource = ValidatingJsonMap.class.getClassLoader().getResource(resourceName);
+    final URL resource = Thread.currentThread().getContextClassLoader().getResource(resourceName);
     if (null == resource) {
       throw new RuntimeException("invalid API spec: " + resourceName);
     }
@@ -326,7 +326,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
       try {
         map = fromJSON(is, includeLocation);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     } catch (IOException ioe) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,

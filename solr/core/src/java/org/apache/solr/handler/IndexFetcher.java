@@ -81,7 +81,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.common.util.NamedList;
@@ -845,7 +845,7 @@ public class IndexFetcher {
         props.store(outFile, "Replication details");
         dir.sync(Collections.singleton(tmpFileName));
       } finally {
-        DW.close(outFile);
+        SW.close(outFile);
       }
       
       solrCore.getDirectoryFactory().renameWithOverwrite(dir, tmpFileName, REPLICATION_PROPERTIES);
@@ -1675,7 +1675,7 @@ public class IndexFetcher {
             }
             //if there is an error continue. But continue from the point where it got broken
           } finally {
-            DW.close(is);
+            SW.close(is);
           }
         }
       } finally {
@@ -1853,7 +1853,7 @@ public class IndexFetcher {
         return new FastInputStream(is);
       } catch (Exception e) {
         //close stream on error
-        DW.close(is);
+        SW.close(is);
         throw new IOException("Could not download file '" + fileName + "'", e);
       }
     }

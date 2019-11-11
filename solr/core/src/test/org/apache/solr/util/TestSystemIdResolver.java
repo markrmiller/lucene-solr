@@ -24,7 +24,7 @@ import java.util.Arrays;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.SolrResourceLoader;
 import org.xml.sax.InputSource;
 
@@ -40,7 +40,7 @@ public class TestSystemIdResolver extends SolrTestCaseJ4 {
     try {
       assertEquals("Resolved SystemId does not match", expectedSystemId, is.getSystemId());
     } finally {
-      DW.close(is.getByteStream());
+      SW.close(is.getByteStream());
     }
   }
   

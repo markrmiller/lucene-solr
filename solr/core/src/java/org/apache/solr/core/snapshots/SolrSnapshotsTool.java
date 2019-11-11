@@ -56,7 +56,7 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.snapshots.CollectionSnapshotMetaData.CoreSnapshotMetaData;
 import org.apache.solr.util.CLIO;
@@ -112,7 +112,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       CLIO.out("Successfully created snapshot with name " + snapshotName + " for collection " + collectionName);
 
     } catch (Exception e) {
-      DW.propegateInterrupt(e);   
+      SW.propegateInterrupt(e);   
       log.error("Failed to create a snapshot with name " + snapshotName + " for collection " + collectionName, e);
       CLIO.out("Failed to create a snapshot with name " + snapshotName + " for collection " + collectionName
           +" due to following error : "+e.getLocalizedMessage());

@@ -44,8 +44,7 @@ dependencies {
   implementation project(':lucene:lucene-join')
   implementation project(':solr:solr-solrj')
   
-  
-  
+    
   // https://mvnrepository.com/artifact/com.google.inject/guice
   implementation ('com.google.inject:guice')
   // https://mvnrepository.com/artifact/com.google.code.guice/guice-servlet
@@ -89,7 +88,9 @@ dependencies {
   implementation ('org.apache.httpcomponents:httpclient')
   implementation ('org.apache.httpcomponents:httpcore')
   implementation ('org.codehaus.woodstox:stax2-api')
-  implementation ('org.codehaus.woodstox:woodstox-core-asl')
+  implementation ('com.fasterxml:aalto-xml')
+  //implementation ('org.codehaus.woodstox:woodstox-core-asl')
+  implementation 'com.fasterxml.staxmate:staxmate'
   implementation ('io.dropwizard.metrics:metrics-core') {
     exclude group: 'com.rabbitmq', module: 'amqp-client' // we don't use this
   }

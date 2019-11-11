@@ -36,7 +36,7 @@ import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.DirectoryFactory;
@@ -110,7 +110,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       }
       indexWriter = null;
     } catch (Exception e) {
-      DW.propegateInterrupt("Error during close of writer.", e);
+      SW.propegateInterrupt("Error during close of writer.", e);
     } 
   }
   
@@ -208,14 +208,14 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
           log.debug("Closing old IndexWriter... core=" + coreName);
           iw.close();
         } catch (Exception e) {
-          DW.propegateInterrupt("Error closing old IndexWriter. core=" + coreName, e);
+          SW.propegateInterrupt("Error closing old IndexWriter. core=" + coreName, e);
         }
       } else {
         try {
           log.debug("Rollback old IndexWriter... core=" + coreName);
           iw.rollback();
         } catch (Exception e) {
-          DW.propegateInterrupt("Error rolling back old IndexWriter. core=" + coreName, e);
+          SW.propegateInterrupt("Error rolling back old IndexWriter. core=" + coreName, e);
         }
       }
     }
@@ -351,7 +351,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
               try {
                 future.get();
               } catch (Exception e) {
-                throw new DW.Exp(e);
+                throw new SW.Exp(e);
               }
             } finally {
               recoveryLock.unlock();

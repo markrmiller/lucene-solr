@@ -38,7 +38,7 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -101,7 +101,7 @@ public class TestRemoteStreaming extends SolrJettyTestBase {
         IOUtils.copy(new InputStreamReader(inputStream, StandardCharsets.UTF_8),strWriter);
         return strWriter.toString();
       } finally {
-        DW.close(inputStream);
+        SW.close(inputStream);
       }
     }
     return null;

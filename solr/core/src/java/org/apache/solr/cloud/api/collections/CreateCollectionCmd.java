@@ -64,6 +64,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.CollectionStatePredicate;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.ImplicitDocRouter;
@@ -78,7 +79,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.TimeSource;
@@ -204,13 +205,13 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         replicaPositions = buildReplicaPositions(cloudManager, clusterState,
             docCollection, message, shardNames, sessionWrapper);
       } catch (Exception e) {
-        DW.Exp exp = new DW.Exp("call(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", e);
+        SW.Exp exp = new SW.Exp("call(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", e);
         try {
           ZkNodeProps deleteMessage = new ZkNodeProps("name", collectionName);
           new DeleteCollectionCmd(coreContainer, CollectionsHandler.ADMIN_PATH).call(clusterState, deleteMessage, results); // nocommit
           // unwrap the exception
         } catch (Exception e1) {
-          DW.propegateInterrupt(e1);
+          SW.propegateInterrupt(e1);
           exp.addSuppressed(e1);
         }
         throw exp;
@@ -323,7 +324,9 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
       if(!isLegacyCloud) {
         // wait for all replica entries to be created
-        Map<String, Replica> replicas = waitToSeeReplicasInState(collectionName, coresToCreate.keySet());
+        Map<String,Replica> replicas = new HashMap<>();
+        zkStateReader.waitForState(collectionName, 20, TimeUnit.SECONDS, expectedReplicas(coresToCreate.size(), replicas)); // nocommit - timeout - keep this below containing timeouts - need central timeout stuff
+        
         for (Map.Entry<String, ShardRequest> e : coresToCreate.entrySet()) {
           ShardRequest sreq = e.getValue();
           String coreNodeName = replicas.get(e.getKey()).getName();
@@ -343,9 +346,9 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         // element, which may be interpreted by the user as a positive ack
         cleanupCollection(collectionName, new NamedList<Object>());
         log.info("Cleaned up artifacts for failed create collection for [{}]", collectionName);
-        throw new SolrException(ErrorCode.BAD_REQUEST, "Underlying core creation failed while creating collection: " + collectionName);
+        throw new SolrException(ErrorCode.BAD_REQUEST, "Underlying core creation failed while creating collection: " + collectionName + " " + results);
       } else {
-        log.debug("Finished create command on all shards for collection: {}", collectionName);
+        log.info("Finished create command on all shards for collection: {}", collectionName);
 
         // Emit a warning about production use of data driven functionality
         boolean defaultConfigSetUsed = message.getStr(COLL_CONF) == null ||
@@ -370,6 +373,8 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           log.warn("Timed out waiting to see the " + COLOCATED_WITH + " property set on collection: " + withCollection);
           // maybe the overseer queue is backed up, we don't want to fail the create request
           // because of this time out, continue
+          
+          // nocommit
         }
       }
 
@@ -382,7 +387,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       log.error("Error during collection create", ex);
       throw ex;
     } catch (Exception ex) {
-      throw new DW.Exp("Error during collection create(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", ex);
+      throw new SW.Exp("Error during collection create(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", ex);
     } finally {
       if (sessionWrapper.get() != null) sessionWrapper.get().release();
     }
@@ -579,7 +584,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     try {
       configManager.copyConfigDir(ConfigSetsHandlerApi.DEFAULT_CONFIGSET_NAME, targetConfig, new HashSet<>());
     } catch (Exception e) {
-     throw new DW.Exp("copyDefaultConfigSetTo(List<String>=" + configNames + ", String=" + targetConfig + ")", e);
+     throw new SW.Exp("copyDefaultConfigSetTo(List<String>=" + configNames + ", String=" + targetConfig + ")", e);
     }
 
     if (log.isDebugEnabled()) {
@@ -598,7 +603,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     try {
       stateManager.removeRecursively(termsPath, true, true);
     } catch (Exception e) {
-      throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
+      throw new SW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
     try {
       log.info("Creating collection in ZooKeeper:" + collection);
@@ -658,7 +663,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           false);
 
     } catch (Exception e) {
-      throw new DW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
+      throw new SW.Exp("createCollectionZkNode(DistribStateManager=" + stateManager + ", String=" + collection + ", Map<String,String>=" + params + ")", e);
     }
 
 
@@ -876,6 +881,31 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     }
   }
   
+  public static CollectionStatePredicate expectedReplicas(int expectedReplicas, Map<String,Replica> replicaMap) {
+    log.info("Wait for expectedReplicas={}", expectedReplicas);
+
+    return (liveNodes, collectionState) -> {
+      if (collectionState == null)
+        return false;
+      if (collectionState.getSlices() == null) {
+        return false;
+      }
+
+      int replicas = 0;
+      for (Slice slice : collectionState) {
+        for (Replica replica : slice) {
+            replicaMap.put(replica.getCoreName(), replica);
+            replicas++;
+        }
+      }
+      if (replicas == expectedReplicas) {
+        return true;
+      }
+
+      return false;
+    };
+  }
+  
   // nocommit
   
   // this should be picking up the coreNodeName for a replica
@@ -887,21 +917,23 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       zkStateReader.waitForState(collectionName, timeouts, TimeUnit.SECONDS, (n, c) -> { 
         if (c == null)
           return false;
-        Map<String, Replica> r = new HashMap<>();
+        Map<String, Replica> replicas = new HashMap<>();
+        Collection<Slice> slices = c.getSlices();
+        if (slices == null) {
+          return false;
+        }
         for (String coreName : coreNames) {
-          if (r.containsKey(coreName)) continue;
-          for (Slice slice : c.getSlices()) {
+          for (Slice slice : slices) {
             for (Replica replica : slice.getReplicas()) {
               if (coreName.equals(replica.getStr(ZkStateReader.CORE_NAME_PROP))) {
-                r.put(coreName, replica);
-                break;
+                replicas.put(coreName, replica);
               }
             }
           }
         }
         
-        if (r.size() == coreNames.size()) {
-          result.set(r);
+        if (replicas.size() == coreNames.size()) {
+          result.set(replicas);
           return true;
         } else {
           errorMessage.set("Timed out waiting to see all replicas timeout=" + timeouts + " coreNames=" + coreNames + " Last state: " + c);
@@ -909,12 +941,17 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         }
 
       });
-    } catch (TimeoutException | InterruptedException e) {
+    } catch (TimeoutException e) {
       String error = errorMessage.get();
       if (error == null)
         error = "Timeout waiting for collection state.";
       throw new SolrException(ErrorCode.SERVER_ERROR, error);
     }
+    
+    if (result.get() == null) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, "Solr encountered an unexpected exception");
+    }
+    
     return result.get();
   }
 }

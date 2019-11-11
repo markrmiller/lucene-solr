@@ -19,7 +19,7 @@ package org.apache.solr.common.cloud;
 import java.lang.invoke.MethodHandles;
 
 import org.apache.solr.common.cloud.ConnectionManager.IsClosed;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
@@ -84,7 +84,7 @@ public class ZkCmdExecutor {
         // it's okay if another beats us creating the node
       }
     } catch (Exception e1) {
-      throw new DW.Exp(e1);
+      throw new SW.Exp(e1);
     }
   }
   

@@ -24,18 +24,18 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -103,8 +103,10 @@ public class ZkShardTerms implements AutoCloseable{
     if (replicasNeedingRecovery.isEmpty()) return;
 
     Terms newTerms;
-    while( (newTerms = terms.increaseTerms(leader, replicasNeedingRecovery)) != null) {
-      if (forceSaveTerms(newTerms)) return;
+    synchronized (writingLock) {
+      while ((newTerms = terms.increaseTerms(leader, replicasNeedingRecovery)) != null) {
+        if (forceSaveTerms(newTerms)) return;
+      }
     }
   }
 
@@ -305,7 +307,7 @@ public class ZkShardTerms implements AutoCloseable{
     } catch (KeeperException.NoNodeException e) {
       throw e;
     } catch (Exception e) {
-      throw new DW.Exp("Error while saving shard term for collection: " + collection, e);
+      throw new SW.Exp("Error while saving shard term for collection: " + collection, e);
     }
     return false;
   }
@@ -324,7 +326,7 @@ public class ZkShardTerms implements AutoCloseable{
         // it's okay if another beats us creating the node
       }
     } catch (Exception e) {
-      throw new DW.Exp("Error creating shard term node in Zookeeper for collection: " + collection, e);
+      throw new SW.Exp("Error creating shard term node in Zookeeper for collection: " + collection, e);
     }
   }
 
@@ -337,8 +339,11 @@ public class ZkShardTerms implements AutoCloseable{
       Stat stat = new Stat();
       byte[] data = zkClient.getData(znodePath, null, stat, true);
       newTerms = new Terms((Map<String, Long>) Utils.fromJSON(data), stat.getVersion());
+    } catch (NoNodeException e) {
+      log.warn("Terms znode ot found for {}", znodePath);
+      return;
     } catch (Exception e) {
-      throw new DW.Exp("Error updating shard term for collection: " + collection, e);
+      throw new SW.Exp("Error updating shard term for collection: " + collection, e);
     }
 
     setNewTerms(newTerms);
@@ -352,7 +357,7 @@ public class ZkShardTerms implements AutoCloseable{
       try {
         registerWatcher();
       } catch (Exception e) {
-        throw new DW.Exp("Error watching shard term for collection: " + collection, e);
+        throw new SW.Exp("Error watching shard term for collection: " + collection, e);
       }
     }
   }
@@ -374,7 +379,7 @@ public class ZkShardTerms implements AutoCloseable{
       // exists operation is faster than getData operation
       zkClient.exists(znodePath, watcher, true);
     } catch (Exception e) {
-      throw new DW.Exp("Error watching shard term for collection: " + collection, e);
+      throw new SW.Exp("Error watching shard term for collection: " + collection, e);
     }
   }
 

@@ -33,7 +33,6 @@ import static org.apache.solr.common.params.CollectionAdminParams.COLOCATED_WITH
 import static org.apache.solr.common.params.CollectionAdminParams.WITH_COLLECTION;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICAPROP;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDROLE;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ALIASPROP;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.BACKUP;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.BALANCESHARDUNIQUE;
@@ -60,7 +59,6 @@ import static org.apache.solr.common.params.CollectionParams.CollectionAction.OV
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.REBALANCELEADERS;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.REINDEXCOLLECTION;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.REMOVEROLE;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.RENAME;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.REPLACENODE;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.RESTORE;
@@ -128,7 +126,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CollectionParams.CollectionAction;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
@@ -157,7 +155,8 @@ import com.google.common.collect.ImmutableMap;
  * overseer messages.
  */
 public class OverseerCollectionMessageHandler implements OverseerMessageHandler, SolrCloseable {
-
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  
   public static final String NUM_SLICES = "numShards";
 
   public static final boolean CREATE_NODE_SET_SHUFFLE_DEFAULT = true;
@@ -194,7 +193,6 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       WITH_COLLECTION, null,
       COLOCATED_WITH, null));
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String FAILURE_FIELD = "failure";
   public static final String SUCCESS_FIELD = "success";
 
@@ -313,7 +311,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     } catch (Exception e) {
       log.error("processMessage(ZkNodeProps=" + message + ", String=" + operation + ")", e);
 
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       
       String collName = message.getStr("collection");
       if (collName == null) collName = message.getStr(NAME);
@@ -685,7 +683,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       processResponse(results, null, coreUrl, updateResponse, slice, Collections.emptySet());
     } catch (Exception e) {
       log.error("commit(NamedList=" + results + ", String=" + slice + ", Replica=" + parentShardLeader + ")", e);
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       processResponse(results, e, coreUrl, updateResponse, slice, Collections.emptySet());
       throw new SolrException(ErrorCode.SERVER_ERROR, "Unable to call distrib softCommit on: " + coreUrl, e);
     }
@@ -882,7 +880,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       });
     } catch (TimeoutException | InterruptedException e) {
       log.error("modifyCollection(ClusterState=" + clusterState + ", ZkNodeProps=" + message + ", NamedList=" + results + ")", e);
-      throw new DW.Exp("Could not modify collection " + message, e);
+      throw new SW.Exp("Could not modify collection " + message, e);
     }
 
     // if switching to/from read-only mode reload the collection

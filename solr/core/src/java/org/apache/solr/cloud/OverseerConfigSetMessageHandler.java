@@ -36,8 +36,8 @@ import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ConfigSetParams;
-import org.apache.solr.common.patterns.DW;
-import org.apache.solr.common.patterns.DW.Exp;
+import org.apache.solr.common.patterns.SW;
+import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.ConfigSetProperties;
@@ -119,7 +119,7 @@ public class OverseerConfigSetMessageHandler implements OverseerMessageHandler {
               + operation);
       }
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       String configSetName = message.getStr(NAME);
 
       if (configSetName == null) {
@@ -329,7 +329,7 @@ public class OverseerConfigSetMessageHandler implements OverseerMessageHandler {
         }
       }
     } catch (Exception e) {
-      Exp exp = new DW.Exp(e);
+      Exp exp = new SW.Exp(e);
       // copying the config dir or writing the properties file may have failed.
       // we should delete the ConfigSet because it may be invalid,
       // assuming we actually wrote something. E.g. could be
@@ -340,7 +340,7 @@ public class OverseerConfigSetMessageHandler implements OverseerMessageHandler {
           deleteConfigSet(configSetName, true);
         }
       } catch (Exception e2) {
-        DW.propegateInterrupt(e2);
+        SW.propegateInterrupt(e2);
         exp.addSuppressed(e2);
       }
 

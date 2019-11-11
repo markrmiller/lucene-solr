@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +39,7 @@ public class TransientSolrCoreCacheDefault extends TransientSolrCoreCache {
 
   protected final CoreContainer coreContainer;
 
-  protected final Map<String, CoreDescriptor> transientDescriptors = DW.concMapSmallO();
+  protected final Map<String, CoreDescriptor> transientDescriptors = SW.concMapSmallO();
 
   //WARNING! The _only_ place you put anything into the list of transient cores is with the putTransientCore method!
   protected volatile Map<String, SolrCore> transientCores; // For "lazily loaded" cores

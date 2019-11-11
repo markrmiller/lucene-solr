@@ -21,7 +21,7 @@ package org.apache.solr.client.solrj.cloud.autoscaling;
 import java.util.ArrayList;
 
 import org.apache.solr.common.cloud.rule.ImplicitSnitch;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.StrUtils;
 
 import static org.apache.solr.client.solrj.cloud.autoscaling.Clause.parseString;
@@ -105,7 +105,7 @@ public class VariableBase implements Variable {
     try {
       return (Variable) implementation.getConstructor(Type.class).newInstance(t);
     } catch (Exception e) {
-      throw new DW.Exp("Unable to instantiate: " + implementation.getName(), e);
+      throw new SW.Exp("Unable to instantiate: " + implementation.getName(), e);
     }
   }
 

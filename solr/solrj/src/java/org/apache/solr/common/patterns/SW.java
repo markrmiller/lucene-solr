@@ -28,14 +28,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -43,7 +40,6 @@ import org.apache.curator.framework.api.CuratorWatcher;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.CloseTimeTracker;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ExecutorUtil.MDCAwareThreadPoolExecutor;
@@ -68,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * 
  */
 @SolrSingleThreaded
-public class DW implements Closeable {
+public class SW implements Closeable {
 
   private static final String WORK_WAS_INTERRUPTED = "Work was interrupted!";
 
@@ -112,7 +108,7 @@ public class DW implements Closeable {
 
   private final boolean ignoreExceptions;
 
-  private Set<Throwable> warns = DW.concSetSmallO();
+  private Set<Throwable> warns = SW.concSetSmallO();
 
   // nocommit should take logger as well
   public static class Exp extends SolrException {
@@ -125,7 +121,7 @@ public class DW implements Closeable {
      * @param msg message to include to clarify the problem
      */
     public Exp(String msg) {
-      this(ErrorCode.SERVER_ERROR, msg, null);
+      this(ErrorCode.SERVER_ERROR, null, msg, null);
     }
     
     /**
@@ -134,7 +130,7 @@ public class DW implements Closeable {
      * @param th the exception to handle
      */
     public Exp(Throwable th) {
-      this(ErrorCode.SERVER_ERROR, th.getMessage(), th);
+      this(ErrorCode.SERVER_ERROR, null, th.getMessage(), th);
     }
     
 
@@ -145,12 +141,24 @@ public class DW implements Closeable {
      * @param th the exception to handle
      */
     public Exp(String msg, Throwable th) {
-      this(ErrorCode.SERVER_ERROR, msg, th);
+      this(ErrorCode.SERVER_ERROR, null, msg, th);
     }
     
-    public Exp(ErrorCode code, String msg, Throwable th) {
+    public Exp(Logger log, String msg, Throwable e) {
+      this(ErrorCode.SERVER_ERROR, log, msg, e);
+    }
+    
+    public Exp(ErrorCode code, Logger classLog, String msg, Throwable th) {
       super(code, msg == null ? ERROR_MSG : msg, th);
-      log.error(ERROR_MSG, th);
+      
+      Logger logger;
+      if (classLog != null) {
+        logger = classLog;
+      } else {
+        logger = log;
+      }
+      
+      logger.error(ERROR_MSG, th);
       if (th != null && th instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
@@ -162,11 +170,11 @@ public class DW implements Closeable {
     }
   }
 
-  public DW(Object object) {
+  public SW(Object object) {
     this(object, false);
   }
 
-  public DW(Object object, boolean ignoreExceptions) {
+  public SW(Object object, boolean ignoreExceptions) {
     this.ignoreExceptions = ignoreExceptions;
     tracker = new CloseTimeTracker(object, object == null ? "NullObject" : object.getClass().getName());
     // constructor must stay very light weight
@@ -503,11 +511,12 @@ public class DW implements Closeable {
         log.debug("Starting a new executor");
       }
       
-      executor = new MDCAwareThreadPoolExecutor(Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+      // figure out thread usage - maybe try to adjust based on current thread count
+      executor = new MDCAwareThreadPoolExecutor(Math.max(2, Runtime.getRuntime().availableProcessors() / 3),
           Runtime.getRuntime().availableProcessors(),
           5L, TimeUnit.SECONDS,
-          new ArrayBlockingQueue<>(1000), // nocommit - retry handler?
-          new SolrjNamedThreadFactory("Solr-DoWork", true, 5)); // nocommit deamon and priority
+          new ArrayBlockingQueue<>(10000), // nocommit - retry handler?
+          new SolrjNamedThreadFactory("Solr-DoWork", true, 7)); // nocommit deamon and priority
 
       threadLocal.set(executor);
     } else {
@@ -602,13 +611,13 @@ public class DW implements Closeable {
    * @param object to close
    */
   public static void close(Object object, boolean ignoreExceptions) {
-    try (DW dw = new DW(object, ignoreExceptions)) {
+    try (SW dw = new SW(object, ignoreExceptions)) {
       dw.add(object);
     }
   }
   
   public static void close(Object object) {
-    try (DW dw = new DW(object)) {
+    try (SW dw = new SW(object)) {
       dw.add(object);
     }
   }
@@ -621,11 +630,11 @@ public class DW implements Closeable {
     return new ConcurrentHashMap<K,V>(132, 0.75f, 50);
   }
   
-  public static ConcurrentHashMap<?,?> concReqsO() {
+  public static <K,V> ConcurrentHashMap<K,V> concMapReqsO() {
     return new ConcurrentHashMap<>(128, 0.75f, 2048);
   }
   
-  public static ConcurrentHashMap<?,?> concMapClassesO() {
+  public static <K,V> ConcurrentHashMap<K,V> concMapClassesO() {
     return new ConcurrentHashMap<>(132, 0.75f, 8192);
   }
 
@@ -671,7 +680,7 @@ public class DW implements Closeable {
   }
   
   
-  // think about second class
+  // think about second class nocommit - better impl checking for leader inzkcontroller
   public static void waitForExists(SolrZkClient zkClient, String znodePath) {
 
     CountDownLatch latch = new CountDownLatch(1);
@@ -683,20 +692,18 @@ public class DW implements Closeable {
 
         log.info("Got event on live node watcher {}", event.toString());
         if (event.getType() == EventType.NodeCreated) {
-          if (zkClient.getCurator().checkExists().forPath(znodePath) != null) {
-            latch.countDown();
-          }
+          latch.countDown();
         }
 
       }).forPath(znodePath);
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
     if (stat == null) {
       try {
         latch.await();
       } catch (InterruptedException e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
       }
     }
 

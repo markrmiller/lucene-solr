@@ -21,7 +21,7 @@ import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 
@@ -79,8 +79,8 @@ public final class LoadAdminUiServlet extends BaseSolrServlet {
         
         out.write( StringUtils.replaceEach(html, search, replace) );
       } finally {
-        DW.close(in);
-        DW.close(out);
+        SW.close(in);
+        SW.close(out);
       }
     } else {
       response.sendError(404);

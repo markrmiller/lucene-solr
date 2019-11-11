@@ -48,7 +48,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
@@ -281,7 +281,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           searchHolder.decref();
         }
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
 
@@ -318,7 +318,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
       try {
         doRecovery(core);
       } catch (Exception e) {
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     } finally {
       MDCLoggingContext.clear();
@@ -798,7 +798,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           log.error("Failed to connect leader {} on recovery, try again", leaderReplica.getBaseUrl());
           Thread.sleep(500);
         }
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
   }
@@ -856,7 +856,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
         searchHolder.decref();
       }
     } catch (Exception e) {
-      throw new DW.Exp(e);
+      throw new SW.Exp(e);
     }
   }
 

@@ -17,15 +17,15 @@
 package org.apache.solr.common;
 
 import java.io.InputStream;
-import org.xml.sax.InputSource;
-import org.xml.sax.EntityResolver;
-import javax.xml.XMLConstants;
+
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLResolver;
 
 import org.apache.commons.io.input.ClosedInputStream;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
 
 /**
  * This class provides several singletons of entity resolvers used by
@@ -60,7 +60,7 @@ public final class EmptyEntityResolver {
     try {
       saxFactory.setFeature(feature, enabled);
     } catch (Exception ex) {
-      throw new DW.Exp(ex);
+      throw new SW.Exp(ex);
     }
   }
   
@@ -70,16 +70,17 @@ public final class EmptyEntityResolver {
    */
   public static void configureSAXParserFactory(SAXParserFactory saxFactory) {
     // don't enable validation of DTDs:
+    saxFactory.setXIncludeAware(false);
     saxFactory.setValidating(false);
     // enable secure processing:
-    trySetSAXFeature(saxFactory, XMLConstants.FEATURE_SECURE_PROCESSING, true);
+   // trySetSAXFeature(saxFactory, XMLConstants.FEATURE_SECURE_PROCESSING, true); nocommit
   }
   
   private static void trySetStAXProperty(XMLInputFactory inputFactory, String key, Object value) {
     try {
       inputFactory.setProperty(key, value);
     } catch (Exception ex) {
-      throw new DW.Exp(ex);
+      throw new SW.Exp(ex);
     }
   }
   

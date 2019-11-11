@@ -47,7 +47,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.Diagnostics;
 import org.apache.solr.request.SolrRequestInfo;
@@ -306,7 +306,7 @@ public class SolrCmdDistributor implements Closeable {
         req.uReq.setBasePath(req.node.getUrl());
         clients.getHttpClient().request(req.uReq);
       } catch (Exception e) {
-        DW.propegateInterrupt(e);
+        SW.propegateInterrupt(e);
         Error error = new Error();
         error.e = e;
         error.req = req;
@@ -343,7 +343,7 @@ public class SolrCmdDistributor implements Closeable {
       SolrClient solrClient = clients.getSolrClient(req);
       solrClient.request(req.uReq);
     } catch (Exception e) {
-      DW.propegateInterrupt(e);
+      SW.propegateInterrupt(e);
       Error error = new Error();
       error.e = e;
       error.req = req;
@@ -434,7 +434,7 @@ public class SolrCmdDistributor implements Closeable {
             }
           }
         } catch (Exception e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
           log.warn("Failed to parse response from {} during replication factor accounting", node, e);
         }
       }

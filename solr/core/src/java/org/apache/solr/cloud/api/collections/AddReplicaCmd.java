@@ -67,7 +67,7 @@ import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
@@ -194,7 +194,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     };
     
      
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
       worker.add("AddReplica", runnable);
     }
     
@@ -252,7 +252,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
         try {
           coreContainer.getZkController().sendStateUpdate(props);
         } catch (Exception e) {
-          throw new DW.Exp("Exception updating Overseer state queue", e);
+          throw new SW.Exp("Exception updating Overseer state queue", e);
         }
       }
       params.set(CoreAdminParams.CORE_NODE_NAME,

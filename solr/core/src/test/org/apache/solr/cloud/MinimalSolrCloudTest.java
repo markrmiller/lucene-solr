@@ -41,11 +41,10 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    TestSysProp.disablePublicKeyHandler();
-    TestSysProp.supressDefaultConfigBootstrap();
+    TestSysProp.disablePublicKeyHandler(); // blocks across cores and not needed here
+    TestSysProp.supressDefaultConfigBootstrap(); // don't need to upload default config for this test
     
     configureCluster(1)
-       // .addConfig("conf", new File(ExternalPaths.TECHPRODUCTS_CONFIGSET).toPath())
         .addConfig("conf", configset("cloud-minimal"))
         .configure();
   }
@@ -53,33 +52,72 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
   @Before
   public void createCollections() throws Exception {
     solrUrl = cluster.getJettySolrRunner(0).getBaseUrl().toString();
-
-    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 60, 4).setMaxShardsPerNode(300).process(cluster.getSolrClient());
-  //  cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 3, 1);
-//    CollectionAdminRequest.createCollection(COLLECTION_TWO_NAME, "conf", 10, 10).setMaxShardsPerNode(100).process(cluster.getSolrClient());
-//    cluster.waitForActiveCollection(COLLECTION_ONE_NAME, 10, 10);
   }
 
   @After
   public void deleteCollections() throws Exception {
-  //  cluster.deleteAllCollections();
+    cluster.deleteAllCollections();
   }
-
+  
   @Test
-  public void makeSomeSolrCloud() throws Exception {
+  public void createOneShard() throws Exception {
+    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 1, 1).setMaxShardsPerNode(300).process(cluster.getSolrClient());
+    
     int numTotalDocs = 2;
-    int numExpectedPerCollection = numTotalDocs / 2;
+    int numExpectedPerCollection = numTotalDocs;
     try (Http2SolrClient http2Client = new Http2SolrClient.Builder().build();
          SolrClient client = new ConcurrentUpdateHttp2SolrClient.Builder(solrUrl, http2Client)
         .withQueueSize(numTotalDocs).build()) {
-      splitDocumentsAcrossCollections(client, numTotalDocs);
+      
+      indexDocs(client, numTotalDocs);
 
       assertEquals(numExpectedPerCollection, client.query(COLLECTION_ONE_NAME, new SolrQuery("*:*")).getResults().getNumFound());
-    //  assertEquals(numExpectedPerCollection, client.query(COLLECTION_TWO_NAME, new SolrQuery("*:*")).getResults().getNumFound());
+    }
+  }
+  
+//  @Test
+//  public void createTwoShards() throws Exception {
+//    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 2, 1).setMaxShardsPerNode(300).process(cluster.getSolrClient());
+//    
+//    int numTotalDocs = 2;
+//    int numExpectedPerCollection = numTotalDocs;
+//    try (Http2SolrClient http2Client = new Http2SolrClient.Builder().build();
+//         SolrClient client = new ConcurrentUpdateHttp2SolrClient.Builder(solrUrl, http2Client)
+//        .withQueueSize(numTotalDocs).build()) {
+//      
+//      indexDocs(client, numTotalDocs);
+//
+//      assertEquals(numExpectedPerCollection, client.query(COLLECTION_ONE_NAME, new SolrQuery("*:*")).getResults().getNumFound());
+//    }
+//  }
+
+//  @Test
+//  public void makeSomeSolrCloud() throws Exception {
+//    int numTotalDocs = 2;
+//    try (Http2SolrClient http2Client = new Http2SolrClient.Builder().build();
+//         SolrClient client = new ConcurrentUpdateHttp2SolrClient.Builder(solrUrl, http2Client)
+//        .withQueueSize(numTotalDocs).build()) {
+//      
+//      indexDocs(client, numTotalDocs);
+//
+//      assertEquals(numTotalDocs, client.query(COLLECTION_ONE_NAME, new SolrQuery("*:*")).getResults().getNumFound());
+//    //  assertEquals(numExpectedPerCollection, client.query(COLLECTION_TWO_NAME, new SolrQuery("*:*")).getResults().getNumFound());
+//    }
+//  }
+
+  private void indexDocs(SolrClient client, int numTotalDocs) throws IOException, SolrServerException {
+    for (int docNum = 0; docNum < numTotalDocs; docNum++) {
+      final SolrInputDocument doc = new SolrInputDocument();
+      doc.setField("id", "value" + docNum);
+
+      client.add(COLLECTION_ONE_NAME, doc);
+
     }
 
+    client.commit(COLLECTION_ONE_NAME);
+    // client.commit(COLLECTION_TWO_NAME);
   }
-
+  
   private void splitDocumentsAcrossCollections(SolrClient client, int numTotalDocs) throws IOException, SolrServerException {
     for (int docNum = 0; docNum < numTotalDocs; docNum++) {
       final SolrInputDocument doc = new SolrInputDocument();

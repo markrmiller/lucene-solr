@@ -24,7 +24,7 @@ import org.apache.solr.client.solrj.impl.ZkClientClusterStateProvider;
 import org.apache.solr.cloud.ZkController.OnReconnectNotifyAsync;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.OnReconnect;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
@@ -86,7 +86,7 @@ final class OnReconnectDoThis implements OnReconnect {
     // re register all descriptors
 
     if (descriptors != null) {
-      try (DW worker = new DW(this)) {
+      try (SW worker = new SW(this)) {
 
         for (CoreDescriptor descriptor : descriptors) {
           // TODO: we need to think carefully about what happens when it
@@ -107,7 +107,7 @@ final class OnReconnectDoThis implements OnReconnect {
             try {
               zkController.register(descriptor.getName(), descriptor, true, true, false);
             } catch (Exception e) {
-              DW.propegateInterrupt("Solr encountered an unexpected exception!", e);
+              SW.propegateInterrupt("Solr encountered an unexpected exception!", e);
             }
           });
 
@@ -126,7 +126,7 @@ final class OnReconnectDoThis implements OnReconnect {
     // nocommit - use DW
     // notify any other objects that need to know when the session was re-connected
 
-    try (DW worker = new DW(this)) {
+    try (SW worker = new SW(this)) {
 
       // the OnReconnect operation can be expensive per listener, so do that async in the background
       zkController.reconnectListeners.forEach((it) -> {

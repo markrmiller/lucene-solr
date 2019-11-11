@@ -31,7 +31,7 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.NamedList;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -122,7 +122,7 @@ public class DeleteNodeCmd implements OverseerCollectionMessageHandler.Cmd {
         cleanupLatch.countDown();
       } catch (Exception e) {
         cleanupLatch.countDown();
-        throw new DW.Exp(e);
+        throw new SW.Exp(e);
       }
     }
     log.debug("Waiting for delete node action to complete");

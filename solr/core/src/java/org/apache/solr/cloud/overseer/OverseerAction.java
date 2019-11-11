@@ -18,7 +18,7 @@ package org.apache.solr.cloud.overseer;
 
 import java.util.Locale;
 
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 
 /**
  * Enum of actions supported by the overseer only.
@@ -41,7 +41,7 @@ public enum OverseerAction {
       try {
         return OverseerAction.valueOf(p.toUpperCase(Locale.ROOT));
       } catch (Exception ex) {
-        throw new DW.Exp(ex);
+        throw new SW.Exp(ex);
       }
     }
     return null;

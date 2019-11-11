@@ -25,18 +25,18 @@
 
   <directoryFactory name="DirectoryFactory"
                     class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
-  <schemaFactory class="ClassicIndexSchemaFactory"/>
+  <schemaFactory class="org.apache.solr.schema.ClassicIndexSchemaFactory"/>
 
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
 
-  <updateHandler class="solr.DirectUpdateHandler2">
+  <updateHandler class="org.apache.solr.update.DirectUpdateHandler2">
     <commitWithin>
       <softCommit>${solr.commitwithin.softcommit:true}</softCommit>
     </commitWithin>
-    <updateLog class="${solr.ulog:solr.UpdateLog}"></updateLog>
+    <updateLog class="${solr.ulog:org.apache.solr.update.UpdateLog}"></updateLog>
   </updateHandler>
 
-  <requestHandler name="/select" class="solr.SearchHandler">
+  <requestHandler name="/select" class="org.apache.solr.handler.component.SearchHandler">
     <lst name="defaults">
       <str name="echoParams">explicit</str>
       <str name="indent">true</str>

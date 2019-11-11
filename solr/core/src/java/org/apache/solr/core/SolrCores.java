@@ -21,7 +21,7 @@ import org.apache.http.annotation.Experimental;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.util.DefaultSolrThreadFactory;
@@ -48,24 +48,22 @@ class SolrCores implements Closeable {
  // nocommit fast synchronization
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final Map<String, SolrCore> cores = DW.concMapSmallO();
+  private final Map<String, SolrCore> cores = SW.concMapSmallO();
 
   // These descriptors, once loaded, will _not_ be unloaded, i.e. they are not "transient".
-  private final Map<String, CoreDescriptor> residentDesciptors = DW.concMapSmallO();
+  private final Map<String, CoreDescriptor> residentDesciptors = SW.concMapSmallO();
 
   private final CoreContainer container;
   
-  private final Set<String> currentlyLoadingCores = DW.concSetSmallO();
-
-
+  private final Set<String> currentlyLoadingCores = SW.concSetSmallO();
 
   // This map will hold objects that are being currently operated on. The core (value) may be null in the case of
   // initial load. The rule is, never to any operation on a core that is currently being operated upon.
-  private static final Set<String> pendingCoreOps = DW.concSetSmallO();
+  private static final Set<String> pendingCoreOps = SW.concSetSmallO();
 
   // Due to the fact that closes happen potentially whenever anything is _added_ to the transient core list, we need
   // to essentially queue them up to be handled via pendingCoreOps.
-  private static final Set<SolrCore> pendingCloses = DW.concSetSmallO();
+  private static final Set<SolrCore> pendingCloses = SW.concSetSmallO();
 
   private volatile TransientSolrCoreCacheFactory transientCoreCache;
 
@@ -106,9 +104,8 @@ class SolrCores implements Closeable {
   // make a temporary copy of the names and shut them down outside the lock.
   public void close() {
     this.closed = true;
-    waitForLoadingCoresToFinish(10 * 1000); // nocommit timeout config
-
-    waitAddPendingCoreOps();
+    
+    waitForLoadingAndOps();
 
     Collection<SolrCore> coreList = new ArrayList<>();
 
@@ -124,22 +121,24 @@ class SolrCores implements Closeable {
 
     // make a copy of the cores then clear the map so the core isn't handed out to a request again
     coreList.addAll(cores.values());
+    cores.forEach((k,v)-> { coreList.add(v);});
     cores.clear();
     if (transientSolrCoreCache != null) {
       coreList.addAll(transientSolrCoreCache.prepareForShutdown());
     }
 
     coreList.addAll(pendingCloses);
+    pendingCloses.forEach((c) -> coreList.add(c));
     pendingCloses.clear();
     
-    try (DW closer = new DW(this)) {
+    try (SW closer = new SW(this)) {
       for (SolrCore core : coreList) {
         closer.collect(() -> {
           MDCLoggingContext.setCore(core);
           try {
             core.close();
           } catch (Throwable e) {
-            DW.propegateInterrupt("Error shutting down core", e);
+            SW.propegateInterrupt("Error shutting down core", e);
           } finally {
             MDCLoggingContext.clear();
           }
@@ -149,6 +148,11 @@ class SolrCores implements Closeable {
       closer.addCollect("CloseSolrCores");
     }
 
+  }
+
+  public void waitForLoadingAndOps() {
+    waitForLoadingCoresToFinish(10 * 1000); // nocommit timeout config
+    waitAddPendingCoreOps();
   }
   
   // Returns the old core if there was a core of the same name.
@@ -389,7 +393,7 @@ class SolrCores implements Closeable {
           try {
             pendingCoreOps.wait();
           } catch (InterruptedException e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
           }
         }
       } while (pending);
@@ -415,7 +419,7 @@ class SolrCores implements Closeable {
           try {
             pendingCoreOps.wait();
           } catch (InterruptedException e) {
-            DW.propegateInterrupt(e);
+            SW.propegateInterrupt(e);
           }
         }
       } while (pending);
@@ -502,7 +506,7 @@ class SolrCores implements Closeable {
         try {
           currentlyLoadingCores.wait(500);
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
         if (System.nanoTime() >= timeout) {
           log.warn("Timed out waiting for SolrCores to finish loading.");
@@ -521,7 +525,7 @@ class SolrCores implements Closeable {
         try {
           currentlyLoadingCores.wait(500);
         } catch (InterruptedException e) {
-          DW.propegateInterrupt(e);
+          SW.propegateInterrupt(e);
         }
         if (System.nanoTime() >= timeout) {
           log.warn("Timed out waiting for SolrCore, {},  to finish loading.", core);

@@ -28,7 +28,7 @@ import org.apache.solr.client.solrj.io.stream.TupleStream;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.patterns.DW;
+import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.util.IOUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,7 +72,7 @@ public class TestSQLHandlerNonCloud extends SolrJettyTestBase {
         }
       }
     } finally {
-      DW.close(tupleStream);
+      SW.close(tupleStream);
     }
     return tuples;
   }
