@@ -91,6 +91,7 @@ import org.apache.solr.common.patterns.SW.Exp;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.OrderedExecutor;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.DirectoryFactory.DirContext;
 import org.apache.solr.core.backup.repository.BackupRepository;
@@ -132,13 +133,13 @@ import org.apache.solr.security.PublicKeyHandler;
 import org.apache.solr.security.SecurityPluginHolder;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.solr.util.DefaultSolrThreadFactory;
-import org.apache.solr.util.OrderedExecutor;
 import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.SolrFileCleaningTracker;
 import org.apache.solr.util.XMLFactorysAndParser;
 import org.apache.solr.util.stats.MetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

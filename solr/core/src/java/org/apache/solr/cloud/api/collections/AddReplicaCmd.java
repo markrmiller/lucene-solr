@@ -195,7 +195,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     
      
     try (SW worker = new SW(this)) {
-      worker.add("AddReplica", runnable);
+      worker.add("AddReplica", new Runnable[] {runnable});
     }
     
 

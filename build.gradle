@@ -274,8 +274,8 @@ configure(subprojects) {
     // project.compileTestJava.options.compilerArgs << '-Xlint:deprecation' << '-Xlint:unchecked'
 
     // fail on basic compiler warnings
-    compileJava.options.compilerArgs << "-Werror"
-    compileTestJava.options.compilerArgs << "-Werror"
+    //compileJava.options.compilerArgs << "-Werror"
+    //compileTestJava.options.compilerArgs << "-Werror"
 
 
     sourceSets {

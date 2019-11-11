@@ -60,7 +60,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.patterns.SW;
 import org.apache.solr.common.patterns.SolrThreadSafe;
 import org.apache.solr.common.util.ExecutorUtil;
-
+import org.apache.solr.common.util.OrderedExecutor;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.PluginInfo;
@@ -77,7 +77,6 @@ import org.apache.solr.update.processor.DistributedUpdateProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.DefaultSolrThreadFactory;
-import org.apache.solr.util.OrderedExecutor;
 import org.apache.solr.util.RTimer;
 import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.TestInjection;
