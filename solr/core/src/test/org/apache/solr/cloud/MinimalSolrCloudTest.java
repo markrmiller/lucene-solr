@@ -56,12 +56,12 @@ public class MinimalSolrCloudTest extends SolrCloudTestCase {
 
   @After
   public void deleteCollections() throws Exception {
-    cluster.deleteAllCollections();
+   // cluster.deleteAllCollections();
   }
   
   @Test
   public void createOneShard() throws Exception {
-    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 1, 1).setMaxShardsPerNode(300).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(COLLECTION_ONE_NAME, "conf", 100, 1).setMaxShardsPerNode(300).process(cluster.getSolrClient());
     
     int numTotalDocs = 2;
     int numExpectedPerCollection = numTotalDocs;
