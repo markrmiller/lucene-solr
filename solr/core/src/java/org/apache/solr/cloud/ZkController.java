@@ -545,7 +545,7 @@ public class ZkController implements Closeable, Runnable {
               // notify any other objects that need to know when the session was re-connected
 
               // the OnReconnect operation can be expensive per listener, so do that async in the background
-              try (ParWork work = new ParWork(this, true, true)) {
+              try (ParWork work = new ParWork(this, true, false)) {
                 reconnectListeners.forEach(listener -> {
                   try {
                     work.collect(new OnReconnectNotifyAsync(listener));
@@ -583,7 +583,7 @@ public class ZkController implements Closeable, Runnable {
       }
     });
     zkClient.setDisconnectListener(() -> {
-      try (ParWork worker = new ParWork("disconnected", true, true)) {
+      try (ParWork worker = new ParWork("disconnected", true, false)) {
         worker.collect(ZkController.this.overseer);
         worker.collect(leaderElectors.values());
         worker.collect("clearZkCollectionTerms", () -> {
@@ -667,7 +667,7 @@ public class ZkController implements Closeable, Runnable {
       ParWork.propagateInterrupt("Error Removing ephemeral live node. Continuing to close CoreContainer", e);
     }
 
-    try (ParWork closer = new ParWork(this, true, true)) {
+    try (ParWork closer = new ParWork(this, true, false)) {
       closer.collect("replicateFromLeaders", replicateFromLeaders);
       closer.collect(leaderElectors);
 
@@ -695,7 +695,7 @@ public class ZkController implements Closeable, Runnable {
     this.shudownCalled = true;
 
     this.isClosed = true;
-    try (ParWork closer = new ParWork(this, true, true)) {
+    try (ParWork closer = new ParWork(this, true, false)) {
       closer.collect(leaderElectors);
       closer.collect(sysPropsCacher);
       closer.collect(cloudManager);

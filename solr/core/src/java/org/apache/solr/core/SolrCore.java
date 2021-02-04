@@ -1828,7 +1828,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
       searcherReadyLatch.countDown();
 
-      try (ParWork closer = new ParWork(this, true, true)) {
+      try (ParWork closer = new ParWork(this, true, false)) {
         List<Callable<Object>> closeHookCalls = new ArrayList<>();
 
         if (closeHooks != null) {
@@ -2736,7 +2736,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
         if (currSearcher == null) {
           future = searcherExecutor.submit(() -> {
-            try (ParWork work = new ParWork(this, false, true)) {
+            try (ParWork work = new ParWork(this, false, false)) {
               for (SolrEventListener listener : firstSearcherListeners) {
                 work.collect("fistSearcherListeners", () -> {
                   listener.newSearcher(newSearcher, null);
@@ -2749,7 +2749,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
         if (currSearcher != null) {
           future = searcherExecutor.submit(() -> {
-            try (ParWork work = new ParWork(this, true, true)) {
+            try (ParWork work = new ParWork(this, true, false)) {
               for (SolrEventListener listener : newSearcherListeners) {
                 work.collect("newSearcherListeners", () -> {
                   listener.newSearcher(newSearcher, null);
@@ -3490,7 +3490,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       }
 
       //some files in conf directory may have  other than managedschema, overlay, params
-      try (ParWork worker = new ParWork("ConfListeners", true, true)) {
+      try (ParWork worker = new ParWork("ConfListeners", true, false)) {
 
         if (cc.isShutDown()) return;
         core.confListeners.forEach(runnable -> {

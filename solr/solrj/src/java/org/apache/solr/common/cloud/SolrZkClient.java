@@ -1218,7 +1218,10 @@ public class SolrZkClient implements Closeable {
           solrZkClient.zkConnManagerCallbackExecutor.submit(() -> watcher.process(event));
         } else {
           if (event.getType() != Event.EventType.None) {
-            solrZkClient.zkCallbackExecutor.submit(() -> watcher.process(event));
+            solrZkClient.zkCallbackExecutor.submit(new ParWork.SolrFutureTask("ZkSolrEventThread", () -> {
+              watcher.process(event);
+              return null;
+            }));
           }
         }
       } catch (RejectedExecutionException e) {
