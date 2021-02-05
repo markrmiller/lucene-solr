@@ -548,6 +548,7 @@ public class SolrZkClient implements Closeable {
       Watcher watcher, boolean failOnExists, boolean retryOnConnLoss, int skipPathParts) throws KeeperException, InterruptedException {
     ZooKeeper keeper = connManager.getKeeper();
     if (log.isDebugEnabled()) log.debug("makePath: {}", path);
+
     boolean retry = true;
     if (path.startsWith("/")) {
       path = path.substring(1, path.length());
@@ -1030,7 +1031,7 @@ public class SolrZkClient implements Closeable {
     isClosed = true;
     connManager.close();
 
-    if (closeTracker != null) closeTracker.close();
+    assert closeTracker != null ? closeTracker.close() : true;
     assert ObjectReleaseTracker.release(this);
   }
 
