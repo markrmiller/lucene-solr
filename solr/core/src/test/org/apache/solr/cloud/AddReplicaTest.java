@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.solr.SolrTestUtil;
@@ -63,7 +64,6 @@ public class AddReplicaTest extends SolrCloudTestCase {
   @After
   public void tearDown() throws Exception  {
     super.tearDown();
-    cluster.getZkClient().printLayout();
   }
 
   @Test
@@ -73,7 +73,7 @@ public class AddReplicaTest extends SolrCloudTestCase {
     CloudHttp2SolrClient cloudClient = cluster.getSolrClient();
 
     CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collection, "conf1", 1, 1);
-    create.waitForFinalState(true);
+   // create.waitForFinalState(true);
     create.setMaxShardsPerNode(20);
     cloudClient.request(create);
 
@@ -81,17 +81,29 @@ public class AddReplicaTest extends SolrCloudTestCase {
         .setNrtReplicas(1)
         .setTlogReplicas(1)
         .setPullReplicas(1);
-    addReplica.setWaitForFinalState(true);
     CollectionAdminResponse status = addReplica.process(cloudClient, collection + "_xyz1");
 
      assertTrue(status.isSuccess());
-    
-    DocCollection docCollection = cloudClient.getZkStateReader().getClusterState().getCollectionOrNull(collection);
-    assertNotNull(docCollection);
-    assertEquals(docCollection.toString(), 4, docCollection.getReplicas().size());
-    assertEquals(docCollection.toString(), 2, docCollection.getReplicas(EnumSet.of(Replica.Type.NRT)).size());
-    assertEquals(docCollection.toString(), 1, docCollection.getReplicas(EnumSet.of(Replica.Type.TLOG)).size());
-    assertEquals(docCollection.toString(), 1, docCollection.getReplicas(EnumSet.of(Replica.Type.PULL)).size());
+
+
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      if (collectionState.getReplicas().size() != 4) {
+        return false;
+      }
+      if (collectionState.getReplicas(EnumSet.of(Replica.Type.NRT)).size() != 2) {
+        return false;
+      }
+      if (collectionState.getReplicas(EnumSet.of(Replica.Type.TLOG)).size() != 1) {
+        return false;
+      }
+      if (collectionState.getReplicas(EnumSet.of(Replica.Type.PULL)).size() != 1) {
+        return false;
+      }
+      return true;
+    });
 
     // but adding any number of replicas is supported if an explicit create node set is specified
     // so test that as well
@@ -109,18 +121,27 @@ public class AddReplicaTest extends SolrCloudTestCase {
         .setCreateNodeSet(String.join(",", createNodeSet));
     status = addReplica.process(cloudClient, collection + "_xyz1");
 
-
     assertTrue(status.isSuccess());
 
-    cluster.waitForActiveCollection(collection, 1, 9);
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      if (collectionState.getReplicas().size() != 9) {
+        return false;
+      }
+      if (collectionState.getReplicas(EnumSet.of(Replica.Type.NRT)).size() != 5) {
+        return false;
+      }
+      if (collectionState.getReplicas(EnumSet.of(Replica.Type.TLOG)).size() != 2) {
+        return false;
+      }
+      if ( collectionState.getReplicas(EnumSet.of(Replica.Type.PULL)).size() != 2) {
+        return false;
+      }
+      return true;
+    });
 
-    docCollection = cloudClient.getZkStateReader().getClusterState().getCollectionOrNull(collection);
-    assertNotNull(docCollection);
-    // sanity check that everything is as before
-    assertEquals(9, docCollection.getReplicas().size());
-    assertEquals(5, docCollection.getReplicas(EnumSet.of(Replica.Type.NRT)).size());
-    assertEquals(2, docCollection.getReplicas(EnumSet.of(Replica.Type.TLOG)).size());
-    assertEquals(2, docCollection.getReplicas(EnumSet.of(Replica.Type.PULL)).size());
   }
 
   @Test

@@ -230,7 +230,7 @@ public class OverseerTest extends SolrTestCaseJ4 {
               ZkStateReader.SHARD_ID_PROP, shardId,
               ZkStateReader.COLLECTION_PROP, collection);
           LeaderElector elector = new LeaderElector(overseer.getZkController());
-          Replica replica = new Replica(coreName, props.getProperties(), collection, -1l, shardId, zkStateReader);
+          Replica replica = new Replica(coreName, props.getProperties(), collection, -1l, shardId, "http://" + nodeName);
           ShardLeaderElectionContextBase ctx = new ShardLeaderElectionContextBase(
               nodeName + "_" + coreName, shardId, collection, replica, null,
               zkStateReader.getZkClient());

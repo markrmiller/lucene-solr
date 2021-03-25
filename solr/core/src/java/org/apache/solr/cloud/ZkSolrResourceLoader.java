@@ -16,15 +16,8 @@
  */
 package org.apache.solr.cloud;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
-import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Map;
-
-import org.apache.commons.collections.map.ReferenceMap;
+import org.apache.commons.collections4.map.AbstractReferenceMap;
+import org.apache.commons.collections4.map.ReferenceMap;
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
@@ -37,6 +30,15 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 /**
  * ResourceLoader that works with ZooKeeper.
  *
@@ -45,10 +47,12 @@ public class ZkSolrResourceLoader extends SolrResourceLoader implements Resource
 
   private final String configSetZkPath;
 
+  private static final ZkByteArrayInputStream NOT_FOUND = new ZkByteArrayInputStream(new byte[0], null, System.nanoTime());
+
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final SolrZkClient zkClient;
 
-  public static Map CONFIG_CACHE = new ReferenceMap(ReferenceMap.HARD, ReferenceMap.WEAK) {
+  public static Map CONFIG_CACHE = new ReferenceMap(AbstractReferenceMap.ReferenceStrength.HARD, AbstractReferenceMap.ReferenceStrength.WEAK) {
     {
       purgeBeforeRead();
       purgeBeforeWrite();
@@ -84,31 +88,41 @@ public class ZkSolrResourceLoader extends SolrResourceLoader implements Resource
 
     try {
 
-      boolean usedCached = false;
-
       ZkSolrResourceLoader.ZkByteArrayInputStream cached = SYNC_CONFIG_CACHE.get(file);
       if (cached != null) {
-        Stat checkStat;
-        try {
-          checkStat = zkClient.exists(file, null);
-        } catch (KeeperException | InterruptedException e) {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-        }
-        if (checkStat != null && checkStat.getVersion() == cached.getStat().getVersion()) {
-          return new ZkSolrResourceLoader.ZkByteArrayInputStream(cached.getBytes(), cached.getStat());
-        }
 
+        Stat checkStat;
+
+        if (TimeUnit.MILLISECONDS.convert(System.nanoTime() - cached.getTime(), TimeUnit.NANOSECONDS) < 5000) {
+          if (cached == NOT_FOUND) {
+            throw new SolrResourceNotFoundException("Can't find resource '" + resource
+                + "' in classpath or '" + configSetZkPath + "', cwd="
+                + System.getProperty("user.dir"));
+          }
+          checkStat = cached.getStat();
+        } else {
+          try {
+            checkStat = zkClient.exists(file, null);
+          } catch (KeeperException | InterruptedException e) {
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+          }
+        }
+        if (checkStat != null && cached.getStat() != null && checkStat.getVersion() == cached.getStat().getVersion()) {
+          return new ZkSolrResourceLoader.ZkByteArrayInputStream(cached.getBytes(), cached.getStat(), cached.getTime());
+        }
       }
 
       Stat stat = new Stat();
       byte[] bytes = zkClient.getData(file, null, stat);
       if (bytes == null) {
+
+        SYNC_CONFIG_CACHE.put(file, NOT_FOUND);
         if (log.isDebugEnabled()) log.debug("resource not found {}", resource);
         throw new SolrResourceNotFoundException("Can't find resource '" + resource
                 + "' in classpath or '" + configSetZkPath + "', cwd="
                 + System.getProperty("user.dir"));
       }
-      ZkByteArrayInputStream is = new ZkByteArrayInputStream(bytes, stat);
+      ZkByteArrayInputStream is = new ZkByteArrayInputStream(bytes, stat, System.nanoTime());
       SYNC_CONFIG_CACHE.put(file, (ZkSolrResourceLoader.ZkByteArrayInputStream) is);
       return is;
     } catch (InterruptedException e) {
@@ -131,17 +145,24 @@ public class ZkSolrResourceLoader extends SolrResourceLoader implements Resource
   public static class ZkByteArrayInputStream extends ByteArrayInputStream{
 
     private final Stat stat;
-    public ZkByteArrayInputStream(byte[] buf, Stat stat) {
+    private final long time;
+
+    public ZkByteArrayInputStream(byte[] buf, Stat stat, long time) {
       super(buf);
       this.stat = stat;
+      this.time = time;
     }
 
-    public Stat getStat(){
+    public Stat getStat() {
       return stat;
     }
 
     public byte[] getBytes() {
       return buf;
+    }
+
+    public long getTime() {
+      return time;
     }
   }
 

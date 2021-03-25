@@ -80,6 +80,7 @@ import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.StrUtils;
@@ -97,7 +98,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
   private volatile String defaultCollection;
   //no of times collection state to be reloaded if stale state error is received
-  private static final int MAX_STALE_RETRIES = Integer.parseInt(System.getProperty("cloudSolrClientMaxStaleRetries", "20"));
+  private static final int MAX_STALE_RETRIES = Integer.parseInt(System.getProperty("cloudSolrClientMaxStaleRetries", "3"));
   private Random rand = new Random();
 
   private final boolean updatesToLeaders;
@@ -129,7 +130,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
   static class StateCache extends ConcurrentHashMap<String, ExpiringCachedDocCollection> {
     final AtomicLong puts = new AtomicLong();
     final AtomicLong hits = new AtomicLong();
-    final Lock evictLock = new ReentrantLock(true);
+    final Lock evictLock = new ReentrantLock(false);
     protected volatile long timeToLive = 60 * 1000L;
 
     @Override
@@ -182,19 +183,17 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
   protected final StateCache collectionStateCache = new StateCache();
 
-  static class ExpiringCachedDocCollection {
+  class ExpiringCachedDocCollection {
     final DocCollection cached;
     final long cachedAt;
-    private final long retryExpiryTime;
     //This is the time at which the collection is retried and got the same old version
     volatile long retriedAt = -1;
     //flag that suggests that this is potentially to be rechecked
     volatile boolean maybeStale = false;
 
-    ExpiringCachedDocCollection(DocCollection cached, long retryExpiryTime) {
+    ExpiringCachedDocCollection(DocCollection cached) {
       this.cached = cached;
       this.cachedAt = System.nanoTime();
-      this.retryExpiryTime = retryExpiryTime;
     }
 
     boolean isExpired(long timeToLiveMs) {
@@ -860,6 +859,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       Set<String> requestedCollectionNames = resolveAliases(inputCollections, isUpdate);
 
       StringBuilder stateVerParamBuilder = null;
+      if (log.isDebugEnabled()) log.debug("build version params for collections {}", requestedCollectionNames);
       for (String requestedCollection : requestedCollectionNames) {
         // track the version of state we're using on the client side using the _stateVer_ param
         DocCollection coll = getDocCollection(requestedCollection, null, null);
@@ -867,18 +867,19 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection not found: " + requestedCollection);
         }
         int collVer = coll.getZNodeVersion();
+        if (coll.getStateFormat()>1) {
+          if(requestedCollections == null) requestedCollections = new ArrayList<>(requestedCollectionNames.size());
+          requestedCollections.add(coll);
 
-        if (requestedCollections == null) requestedCollections = new ArrayList<>(requestedCollectionNames.size());
-        requestedCollections.add(coll);
+          if (stateVerParamBuilder == null) {
+            stateVerParamBuilder = new StringBuilder();
+          } else {
+            stateVerParamBuilder.append("|"); // hopefully pipe is not an allowed char in a collection name
+          }
 
-        if (stateVerParamBuilder == null) {
-          stateVerParamBuilder = new StringBuilder();
-        } else {
-          stateVerParamBuilder.append("|"); // hopefully pipe is not an allowed char in a collection name
+          Map su = coll.getStateUpdates();
+          stateVerParamBuilder.append(coll.getName()).append(":").append(collVer).append(">").append(su == null ? 0 : su.hashCode());
         }
-        Map su = coll.getStateUpdates();
-        stateVerParamBuilder.append(coll.getName()).append(":").append(collVer).append(">").append(su == null ? 0 : su.hashCode());
-
       }
 
       if (stateVerParamBuilder != null) {
@@ -910,10 +911,9 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           String[] versionAndUpdatesHash = ((String)e.getValue()).split(">");
           int version = Integer.parseInt(versionAndUpdatesHash[0]);
           int updateHash = Integer.parseInt(versionAndUpdatesHash[1]);
-
+          log.info("got invalid states", versionAndUpdatesHash);
           getDocCollection((String) e.getKey(), version, updateHash);
         }
-
       }
     } catch (Exception exc) {
       ParWork.propagateInterrupt("Request failed", exc);
@@ -966,11 +966,15 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           // and we could not get any information from the server
           //it is probably not worth trying again and again because
           // the state would not have been updated
-          try {
-            Thread.sleep(100);
-          } catch (InterruptedException e) {
-
-          }
+//          try {
+//            if (retryCount > 3) {
+//              Thread.sleep(500);
+//            } else {
+//              Thread.sleep(100);
+//            }
+//          } catch (InterruptedException e) {
+//
+//          }
           log.info("trying request again retryCnt={}", retryCount + 1);
           return requestWithRetryOnStaleState(request, retryCount + 1, inputCollections);
         }
@@ -979,7 +983,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       }
 
       boolean stateWasStale = false;
-      if (retryCount <= MAX_STALE_RETRIES  &&
+      if (retryCount < MAX_STALE_RETRIES  &&
           requestedCollections != null    &&
           !requestedCollections.isEmpty() &&
           (SolrException.ErrorCode.getErrorCode(errorCode) == SolrException.ErrorCode.INVALID_STATE || errorCode == 404))
@@ -996,20 +1000,18 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
       // if we experienced a communication error, it's worth checking the state
       // with ZK just to make sure the node we're trying to hit is still part of the collection
-      if (retryCount <= MAX_STALE_RETRIES &&
+      if (retryCount < MAX_STALE_RETRIES &&
           !stateWasStale &&
           requestedCollections != null &&
           !requestedCollections.isEmpty() &&
           wasCommError) {
         for (DocCollection ext : requestedCollections) {
           DocCollection latestStateFromZk = getDocCollection(ext.getName(), null, null);
-          if (latestStateFromZk != null && latestStateFromZk.getZNodeVersion() != ext.getZNodeVersion()
-              || latestStateFromZk.getStateUpdates().hashCode() != ext.getStateUpdates().hashCode()) {
-            log.info("stale state:" + latestStateFromZk.getZNodeVersion() + " " + ext.getZNodeVersion());
+          if (latestStateFromZk.getZNodeVersion() != ext.getZNodeVersion()) {
             // looks like we couldn't reach the server because the state was stale == retry
             stateWasStale = true;
             // we just pulled state from ZK, so update the cache so that the retry uses it
-            collectionStateCache.put(ext.getName(), new ExpiringCachedDocCollection(latestStateFromZk, retryExpiryTime));
+            collectionStateCache.put(ext.getName(), new ExpiringCachedDocCollection(latestStateFromZk));
           }
         }
       }
@@ -1077,9 +1079,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       }
 
     } else if (ADMIN_PATHS.contains(request.getPath())) {
-      List<String> liveNodesList = new ArrayList<>(liveNodes);
-      Collections.shuffle(liveNodesList, rand);
-      for (String liveNode : liveNodesList) {
+      for (String liveNode : liveNodes) {
         theUrlList.add(Utils.getBaseUrlForNodeName(liveNode,
             getClusterStateProvider().getClusterProperty(ZkStateReader.URL_SCHEME,"http")));
       }
@@ -1095,29 +1095,25 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       //   at every shard when getting leaders if we tweaked some things
 
       // Retrieve slices from the cloud state and, for each collection specified, add it to the Map of slices.
-      List<Replica> sortedReplicas = new ArrayList<>();
-      List<Replica> replicas = new ArrayList<>();
 
       Map<String,Slice> slices = new HashMap<>();
       String shardKeys = reqParams.get(ShardParams._ROUTE_);
       for (String collectionName : collectionNames) {
         DocCollection col = getDocCollection(collectionName, null, null);
+        log.info("doc col is {}", col);
         if (col == null) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection not found: " + collectionName);
         }
-        slices.putAll(col.getSlicesMap());
-        List<Slice> routeSlices = new ArrayList<>(col.getRouter().getSearchSlices(shardKeys, reqParams, col));
-        Collections.shuffle(routeSlices);
+        Collection<Slice> routeSlices = new ArrayList<>(col.getRouter().getSearchSlices(shardKeys, reqParams, col));
         ClientUtils.addSlices(slices, collectionName, routeSlices, true);
       }
 
       // Gather URLs, grouped by leader or replica
-
+      List<Replica> sortedReplicas = new ArrayList<>();
+      List<Replica> replicas = new ArrayList<>();
       for (Slice slice : slices.values()) {
         Replica leader = slice.getLeader();
-        ArrayList<Replica> replicaList = new ArrayList<>(slice.getReplicas());
-        Collections.shuffle(replicaList);
-        for (Replica replica : replicaList) {
+        for (Replica replica : slice.getReplicas()) {
           String node = replica.getNodeName();
           if (!liveNodes.contains(node) // Must be a live node to continue
               || replica.getState() != Replica.State.ACTIVE) // Must be an ACTIVE replica to continue
@@ -1147,9 +1143,15 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       });
 
       if (theUrlList.isEmpty()) {
-        collectionStateCache.keySet().removeAll(collectionNames);
-        throw new SolrException(SolrException.ErrorCode.INVALID_STATE,
-            "Could not find a healthy node to handle the request, collection names: " + collectionNames);
+        if (collectionNames.size() == 0) {
+          collectionStateCache.keySet().removeAll(collectionNames);
+          throw new SolrException(SolrException.ErrorCode.INVALID_STATE, "Could not find a healthy node to handle the request, collection names: " + collectionNames + " live nodes=" + liveNodes);
+        }
+
+        // MRM TODO:
+        theUrlList.add(Utils.getBaseUrlForNodeName(liveNodes.iterator().next(),
+            getClusterStateProvider().getClusterProperty(ZkStateReader.URL_SCHEME,"http")) + "/" + collectionNames.iterator().next());
+       // theUrlList.add( "http://" + liveNodes.iterator().next().replaceAll("_", "/")  + "/" + collectionNames.iterator().next());
       }
     }
     LBSolrClient.Req req = new LBSolrClient.Req(request, theUrlList);
@@ -1193,12 +1195,13 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
 
   protected DocCollection getDocCollection(String collection, Integer expectedVersion, Integer updateHash) throws SolrException {
+    log.info("getDocCollection expectedVersion={} expectedUpdateHash={}", expectedVersion, updateHash);
     if (expectedVersion == null) expectedVersion = -1;
     if (collection == null) return null;
     ExpiringCachedDocCollection cacheEntry = collectionStateCache.get(collection);
     DocCollection col = cacheEntry == null ? null : cacheEntry.cached;
     if (col != null) {
-      if (expectedVersion <= col.getZNodeVersion() && (expectedVersion == -1 || updateHash == col.getStateUpdates().hashCode())
+      if (expectedVersion <= col.getZNodeVersion()
           && !cacheEntry.shouldRetry()) return col;
     }
 
@@ -1207,29 +1210,34 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       //no such collection exists
       return null;
     }
-//    if (!ref.isLazilyLoaded()) {
-//      //it is readily available just return it
-//      return ref.get();
-//    }
+    if (!ref.isLazilyLoaded()) {
+      //it is readily available just return it
+      return ref.get();
+    }
+
 
     DocCollection fetchedCol = null;
-    /*we have waited for sometime just check once again*/
-    cacheEntry = collectionStateCache.get(collection);
-    col = cacheEntry == null ? null : cacheEntry.cached;
-    if (col != null) {
-      if (expectedVersion <= col.getZNodeVersion() && (expectedVersion == -1 || updateHash == col.getStateUpdates().hashCode()) && !cacheEntry.shouldRetry()) return col;
-    }
-    // We are going to fetch a new version
-    // we MUST try to get a new version
-    fetchedCol = ref.get(false);//this is a call to ZK
-    if (fetchedCol == null) return null;// this collection no more exists
-    if (col != null && fetchedCol.getZNodeVersion() == col.getZNodeVersion() && (expectedVersion == -1 || updateHash == fetchedCol.getStateUpdates().hashCode())) {
-      cacheEntry.setRetriedAt();//we retried and found that it is the same version
-      cacheEntry.maybeStale = false;
-    } else {
-      collectionStateCache.put(collection, new ExpiringCachedDocCollection(fetchedCol, retryExpiryTime));
-    }
-    return fetchedCol;
+
+      /*we have waited for sometime just check once again*/
+      cacheEntry = collectionStateCache.get(collection);
+      col = cacheEntry == null ? null : cacheEntry.cached;
+      if (col != null) {
+        if (expectedVersion <= col.getZNodeVersion()
+            && !cacheEntry.shouldRetry()) return col;
+      }
+      // We are going to fetch a new version
+      // we MUST try to get a new version
+      fetchedCol = ref.get();//this is a call to ZK
+      if (fetchedCol == null) return null;// this collection no more exists
+      if (col != null && fetchedCol.getZNodeVersion() == col.getZNodeVersion()) {
+        cacheEntry.setRetriedAt();//we retried and found that it is the same version
+        cacheEntry.maybeStale = false;
+      } else {
+        if (fetchedCol.getStateFormat() > 1)
+          collectionStateCache.put(collection, new ExpiringCachedDocCollection(fetchedCol));
+      }
+      return fetchedCol;
+
   }
 
   ClusterState.CollectionRef getCollectionRef(String collection) {
@@ -1330,50 +1338,4 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
     return true;
   }
-
-  public static List<String> populateShardNames(ZkNodeProps message, String router) {
-    List<String> shardNames = new ArrayList<>();
-    Integer numSlices = message.getInt(ZkStateReader.NUM_SHARDS_PROP, -1);
-    if (ImplicitDocRouter.NAME.equals(router)) {
-      BaseCloudSolrClient.getShardNames(shardNames, message.getStr("shards", null));
-    } else {
-      if (numSlices == null) {
-        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, ZkStateReader.NUM_SHARDS_PROP + " is a required param (when using CompositeId router).");
-      }
-      if (numSlices <= 0) {
-        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, ZkStateReader.NUM_SHARDS_PROP + " must be > 0");
-      }
-      BaseCloudSolrClient.getShardNames(numSlices, shardNames);
-    }
-    return shardNames;
-  }
-
-  public static List<String> getShardNames(ZkNodeProps zkProps) {
- //   zkProps.getInt(ZkStateReader.NUM_SHARDS_PROP, 0), zkProps.getStr("shards")
-    List<String> list = new ArrayList<>();
-    getShardNames(list, zkProps.getStr("shards"));
-    return list;
-  }
-
-  public static void getShardNames(Integer numShards, List<String> shardNames) {
-    if (numShards == null)
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "numShards" + " is a required param");
-    for (int i = 0; i < numShards; i++) {
-      final String sliceName = "s" + (i + 1);
-      shardNames.add(sliceName);
-    }
-
-  }
-
-  public static void getShardNames(List<String> shardNames, String shards) {
-    if (shards == null)
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "shards" + " is a required param");
-    for (String s : shards.split(",")) {
-      if (s == null || s.trim().isEmpty()) continue;
-      shardNames.add(s.trim());
-    }
-    if (shardNames.isEmpty())
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "shards" + " is a required param");
-  }
-
 }

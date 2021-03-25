@@ -253,7 +253,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
 
   public final static ThreadLocal<char[]> THREAD_LOCAL_BBUFF = new ThreadLocal<>(){
     protected char[] initialValue() {
-      return new char[16384];
+      return new char[32768];
     }
   };
 
@@ -263,9 +263,8 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
 
   public static ValidatingJsonMap fromJSON(Reader r, String includeLocation) {
     try {
-      ValidatingJsonMap map = (ValidatingJsonMap) getObjectBuilder(
-          new JSONParser(r, THREAD_LOCAL_BBUFF.get())).getObject();
-      handleIncludes(map, includeLocation, 4);
+      ValidatingJsonMap map = (ValidatingJsonMap) getObjectBuilder(new JSONParser(r)).getObject();
+      handleIncludes(map, includeLocation, 3);
       return map;
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -330,7 +329,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
     return new ObjectBuilder(jp) {
       @Override
       public Object newObject() throws IOException {
-        return new ValidatingJsonMap(12);
+        return new ValidatingJsonMap(32);
       }
     };
   }
@@ -354,7 +353,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
               }
 
               if (map == null) throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Empty value for " + resourceName);
-              return getDeepCopy(map, 5, false);
+              return getDeepCopy(map, 3, false);
             }
           } catch (IOException e) {
             // TODO: at least log
@@ -370,7 +369,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
       }
 
       if (map == null) throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Empty value for " + resourceName);
-      return getDeepCopy(map, 5, false);
+      return getDeepCopy(map, 3, false);
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }

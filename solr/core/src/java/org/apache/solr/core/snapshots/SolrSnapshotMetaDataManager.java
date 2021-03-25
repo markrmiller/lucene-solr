@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core.snapshots;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -57,9 +58,17 @@ import org.slf4j.LoggerFactory;
  * {@linkplain IndexDeletionPolicyWrapper} in Solr uses this class to create/delete the Solr index
  * snapshots.
  */
-public class SolrSnapshotMetaDataManager {
+public class SolrSnapshotMetaDataManager implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String SNAPSHOT_METADATA_DIR = "snapshot_metadata";
+
+  @Override
+  public void close() throws IOException {
+    if (dir != null) {
+      solrCore.getDirectoryFactory().doneWithDirectory(dir);
+      solrCore.getDirectoryFactory().release(dir);
+    }
+  }
 
   /**
    * A class defining the meta-data for a specific snapshot.
@@ -111,7 +120,7 @@ public class SolrSnapshotMetaDataManager {
   // The index writer which maintains the snapshots metadata
   private long nextWriteGen;
 
-  private final Directory dir;
+  private Directory dir;
 
   /** Used to map snapshot name to snapshot meta-data. */
   protected final Map<String,SnapshotMetaData> nameToDetailsMapping = new LinkedHashMap<>();
@@ -125,7 +134,7 @@ public class SolrSnapshotMetaDataManager {
    *            the existing meta-data.
    * @throws IOException in case of errors.
    */
-  public SolrSnapshotMetaDataManager(SolrCore solrCore, Directory dir) throws IOException {
+  public SolrSnapshotMetaDataManager(SolrCore solrCore, String dir) throws IOException {
     this(solrCore, dir, OpenMode.CREATE_OR_APPEND);
   }
 
@@ -139,15 +148,19 @@ public class SolrSnapshotMetaDataManager {
    *                              Updates the existing structure if one exists.
    * @throws IOException in case of errors.
    */
-  public SolrSnapshotMetaDataManager(SolrCore solrCore, Directory dir, OpenMode mode) throws IOException {
+  public SolrSnapshotMetaDataManager(SolrCore solrCore, String dir, OpenMode mode) throws IOException {
     this.solrCore = solrCore;
-    this.dir = dir;
 
-    if (mode == OpenMode.CREATE) {
-      deleteSnapshotMetadataFiles();
+    if (!solrCore.isNewCore()) {
+
+      this.dir = solrCore.getDirectoryFactory().get(dir, DirContext.DEFAULT, solrCore.getSolrConfig().indexConfig.lockType);
+
+      if (mode == OpenMode.CREATE) {
+        deleteSnapshotMetadataFiles();
+      }
+
+      loadFromSnapshotMetadataFile();
     }
-
-    loadFromSnapshotMetadataFile();
 
     if (mode == OpenMode.APPEND && nextWriteGen == 0) {
       throw new IllegalStateException("no snapshots stored in this directory");

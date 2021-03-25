@@ -188,6 +188,8 @@ public class HttpPartitionTest extends AbstractFullDistribZkTestBase {
       int achievedRf = sendDoc(2, 1, leaderJetty);
       assertEquals("Unexpected achieved replication factor", 1, achievedRf);
       try (ZkShardTerms zkShardTerms = new ZkShardTerms(testCollectionName, "shard1", cloudClient.getZkStateReader().getZkClient())) {
+        zkShardTerms.createWatcher();
+
         assertFalse(zkShardTerms.canBecomeLeader(notLeaders.get(0).getName()));
       }
       waitForState(testCollectionName, notLeaders.get(0).getName(), DOWN, 10000);

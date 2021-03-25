@@ -170,9 +170,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     CollectionAdminRequest.deleteCollection(collectionName).process(client);
 
     log.info("create collection again");
-    cluster.getZkClient().printLayout();
     // create it again
-    createCollection(collectionName, null, false);
+    createCollection(collectionName, null, true);
 
     // check that there's no left-over state
     assertEquals(0, client.query(collectionName, new SolrQuery("*:*")).getResults().getNumFound());

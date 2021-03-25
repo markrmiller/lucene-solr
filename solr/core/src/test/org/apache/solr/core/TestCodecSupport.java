@@ -242,7 +242,7 @@ public class TestCodecSupport extends SolrTestCaseJ4 {
     CoreContainer coreContainer = h.getCoreContainer();
 
     CoreDescriptor cd = new CoreDescriptor(newCoreName, testSolrHome.resolve(newCoreName), coreContainer);
-    c = new SolrCore(coreContainer, cd, new ConfigSet("fakeConfigset", config, schema, null, true));
+    c = new SolrCore(coreContainer, cd, new ConfigSet("fakeConfigset", config, schema, null, true), true);
     c.start();
     assertNull(coreContainer.registerCore(cd, c, false));
     h.coreName = newCoreName;

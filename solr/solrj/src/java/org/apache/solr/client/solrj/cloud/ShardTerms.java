@@ -128,9 +128,9 @@ public class ShardTerms implements MapWriter {
    * @return null if highest terms are already larger than zero
    */
   public ShardTerms ensureHighestTermsAreNotZero() {
-    if (maxTerm > 0 || values.size() == 0) return null;
+    if (maxTerm > 0) return null;
     else {
-      Map<String, Long> newValues =  new ConcurrentHashMap<String, Long>(32, 0.75F, 32);
+      Map<String, Long> newValues = new ConcurrentHashMap<>(values);
       for (String replica : values.keySet()) {
         newValues.put(replica, 1L);
       }
@@ -210,8 +210,8 @@ public class ShardTerms implements MapWriter {
    */
   public ShardTerms startRecovering(String coreNodeName) {
     long maxTerm = getMaxTerm();
-    Long val = values.get(coreNodeName);
-    if (val == null || val == maxTerm)
+    Long term = values.get(coreNodeName);
+    if (term != null && term == maxTerm)
       return null;
 
     Map<String, Long> newValues = new ConcurrentHashMap<>(values);
@@ -256,7 +256,7 @@ public class ShardTerms implements MapWriter {
   }
 
   public Map<String, Long> getTerms() {
-    return new HashMap<>(this.values);
+    return new ConcurrentHashMap<>(this.values);
   }
 
   public boolean isRecovering(String name) {

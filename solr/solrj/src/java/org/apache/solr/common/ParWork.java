@@ -80,14 +80,15 @@ public class ParWork implements Closeable {
     if (EXEC == null) {
       synchronized (ParWork.class) {
         if (EXEC == null) {
-          Integer coreSize = Integer.getInteger("solr.rootSharedThreadPoolCoreSize", 32);
+          Integer coreSize = Integer.getInteger("solr.rootSharedThreadPoolCoreSize", 256);
           EXEC = (ParWorkExecutor) getParExecutorService(ROOT_EXEC_NAME, coreSize
-             , Integer.MAX_VALUE, 1000,
+             , Integer.MAX_VALUE, 10000,
               new SynchronousQueue());
           ((ParWorkExecutor)EXEC).enableCloseLock();
-          for (int i = 0; i < Math.min(coreSize, 12); i++) {
-            EXEC.prestartCoreThread();
-          }
+//          for (int i = 0; i < Math.min(coreSize, 64); i++) {
+//            EXEC.prestartCoreThread();
+//          }
+          EXEC.prestartAllCoreThreads();
         }
       }
     }
@@ -435,7 +436,7 @@ public class ParWork implements Closeable {
         Integer minThreads;
         Integer maxThreads;
         minThreads = 4;
-        maxThreads = Integer.getInteger("solr.perThreadPoolSize", PROC_COUNT / 2);
+        maxThreads = Integer.getInteger("solr.perThreadPoolSize", PROC_COUNT);
         exec = getExecutorService(Math.max(minThreads, maxThreads)); // keep alive directly affects how long a worker might
        // ((PerThreadExecService)exec).closeLock(true);
         // be stuck in poll without an enqueue on shutdown
@@ -458,8 +459,8 @@ public class ParWork implements Closeable {
     return new PerThreadExecService(getRootSharedExecutor(), maximumPoolSize);
   }
 
-  public static ExecutorService getExecutorService(int maximumPoolSize, boolean callerThreadAllowed, boolean noCallerRunsAvailableLimit) {
-    return new PerThreadExecService(getRootSharedExecutor(), maximumPoolSize, callerThreadAllowed, noCallerRunsAvailableLimit);
+  public static ExecutorService getExecutorService(int maximumPoolSize, boolean callerThreadAllowed, boolean callerThreadUsesAvailableLimit) {
+    return new PerThreadExecService(getRootSharedExecutor(), maximumPoolSize, callerThreadAllowed, callerThreadUsesAvailableLimit);
   }
 
   private void handleObject(AtomicReference<Throwable> exception, final TimeTracker workUnitTracker, Object ob) {

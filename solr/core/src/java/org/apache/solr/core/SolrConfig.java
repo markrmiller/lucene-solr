@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -122,6 +123,8 @@ public class SolrConfig extends XmlConfigFile implements MapSerializable {
   public static final String DEFAULT_CONF_FILE = "solrconfig.xml";
 
   private volatile RequestParams requestParams;
+
+  private final ReentrantLock requestParamsLock = new ReentrantLock(true);
 
   public enum PluginOpts {
     MULTI_OK,
@@ -1014,10 +1017,13 @@ public class SolrConfig extends XmlConfigFile implements MapSerializable {
   public RequestParams getRequestParams() {
 
     if (requestParams == null) {
-      synchronized (this) {
+      requestParamsLock.lock();
+      try {
         if (requestParams == null) {
           return refreshRequestParams();
         }
+      } finally {
+        requestParamsLock.unlock();
       }
     }
     return requestParams;

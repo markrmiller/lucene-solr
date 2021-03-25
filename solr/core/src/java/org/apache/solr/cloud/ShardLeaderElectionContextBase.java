@@ -153,7 +153,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
         }
       } catch (Exception e) {
 
-        if (leaderSeqPath != null) {
+        if (leaderSeqPath != null && zkClient.isAlive()) {
           if (log.isDebugEnabled()) log.debug("Delete leader seq election path {} path we watch is {}", leaderSeqPath, watchedSeqPath);
           try {
             zkClient.delete(leaderSeqPath, -1, true, false);
@@ -183,7 +183,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
         throw new IllegalStateException("We have won as leader, but we have no leader election node known to us leaderPath " + leaderPath);
       }
 
-      log.info("Creating leader registration node {} after winning as {} parent is {}", leaderPath, leaderSeqPath, parent);
+      log.debug("Creating leader registration node {} after winning as {} parent is {}", leaderPath, leaderSeqPath, parent);
       List<Op> ops = new ArrayList<>(3);
 
       // We use a multi operation to get the parent nodes version, which will
@@ -200,7 +200,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       List<OpResult> results;
 
       results = zkClient.multi(ops, true, false);
-      log.info("Results from call {}", results);
+      log.debug("Results from call {}", results);
       Iterator<Op> it = ops.iterator();
       for (OpResult result : results) {
         if (result.getType() == ZooDefs.OpCode.setData) {
@@ -213,7 +213,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       //assert leaderZkNodeParentVersion != null;
 
     } catch (NoNodeException e) {
-      log.warn("No node exists for election", e);
+      log.warn("No node exists for election {} {} {}", e.getPath(), leaderSeqPath, leaderPath, e);
       throw new AlreadyClosedException("No node exists for election");
     } catch (KeeperException.NodeExistsException e) {
       log.error("Node already exists for election", e);

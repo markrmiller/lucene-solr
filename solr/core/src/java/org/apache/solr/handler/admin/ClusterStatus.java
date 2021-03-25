@@ -140,13 +140,10 @@ public class ClusterStatus {
         requestedShards.addAll(Arrays.asList(paramShards));
       }
 
-      if (clusterStateCollection.getStateFormat() > 1) {
-        bytes = Utils.toJSON(clusterStateCollection);
-        Map<String, Object> docCollection = (Map<String, Object>) Utils.fromJSON(bytes);
-        collectionStatus = getCollectionStatus(docCollection, name, requestedShards);
-      } else {
-        collectionStatus = getCollectionStatus((Map<String, Object>) stateMap.get(name), name, requestedShards);
-      }
+
+      bytes = Utils.toJSON(clusterStateCollection);
+      Map<String, Object> docCollection = (Map<String, Object>) Utils.fromJSON(bytes);
+      collectionStatus = getCollectionStatus(docCollection, name, requestedShards);
 
       collectionStatus.put("znodeVersion", clusterStateCollection.getZNodeVersion());
       if (collectionVsAliases.containsKey(name) && !collectionVsAliases.get(name).isEmpty()) {
@@ -163,6 +160,7 @@ public class ClusterStatus {
     }
 
     List<String> liveNodes = zkStateReader.getZkClient().getChildren(ZkStateReader.LIVE_NODES_ZKNODE, null, true);
+
 
     // now we need to walk the collectionProps tree to cross-check replica state with live nodes
     crossCheckReplicaStateWithLiveNodes(liveNodes, collectionProps);
@@ -189,6 +187,8 @@ public class ClusterStatus {
 
     // add live_nodes
     clusterStatus.add("live_nodes", liveNodes);
+
+
 
     results.add("cluster", clusterStatus);
   }

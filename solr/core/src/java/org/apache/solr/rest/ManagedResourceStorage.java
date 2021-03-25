@@ -212,9 +212,11 @@ public abstract class ManagedResourceStorage {
     public void configure(SolrResourceLoader loader, NamedList<String> initArgs) throws SolrException {
       // validate connectivity and the configured znode base
       try {
-        if (!zkClient.exists(znodeBase)) {
-          zkClient.mkdir(znodeBase);
-        }
+
+        zkClient.mkdir(znodeBase);
+
+      } catch (KeeperException.NodeExistsException e) {
+
       } catch (Exception exc) {
         String errMsg = String.format
             (Locale.ROOT, "Failed to verify znode at %s due to: %s", znodeBase, exc.toString());
@@ -509,8 +511,8 @@ public abstract class ManagedResourceStorage {
     }
     
     String objectType = (parsed != null) ? parsed.getClass().getSimpleName() : "null";
-    if (log.isInfoEnabled()) {
-      log.info(String.format(Locale.ROOT, "Loaded %s at path %s using %s",
+    if (log.isDebugEnabled()) {
+      log.debug(String.format(Locale.ROOT, "Loaded %s at path %s using %s",
           objectType, storedResourceId, storageIO.getInfo()));
     }
     

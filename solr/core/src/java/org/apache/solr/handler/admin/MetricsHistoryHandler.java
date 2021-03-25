@@ -362,7 +362,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         });
         NamedList nl = (NamedList)result.get();
         if (nl != null) {
-          try (ParWork worker = new ParWork(this, false, false)) {
+          try (ParWork worker = new ParWork(this, false, true)) {
             for (Iterator<Map.Entry<String, Object>> it = nl.iterator(); it.hasNext(); ) {
               Map.Entry<String, Object> entry = it.next();
               String key = entry.getKey();
@@ -613,10 +613,10 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     RrdDb db = knownDbs.computeIfAbsent(registry, r -> {
       RrdDef def = createDef(r, group);
       try {
-        RrdDb newDb = RrdDb.getBuilder().setRrdDef(def).setBackendFactory(factory).setUsePool(true).build();
+        RrdDb newDb = RrdDb.getBuilder().setRrdDef(def).setBackendFactory(factory).build();
         return newDb;
       } catch (Exception e) {
-        log.warn("Can't create RrdDb for registry {}, group {}: {}", registry, group, e);
+        log.warn("Can't create RrdDb for registry {}, group {}", registry, group, e);
         return null;
       }
     });
@@ -631,15 +631,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
 
     if (collectService != null) {
       scheduledFuture.cancel(false);
-      collectService.shutdown();
-      try {
-        boolean success = collectService.awaitTermination(1, TimeUnit.SECONDS);
-        if (!success) {
-          collectService.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-
-      }
+      collectService.shutdownNow();
     }
 
     try (ParWork closer = new ParWork(this)) {

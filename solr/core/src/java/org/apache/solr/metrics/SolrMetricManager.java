@@ -487,14 +487,18 @@ public class SolrMetricManager {
    * @param registry name of the registry to remove
    */
   public void removeRegistry(String registry) {
-    // close any reporters for this registry first
-    closeReporters(registry, null);
-    // make sure we use a name with prefix
-    registry = enforcePrefix(registry);
-    if (isSharedRegistry(registry)) {
-      REGISTRIES.remove(registry);
-    } else {
-      registries.remove(registry);
+    try {
+      // close any reporters for this registry first
+      closeReporters(registry, null);
+      // make sure we use a name with prefix
+      registry = enforcePrefix(registry);
+      if (isSharedRegistry(registry)) {
+        REGISTRIES.remove(registry);
+      } else {
+        registries.remove(registry);
+      }
+    } catch (Exception e) {
+      log.error("Exception removing metric history entries");
     }
   }
 

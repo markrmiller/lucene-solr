@@ -34,7 +34,6 @@ import org.apache.solr.common.util.NamedList;
 import org.slf4j.MDC;
 
 import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
-
 /**
  * LBHttp2SolrClient or "LoadBalanced LBHttp2SolrClient" is a load balancing wrapper around
  * {@link Http2SolrClient}. This is useful when you
@@ -74,18 +73,24 @@ public class LBHttp2SolrClient extends LBSolrClient {
   private final Http2SolrClient httpClient;
 
   public LBHttp2SolrClient(Http2SolrClient httpClient, String... baseSolrUrls) {
+    this(httpClient, httpClient == null ? false : httpClient.isMarkedInternal(), baseSolrUrls);
+  }
+
+  public LBHttp2SolrClient(Http2SolrClient httpClient, boolean markInternal, String... baseSolrUrls) {
     super(Arrays.asList(baseSolrUrls));
     // MRM TODO: - should only be internal for us
-    this.httpClient = new Http2SolrClient.Builder().withHttpClient(httpClient).markInternalRequest().build();
+    Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
+    if (markInternal) {
+      builder = builder.markInternalRequest();
+    }
+    this.httpClient = builder.build();
   }
 
   public LBHttp2SolrClient(String... baseSolrUrls) {
     super(Arrays.asList(baseSolrUrls));
     // MRM TODO: - should only be internal for us
-    this.httpClient = new Http2SolrClient.Builder().markInternalRequest()
-        // .withResponseParser(responseParser) // MRM TODO:
-        // .allowCompression(compression) // MRM TODO:
-        .build();
+    Http2SolrClient.Builder builder = new Http2SolrClient.Builder();
+    this.httpClient = builder.build();
   }
 
   @Override

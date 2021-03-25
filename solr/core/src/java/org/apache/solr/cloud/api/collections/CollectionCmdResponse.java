@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -61,7 +63,6 @@ import static org.apache.solr.common.cloud.ZkStateReader.SHARD_ID_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.TLOG_REPLICAS;
 import static org.apache.solr.common.params.CollectionAdminParams.COLL_CONF;
 import static org.apache.solr.common.params.CollectionAdminParams.FOLLOW_ALIASES;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
 import static org.apache.solr.common.params.CommonAdminParams.TIMEOUT;
 import static org.apache.solr.common.params.CommonAdminParams.WAIT_FOR_FINAL_STATE;
@@ -159,7 +160,7 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
     collection = clusterState.getCollection(collectionName);
     List<ReplicaPosition> positions = buildReplicaPositions(ocmh.cloudManager, clusterState, collection, message, replicaTypesVsCount);
     for (ReplicaPosition replicaPosition : positions) {
-      clusterState = new CollectionMutator(ocmh.cloudManager).modifyCollection(clusterState, message);
+      clusterState = new CollectionMutator(ocmh.cloudManager, ocmh.zkStateReader).modifyCollection(clusterState, message);
       collection = clusterState.getCollection(collectionName);
       CreateReplica cr = assignReplicaDetails(collection, message, replicaPosition, ocmh.overseer);
 
@@ -185,6 +186,14 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
 //        .map(replicaPosition -> assignReplicaDetails(collection, message, replicaPosition))
 //        .collect(Collectors.toList());
 
+    if (!onlyUpdateState) {
+      try {
+        ocmh.overseer.getZkStateWriter().enqueueStructureChange(clusterState.getCollection(collectionName));
+        ocmh.overseer.getZkStateWriter().writePendingUpdates(collectionName);
+      } catch (Exception e) {
+        log.error("failed enqueuing clusterstate update");
+      }
+    }
 
     for (CreateReplica createReplica : createReplicas) {
       message.getProperties().put(ZkStateReader.CORE_NAME_PROP, createReplica.coreName);
@@ -196,6 +205,7 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
 
       log.debug("create replica {} params={}", createReplica, params);
       if (!onlyUpdateState) {
+
         shardRequestTracker.sendShardRequest(createReplica.node, params, shardHandler);
       }
 
@@ -228,6 +238,7 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
             }
 
             String asyncId = finalMessage.getStr(ASYNC);
+            log.info("done adding replica waitForFinalState={}", waitForFinalState);
             if (waitForFinalState) {
               for (CreateReplica createReplica : createReplicas) {
                 waitForActiveReplica(createReplica.sliceName, collectionName, asyncId, ocmh.zkStateReader, createReplica);
@@ -246,29 +257,29 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
   }
 
   private void waitForActiveReplica(String shard, String collectionName, String asyncId, ZkStateReader zkStateReader, CreateReplica createReplica) {
-//    try {
-//      log.info("waiting for created replica shard={} {}", shard, createReplica.coreName);
-//      zkStateReader.waitForState(collectionName, 30, TimeUnit.SECONDS, (liveNodes, collectionState) -> { // MRM TODO: timeout
-//        if (collectionState == null) {
-//          return false;
-//        }
-//
-//        Slice slice = collectionState.getSlice(shard);
-//        if (slice == null) {
-//          return false;
-//        }
-//
-//        Replica replica = collectionState.getReplica(createReplica.coreName);
-//        if (replica != null && replica.getState().equals(Replica.State.ACTIVE)) {
-//          return true;
-//        }
-//
-//        return false;
-//      });
-//    } catch (TimeoutException | InterruptedException e) {
-//      log.error("addReplica name={}", createReplica.coreName, e);
-//      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-//    }
+    try {
+      log.info("waiting for created replica shard={} {}", shard, createReplica.coreName);
+      zkStateReader.waitForState(collectionName, 30, TimeUnit.SECONDS, (liveNodes, collectionState) -> { // MRM TODO: timeout
+        if (collectionState == null) {
+          return false;
+        }
+
+        Slice slice = collectionState.getSlice(shard);
+        if (slice == null) {
+          return false;
+        }
+
+        Replica replica = collectionState.getReplica(createReplica.coreName);
+        if (replica != null && replica.getState().equals(Replica.State.ACTIVE)) {
+          return true;
+        }
+
+        return false;
+      });
+    } catch (TimeoutException | InterruptedException e) {
+      log.error("addReplica name={}", createReplica.coreName, e);
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+    }
   }
 
   private ModifiableSolrParams getReplicaParams(DocCollection collection, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results,
@@ -303,10 +314,13 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
     ModifiableSolrParams params = new ModifiableSolrParams();
     ZkStateReader zkStateReader = ocmh.zkStateReader;
     String collectionName = collection.getName();
-    ZkNodeProps props = new ZkNodeProps(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower(), ZkStateReader.COLLECTION_PROP, collectionName, ZkStateReader.SHARD_ID_PROP, createReplica.sliceName,
-        ZkStateReader.CORE_NAME_PROP, createReplica.coreName, ZkStateReader.STATE_PROP, Replica.State.RECOVERING.toString(), "node", createReplica.node, ZkStateReader.REPLICA_TYPE, createReplica.replicaType.name());
+//    ZkNodeProps props = new ZkNodeProps(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower(), ZkStateReader.COLLECTION_PROP, collectionName, ZkStateReader.SHARD_ID_PROP, createReplica.sliceName,
+//        ZkStateReader.CORE_NAME_PROP, createReplica.coreName, ZkStateReader.STATE_PROP, Replica.State.RECOVERING.toString(), "node", createReplica.node, ZkStateReader.REPLICA_TYPE, createReplica.replicaType.name());
 
-    String configName = zkStateReader.readConfigName(collectionName);
+    String configName = message.getStr(COLL_CONF);
+    if (configName == null) {
+      configName = zkStateReader.readConfigName(collectionName);
+    }
     String routeKey = message.getStr(ShardParams._ROUTE_);
     String dataDir = message.getStr(CoreAdminParams.DATA_DIR);
     String ulogDir = message.getStr(CoreAdminParams.ULOG_DIR);
@@ -387,7 +401,7 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
     return new CreateReplica(intId, collection, shard, node, replicaType, coreName);
   }
 
-  public static List<ReplicaPosition> buildReplicaPositions(SolrCloudManager cloudManager, ClusterState clusterState, DocCollection collection,
+  public List<ReplicaPosition> buildReplicaPositions(SolrCloudManager cloudManager, ClusterState clusterState, DocCollection collection,
                                                             ZkNodeProps message,
                                                             EnumMap<Replica.Type, Integer> replicaTypeVsCount) throws IOException, InterruptedException {
     boolean skipCreateReplicaInClusterState = message.getBool(SKIP_CREATE_REPLICA_IN_CLUSTER_STATE, false);
@@ -422,7 +436,7 @@ public class CollectionCmdResponse implements OverseerCollectionMessageHandler.C
       int i = 0;
       for (Map.Entry<Replica.Type, Integer> entry : replicaTypeVsCount.entrySet()) {
         for (int j = 0; j < entry.getValue(); j++) {
-          positions.add(new ReplicaPosition(sliceName, i++, entry.getKey(), node));
+          positions.add(new ReplicaPosition(sliceName, i++, entry.getKey(), node, ocmh.zkStateReader.getBaseUrlForNodeName(node)));
         }
       }
     }

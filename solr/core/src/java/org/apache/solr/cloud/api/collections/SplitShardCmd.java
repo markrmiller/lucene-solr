@@ -305,7 +305,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         propMap.put("shard_parent_zk_session", leaderZnodeStat.getEphemeralOwner());
 
         //ocmh.overseer.offerStateUpdate(Utils.toJSON(new ZkNodeProps(propMap)));
-        clusterState = new CollectionMutator(ocmh.cloudManager).createShard(clusterState, new ZkNodeProps(propMap));
+        clusterState = new CollectionMutator(ocmh.cloudManager, zkStateReader).createShard(clusterState, new ZkNodeProps(propMap));
 
 
         log.debug("Adding first replica {} as part of slice {} of collection {} on {}"
@@ -349,7 +349,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
 //        firstReplicaFutures.add(future);
       }
 
-      ocmh.overseer.getZkStateWriter().enqueueUpdate(clusterState.getCollection(collectionName), null,false);
+      ocmh.overseer.getZkStateWriter().enqueueStructureChange(clusterState.getCollection(collectionName));
       ocmh.overseer.writePendingUpdates(collectionName);
 
       log.info("Clusterstate after adding new shard for split {}", clusterState);
@@ -686,7 +686,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
           ClusterState completeCs = finalClusterState;
           for (Map<String,Object> replica : replicas) {
              completeCs = checkAndCompleteShardSplit(completeCs, coll, replica.get("name").toString(), replica.get("shard").toString(),
-                new Replica(replica.get("name").toString(), replica, replica.get("collection").toString(), -1l, replica.get("shard").toString(), ocmh.zkStateReader));
+                new Replica(replica.get("name").toString(), replica, replica.get("collection").toString(), -1l, replica.get("shard").toString(), replica.get(ZkStateReader.BASE_URL_PROP).toString()));
           }
 
           CollectionCmdResponse.Response response = new CollectionCmdResponse.Response();

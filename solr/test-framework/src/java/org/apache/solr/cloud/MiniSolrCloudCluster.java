@@ -704,7 +704,7 @@ public class MiniSolrCloudCluster {
 
   protected CloudHttp2SolrClient buildZkReaderAndSolrClient() {
     // return new CloudHttp2SolrClient.Builder(Collections.singletonList(zkServer.getZkHost()), Optional.of("/solr")).build();
-    zkStateReader = new ZkStateReader(zkServer.getZkAddress(), 15000, 30000);
+    zkStateReader = new ZkStateReader(zkServer.getZkAddress(), 45000, 15000);
     zkStateReader.createClusterStateWatchersAndUpdate();
     return new CloudHttp2SolrClient.Builder(zkStateReader).build();
   }

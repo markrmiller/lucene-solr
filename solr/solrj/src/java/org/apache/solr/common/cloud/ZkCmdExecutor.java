@@ -62,9 +62,6 @@ public class ZkCmdExecutor {
     KeeperException exception = null;
     int tryCnt = 0;
     while (tryCnt < zkCmdExecutor.retryCount) {
-      if (!zkCmdExecutor.solrZkClient.isAlive() && !zkCmdExecutor.solrZkClient.isClosed()) {
-        throw new AlreadyClosedException("SolrZkClient is already closed");
-      }
       try {
         return (T) operation.execute();
       } catch (KeeperException.ConnectionLossException | KeeperException.SessionExpiredException e) {
@@ -75,9 +72,9 @@ public class ZkCmdExecutor {
         if (exception == null) {
           exception = e;
         }
-        if (zkCmdExecutor.solrZkClient.isClosed()) {
-          throw e;
-        }
+//        if (zkCmdExecutor.solrZkClient.isClosed()) {
+//          throw e;
+//        }
         zkCmdExecutor.retryDelay(tryCnt);
       }
       tryCnt++;

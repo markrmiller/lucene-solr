@@ -28,10 +28,10 @@
         =>%ex{short}}}{10240}%n"/>
         </Console>
 
-        <File name="FILE_COLOR" fileName="${sys:user.home}/solr-test.log" immediateFlush="false" append="false">
+        <File name="FILE_COLOR" fileName="${sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%maxLen{%t}{8})}{yellow,bold} [%style{%X{node_name} %X{core}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m %notEmpty{%ex}}\n"/>
         </File>
-        <File name="FILE" fileName="${sys:user.home}/solr-test.log" immediateFlush="false" append="false">
+        <File name="FILE" fileName="${sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %c{1.} %m%notEmpty{
         =>%ex{short}}}{10240}%n"/>
         </File>
@@ -46,8 +46,8 @@
 
         <AsyncLogger name="org.apache.hadoop" level="WARN"/>
         <AsyncLogger name="org.apache.directory" level="WARN"/>
-        <AsyncLogger name="org.apache.solr.hadoop" level="INFO"/>
-        <AsyncLogger name="org.eclipse.jetty" level="INFO"/>
+        <AsyncLogger name="org.apache.solr.hadoop" level="WARN"/>
+        <AsyncLogger name="org.eclipse.jetty" level="WARN"/>
 
         <AsyncLogger name="org.apache.solr.core.SolrCore" level="INFO"/>
         <AsyncLogger name="org.apache.solr.core.DefaultSolrCore" level="INFO"/>
@@ -79,7 +79,7 @@
         </AsyncLogger>
 
 
-        <AsyncLogger name="com.google.inject.servlet" level="INFO"/>
+        <AsyncLogger name="com.google.inject.servlet" level="WARN"/>
         <AsyncLogger name="org.apache.solr.client.solrj.impl.Http2SolrClient" level="INFO"/>
 
         <AsyncRoot level="INFO">

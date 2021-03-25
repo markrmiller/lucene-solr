@@ -63,13 +63,13 @@ public class NodeMutator {
             log.debug("Update replica state for {} to {}", replica, Replica.State.RECOVERING);
             Map<String, Object> props = replica.shallowCopy();
             props.put(ZkStateReader.STATE_PROP, Replica.State.RECOVERING.toString());
-            Replica newReplica = new Replica(replica.getName(), props, collection, replica.getCollectionId(), slice.getName(), nodeNameToBaseUrl);
+            Replica newReplica = new Replica(replica.getName(), props, collection, replica.getCollectionId(), slice.getName(), replica.getBaseUrl());
             newReplicas.put(replica.getName(), newReplica);
             needToUpdateCollection = true;
           }
         }
 
-        Slice newSlice = new Slice(slice.getName(), newReplicas, slice.shallowCopy(), collection, docCollection.getId(), nodeNameToBaseUrl);
+        Slice newSlice = new Slice(slice.getName(), newReplicas, slice.shallowCopy(), collection, docCollection.getId());
         slicesCopy.put(slice.getName(), newSlice);
       }
 

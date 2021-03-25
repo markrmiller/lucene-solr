@@ -1043,6 +1043,8 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
       commit();
 
       try (ZkShardTerms zkShardTerms = new ZkShardTerms(COLLECTION, SHARD1, cloudClient.getZkStateReader().getZkClient())) {
+        zkShardTerms.createWatcher();
+
         for (int i=0; i<100; i++) {
           Thread.sleep(10);
 

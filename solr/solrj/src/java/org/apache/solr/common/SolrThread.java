@@ -1,6 +1,8 @@
 package org.apache.solr.common;
 
 
+import org.apache.solr.common.util.ValidatingJsonMap;
+
 import java.util.concurrent.ExecutorService;
 
 public class SolrThread extends Thread {
@@ -29,6 +31,7 @@ public class SolrThread extends Thread {
     } finally {
 //      ExecutorUtil.shutdownAndAwaitTermination(executorService);
 //      executorService = null;
+      ValidatingJsonMap.THREAD_LOCAL_BBUFF.remove();
     }
   }
 

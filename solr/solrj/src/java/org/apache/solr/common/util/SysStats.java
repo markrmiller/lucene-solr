@@ -55,7 +55,7 @@ public class SysStats extends Thread {
         this.refreshIntervalMs = TimeUnit.MILLISECONDS.convert(refreshInterval, TimeUnit.NANOSECONDS);
         setName("CPUMonitoringThread");
         setDaemon(true);
-        start();
+       // start();
     }
 
     public static synchronized void reStartSysStats() {

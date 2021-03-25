@@ -64,6 +64,15 @@ public class ClusterState implements JSONWriter.Writable {
   }
 
 
+  public ClusterState(Map<String, CollectionRef> lazyCollectionStates, Map<String, DocCollection> watchedCollectionStates) {
+    this.znodeVersion = -1;
+    this.collectionStates = new LinkedHashMap<>(lazyCollectionStates);
+    for (DocCollection coll : watchedCollectionStates.values()) {
+      this.collectionStates.put(coll.getName(), new CollectionRef(coll));
+    }
+  }
+
+
   /**
    * Returns a new cluster state object modified with the given collection.
    *
@@ -232,7 +241,7 @@ public class ClusterState implements JSONWriter.Writable {
     Map<String,CollectionRef> collections = new LinkedHashMap<>(stateMap.size());
     for (Entry<String, Object> entry : stateMap.entrySet()) {
       String collectionName = entry.getKey();
-      DocCollection coll = collectionFromObjects(zkStateReader, collectionName, (Map<String,Object>)entry.getValue(), version);
+      DocCollection coll = collectionFromObjects(collectionName, (Map<String,Object>)entry.getValue(), version);
       collections.put(collectionName, new CollectionRef(coll));
     }
 
@@ -240,17 +249,17 @@ public class ClusterState implements JSONWriter.Writable {
   }
 
   // TODO move to static DocCollection.loadFromMap
-  private static DocCollection collectionFromObjects(Replica.NodeNameToBaseUrl zkStateReader, String name, Map<String, Object> objs, Integer version) {
+  private static DocCollection collectionFromObjects(String name, Map<String, Object> objs, Integer version) {
     Map<String,Object> props;
     Map<String,Slice> slices;
 
     Map<String, Object> sliceObjs = (Map<String, Object>) objs.get(DocCollection.SHARDS);
     if (sliceObjs == null) {
       // legacy format from 4.0... there was no separate "shards" level to contain the collection shards.
-      slices = Slice.loadAllFromMap(zkStateReader, name, (Long) objs.get("id"), objs);
+      slices = Slice.loadAllFromMap( name, (Long) objs.get("id"), objs);
       props = Collections.emptyMap();
     } else {
-      slices = Slice.loadAllFromMap(zkStateReader, name, (Long) objs.get("id"), sliceObjs);
+      slices = Slice.loadAllFromMap(name, (Long) objs.get("id"), sliceObjs);
       props = new HashMap<>(objs);
       objs.remove(DocCollection.SHARDS);
     }
@@ -267,7 +276,7 @@ public class ClusterState implements JSONWriter.Writable {
       router = DocRouter.getDocRouter((String) routerProps.get("name"));
     }
 
-    return new DocCollection(name, slices, props, router, version, null);
+    return new DocCollection(name, slices, props, router, version, new HashMap(0));
   }
 
   @Override
@@ -376,11 +385,11 @@ public class ClusterState implements JSONWriter.Writable {
       this.coll = coll;
     }
 
-    /** Return the DocCollection, using cached state if lazy.
+    /** Return the DocCollection, always refetching if lazy. Equivalent to get(false)
      * @return The collection state modeled in zookeeper
      */
     public DocCollection get(){
-      return get(true);
+      return get(false);
     }
 
     /** Return the DocCollection

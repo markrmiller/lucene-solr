@@ -35,10 +35,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -49,7 +46,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFactory, ThreadPool.SizedThreadPool, Dumpable, TryExecutor, Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static Runnable NOOP = () -> {
   };
 
@@ -64,9 +61,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
    */
   private final AtomicBiInteger _counts = new AtomicBiInteger(Integer.MIN_VALUE, 0);
   private final AtomicLong _lastShrink = new AtomicLong();
-  private final Map<Runnable,Future> _threads = new ConcurrentHashMap<>(256, 0.75f, SysStats.PROC_COUNT);
 
-  private final Set<Future> _threadFutures = ConcurrentHashMap.newKeySet();
 
   private final Object _joinLock = new Object();
   private final BlockingQueue<Runnable> _jobs;
@@ -91,7 +86,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
   }
 
   public SolrQueuedThreadPool(String name) {
-    this(name, Integer.MAX_VALUE, Integer.getInteger("solr.minContainerThreads", 10), Integer.getInteger("solr.containerThreadsIdleTimeout", 1000), -1, null, -1, null,
+    this(name, Integer.MAX_VALUE, Integer.getInteger("solr.minContainerThreads", 250), Integer.getInteger("solr.containerThreadsIdleTimeout", 10000), -1, null, -1, null,
         new SolrNamedThreadFactory(name));
   }
 
@@ -126,7 +121,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     setReservedThreads(0);
     setLowThreadsThreshold(-1);
     if (queue == null) {
-      int capacity = Math.max(_minThreads, 8) * 512;
+      int capacity = Math.max(_minThreads, 8) * 8;
       queue = new BlockingArrayQueue<>(capacity, capacity);
     }
     _jobs = queue;
@@ -163,7 +158,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     super.doStart();
     // The threads count set to MIN_VALUE is used to signal to Runners that the pool is stopped.
     _counts.set(0, 0); // threads, idle
-    ensureThreads();
+    //ensureThreads();
 
   }
 
@@ -173,19 +168,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
   }
 
   private void joinThreads(long stopByNanos) throws InterruptedException, TimeoutException, ExecutionException {
-    _threadFutures.forEach(thread -> {
 
-        try {
-          thread.get(100, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-
-        } catch (ExecutionException e) {
-
-        } catch (TimeoutException e) {
-
-        }
-
-    });
 
   }
 
@@ -238,7 +221,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
 
     if (_minThreads > _maxThreads) _maxThreads = _minThreads;
 
-    if (isStarted()) ensureThreads();
+   // if (isStarted()) ensureThreads();
   }
 
   /**
@@ -397,31 +380,26 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
       // and we are not at max threads.
       startThread = (idle <= 0 && threads < _maxThreads) ? 1 : 0;
 
+      if (log.isDebugEnabled()) {
+        if (startThread == 1) {
+          log.debug("trigger a thread {} cnt={}", _name, threads);
+        }
+      }
+
       // The job will be run by an idle thread when available
       if (!_counts.compareAndSet(counts, threads + startThread, idle + startThread - 1)) continue;
 
       break;
     }
 
-    if (_queueOfferTimeout == -1) {
-      if (!_jobs.offer(job)) {
-        // reverse our changes to _counts.
-        if (addCounts(-startThread, 1 - startThread)) LOG.warn("{} rejected {}", this, job);
-        throw new RejectedExecutionException(job.toString());
-      }
-    } else {
-      try {
-        if (!_jobs.offer(job, _queueOfferTimeout, TimeUnit.MILLISECONDS)) {
-          // reverse our changes to _counts.
-          if (addCounts(-startThread, 1 - startThread)) LOG.warn("{} rejected {}", this, job);
-          throw new RejectedExecutionException(job.toString());
-        }
-      } catch (InterruptedException e) {
-
-      }
+    if (!_jobs.offer(job)) {
+      // reverse our changes to _counts.
+      if (addCounts(-startThread, 1 - startThread)) log.warn("{} {} rejected {}", _name, this, job);
+      throw new RejectedExecutionException(job.toString());
     }
 
-    if (LOG.isDebugEnabled()) LOG.debug("queue {} startThread={}", job, startThread);
+
+    if (log.isDebugEnabled()) log.debug("{} queue {} startThread={}", _name, job, startThread);
 
     // Start a thread if one was needed
     while (startThread-- > 0) startThread();
@@ -513,15 +491,15 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     }
   }
 
+
   protected void startThread() {
     boolean started = false;
     try {
       Runnable runnable = newRunnable(_runnable);
-      Future future = ParWork.getRootSharedExecutor().submit(runnable);
-      if (LOG.isDebugEnabled()) LOG.debug("Starting {}", runnable);
-      _threads.put(runnable, future);
+      if (log.isDebugEnabled()) log.debug("Starting {} {}", _name, runnable);
       _lastShrink.set(System.nanoTime());
-      _runnable.waitForStart();
+      log.debug("started a thread {}", _name);
+      Future future = ParWork.getRootSharedExecutor().submit(runnable);
       started = true;
     } finally {
       if (!started) addCounts(-1, -1); // threads, idle
@@ -553,7 +531,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
   }
 
   protected void removeThread(Runnable thread) {
-    _threads.remove(thread);
+
   }
 
   @Override
@@ -581,10 +559,6 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     } catch (Error error) {
       log.error("Error in Jetty thread pool thread", error);
       this.error = error;
-    }
-
-    synchronized (notify) {
-      notify.notifyAll();
     }
   }
 
@@ -628,7 +602,6 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     private void cleanupThreadLocals() {
       JavaBinCodec.THREAD_LOCAL_ARR.remove();
       JavaBinCodec.THREAD_LOCAL_BRR.remove();
-      ValidatingJsonMap.THREAD_LOCAL_BBUFF.remove();
     }
   }
 
@@ -665,17 +638,17 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     }
 
     public void waitForStart() {
-      try {
-        latch.await();
-      } catch (InterruptedException e) {
-
-      }
+//      try {
+//        latch.await();
+//      } catch (InterruptedException e) {
+//
+//      }
     }
 
     @Override
     public void run() {
-      if (LOG.isDebugEnabled()) LOG.debug("Runner started for {}", SolrQueuedThreadPool.this);
-      latch.countDown();
+      if (log.isDebugEnabled()) log.debug("Runner started for {}", SolrQueuedThreadPool.this);
+  //    latch.countDown();
       boolean idle = true;
       try {
         Runnable job = null;
@@ -701,38 +674,32 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
                 long last = _lastShrink.get();
                 long now = System.nanoTime();
                 if ((now - last) > TimeUnit.MILLISECONDS.toNanos(idleTimeout) && _lastShrink.compareAndSet(last, now)) {
-                  if (LOG.isDebugEnabled()) LOG.debug("shrinking {}", SolrQueuedThreadPool.this);
+                  if (log.isDebugEnabled()) log.debug("shrinking {}", SolrQueuedThreadPool.this);
                   break;
                 }
               }
 
               // Wait for a job, only after we have checked if we should shrink
-              if (closed) {
-                job = _jobs.poll();
-              } else {
-                job = idleJobPoll(idleTimeout);
-              }
+
+              // Wait for a job, only after we have checked if we should shrink
+              job = idleJobPoll(idleTimeout);
 
               // If still no job?
-              if (job == null) {
-                if (closed) {
-                  break;
-                }
+              if (job == null)
                 // continue to try again
                 continue;
-              }
             }
 
             idle = false;
 
             // run job
-            if (LOG.isTraceEnabled()) LOG.trace("run {} in {}", job, SolrQueuedThreadPool.this);
+            if (log.isTraceEnabled()) log.trace("run {} in {}", job, SolrQueuedThreadPool.this);
             runJob(job);
-            if (LOG.isTraceEnabled()) LOG.trace("ran {} in {}", job, SolrQueuedThreadPool.this);
+            if (log.isTraceEnabled()) log.trace("ran {} in {}", job, SolrQueuedThreadPool.this);
           } catch (InterruptedException e) {
-            if (LOG.isTraceEnabled()) LOG.trace("interrupted {} in {}", job, SolrQueuedThreadPool.this);
+            if (log.isTraceEnabled()) log.trace("interrupted {} in {}", job, SolrQueuedThreadPool.this);
           } catch (Throwable e) {
-            LOG.warn("", e);
+            log.warn("", e);
           } finally {
             // Clear any interrupted status
             Thread.interrupted();
@@ -740,11 +707,9 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
         }
       } finally {
 
-        removeThread(this);
-
         // Decrement the total thread count and the idle count if we had no job
         addCounts(-1, idle ? -1 : 0);
-        if (LOG.isDebugEnabled()) LOG.debug("{} exited for {}", this, SolrQueuedThreadPool.this);
+        if (log.isDebugEnabled()) log.debug("{} exited for {}", this, SolrQueuedThreadPool.this);
 
         // There is a chance that we shrunk just as a job was queued for us, so
         // check again if we have sufficient threads to meet demand
@@ -755,9 +720,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
     }
   }
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private volatile Error error;
-  private final Object notify = new Object();
 
   //    public void fillWithNoops() {
   //        int threads = _counts.getAndSetHi(Integer.MIN_VALUE);
@@ -777,7 +740,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
       try {
         super.doStop();
       } catch (Exception e) {
-        LOG.warn("super.doStop", e);
+        log.warn("super.doStop", e);
 
       }
 
@@ -800,11 +763,11 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
         try {
           joinThreads(TimeUnit.MILLISECONDS.toNanos(250));
         } catch (InterruptedException e) {
-          LOG.warn("Interrupted in joinThreads on close {}", e);
+          log.warn("Interrupted in joinThreads on close {}", e);
         } catch (TimeoutException e) {
-          LOG.warn("Timeout in joinThreads on close {}", e);
+          log.warn("Timeout in joinThreads on close {}", e);
         } catch (ExecutionException e) {
-          LOG.warn("Execution exception in joinThreads on close {}", e);
+          log.warn("Execution exception in joinThreads on close {}", e);
         }
       }
 

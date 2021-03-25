@@ -55,7 +55,7 @@ public class DistributedMap {
     if (data == null || data.length == 0) {
       throw new IllegalArgumentException();
     }
-    zookeeper.setData(path, data, true);
+    zookeeper.setData(path, data, -1, true, true);
   }
 
   public void put(String trackingId, byte[] data, CreateMode createMode) throws KeeperException, InterruptedException {

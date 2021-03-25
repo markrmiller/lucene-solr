@@ -419,11 +419,12 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //        }
 //      }
     } finally {
-      if (!cc.isShutDown()) {
+      if (cc != null && !cc.isShutDown()) {
         log.info("CoreContainer is not yet shutdown during filter destroy, shutting down now {}", cc);
-        GlobalTracer.get().close();
+
         stopCoreContainer(cc);
       }
+      GlobalTracer.get().close();
 
 //      if (SolrLifcycleListener.isRegisteredStopped(stopRunnable)) {
 //        SolrLifcycleListener.removeStopped(stopRunnable);

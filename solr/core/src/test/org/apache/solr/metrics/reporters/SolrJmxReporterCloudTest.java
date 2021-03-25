@@ -66,9 +66,14 @@ public class SolrJmxReporterCloudTest extends SolrCloudTestCase {
   @AfterClass
   public static void releaseMBeanServer() {
     if (mBeanServer != null) {
-      MBeanServerFactory.releaseMBeanServer(mBeanServer);
+      try {
+        MBeanServerFactory.releaseMBeanServer(mBeanServer);
+      } catch (Exception e) {
+        log.warn("Exception releasing mbeanserver", e);
+      } finally {
+        mBeanServer = null;
+      }
     }
-    mBeanServer = null;
   }
   
 

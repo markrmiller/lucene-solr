@@ -143,78 +143,74 @@ public abstract class AbstractPluginLoader<T>
    * If a default element is defined, it will be returned from this function.
    * 
    */
-  public T load( SolrResourceLoader loader, ArrayList<NodeInfo> nodes )
-  {
+  public T load( SolrResourceLoader loader, ArrayList<NodeInfo> nodes ) {
     List<PluginInitInfo> info = new ArrayList<>();
     AtomicReference<T> defaultPlugin = new AtomicReference<>();
     XPath xpath = loader.getXPath();
-    if (nodes !=null ) {
+    if (nodes != null) {
       for (int i = 0; i < nodes.size(); i++) {
-        try (ParWork parWork = new ParWork(this, false, true)) {
-          NodeInfo node = nodes.get(i);
+        NodeInfo node = nodes.get(i);
 
-          String name = null;
-          try {
-            name = DOMUtil.getAttr(node, NAME, requireName ? type : null);
-            String className = DOMUtil.getAttr(node, "class", null);
-            String defaultStr = DOMUtil.getAttr(node, "default", null);
+        String name = null;
+        try {
+          name = DOMUtil.getAttr(node, NAME, requireName ? type : null);
+          String className = DOMUtil.getAttr(node, "class", null);
+          String defaultStr = DOMUtil.getAttr(node, "default", null);
 
-            if (Objects.isNull(className) && Objects.isNull(name)) {
-              throw new RuntimeException(type + ": missing mandatory attribute 'class' or 'name'");
-            }
-
-            String finalName = name;
-
-            try {
-              T plugin = create(loader, finalName, className, node, xpath);
-
-              if (log.isTraceEnabled()) {
-                log.trace("created {}: {}", ((finalName != null) ? finalName : ""), plugin.getClass().getName());
-              }
-
-              // Either initialize now or wait till everything has been registered
-              if (preRegister) {
-                info.add(new PluginInitInfo(plugin, node));
-              } else {
-                init(plugin, node);
-              }
-
-              T old = register(finalName, plugin);
-              if (old != null && !(finalName == null && !requireName)) {
-                throw new SolrException(ErrorCode.SERVER_ERROR, "Multiple " + type + " registered to the same name: " + finalName + " ignoring: " + old);
-              }
-
-              if (defaultStr != null && Boolean.parseBoolean(defaultStr)) {
-                if (defaultPlugin.get() != null) {
-                  throw new SolrException(ErrorCode.SERVER_ERROR, "Multiple default " + type + " plugins: " + defaultPlugin + " AND " + finalName);
-                }
-                defaultPlugin.set(plugin);
-              }
-            } catch (Exception e) {
-              if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-              } else {
-                throw new SolrException(ErrorCode.SERVER_ERROR, e);
-              }
-            }
-
-          } catch (Exception ex) {
-            ParWork.propagateInterrupt(ex);
-            SolrException e = new SolrException(ErrorCode.SERVER_ERROR, "Plugin init failure for " + type + (null != name ? (" \"" + name + "\"") : "") + ": " + ex.getMessage(), ex);
-            throw e;
+          if (Objects.isNull(className) && Objects.isNull(name)) {
+            throw new RuntimeException(type + ": missing mandatory attribute 'class' or 'name'");
           }
+
+          String finalName = name;
+
+          try {
+            T plugin = create(loader, finalName, className, node, xpath);
+
+            if (log.isTraceEnabled()) {
+              log.trace("created {}: {}", ((finalName != null) ? finalName : ""), plugin.getClass().getName());
+            }
+
+            // Either initialize now or wait till everything has been registered
+            if (preRegister) {
+              info.add(new PluginInitInfo(plugin, node));
+            } else {
+              init(plugin, node);
+            }
+
+            T old = register(finalName, plugin);
+            if (old != null && !(finalName == null && !requireName)) {
+              throw new SolrException(ErrorCode.SERVER_ERROR, "Multiple " + type + " registered to the same name: " + finalName + " ignoring: " + old);
+            }
+
+            if (defaultStr != null && Boolean.parseBoolean(defaultStr)) {
+              if (defaultPlugin.get() != null) {
+                throw new SolrException(ErrorCode.SERVER_ERROR, "Multiple default " + type + " plugins: " + defaultPlugin + " AND " + finalName);
+              }
+              defaultPlugin.set(plugin);
+            }
+          } catch (Exception e) {
+            if (e instanceof RuntimeException) {
+              throw (RuntimeException) e;
+            } else {
+              throw new SolrException(ErrorCode.SERVER_ERROR, e);
+            }
+          }
+
+        } catch (Exception ex) {
+          ParWork.propagateInterrupt(ex);
+          SolrException e = new SolrException(ErrorCode.SERVER_ERROR, "Plugin init failure for " + type + (null != name ? (" \"" + name + "\"") : "") + ": " + ex.getMessage(), ex);
+          throw e;
         }
       }
+
     }
-      
+
     // If everything needs to be registered *first*, this will initialize later
-    for( PluginInitInfo pinfo : info ) {
+    for (PluginInitInfo pinfo : info) {
       try {
-        init( pinfo.plugin, pinfo.node );
-      }
-      catch( Exception ex ) {
-        SolrException e = new SolrException
-          (ErrorCode.SERVER_ERROR, "Plugin Initializing failure for " + type, ex);
+        init(pinfo.plugin, pinfo.node);
+      } catch (Exception ex) {
+        SolrException e = new SolrException(ErrorCode.SERVER_ERROR, "Plugin Initializing failure for " + type, ex);
         throw e;
       }
     }

@@ -163,7 +163,7 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
       props.put(ZkStateReader.NODE_NAME_PROP,  Integer.toString(nodeNumber));
       props.put(ZkStateReader.CORE_NAME_PROP, "");
 
-      replica = new Replica("", props, "", -1l, shard, zkStateReader);
+      replica = new Replica("", props, "", -1l, shard, "baseUrl");
 
       this.es = es;
       if (this.es == null) {
@@ -279,7 +279,7 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
         ZkCoreNodeProps leaderProps = new ZkCoreNodeProps(
             ZkNodeProps.load(data));
         // MRM TODO:
-        Replica replica = new Replica("", leaderProps.getNodeProps().getProperties(), collection, -1l, slice, zkStateReader);
+        Replica replica = new Replica("", leaderProps.getNodeProps().getProperties(), collection, -1l, slice, leaderProps.getNodeProps().getStr(ZkStateReader.BASE_URL_PROP));
 
         return replica.getCoreUrl();
       } catch (NoNodeException | SessionExpiredException e) {

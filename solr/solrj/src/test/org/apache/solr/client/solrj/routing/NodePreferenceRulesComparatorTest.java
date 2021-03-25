@@ -75,7 +75,7 @@ public class NodePreferenceRulesComparatorTest extends SolrTestCaseJ4 {
                 ZkStateReader.CORE_NAME_PROP, "collection1",
                 ZkStateReader.REPLICA_TYPE, "TLOG",
                 "id", "-1"
-            ),"collection1",-1l, "shard1", nodeName -> "http://" + nodeName
+            ),"collection1",-1l, "shard1", "http://nodeName"
         )
     );
 
@@ -125,7 +125,7 @@ public class NodePreferenceRulesComparatorTest extends SolrTestCaseJ4 {
                 ZkStateReader.CORE_NAME_PROP, "collection1",
                 ZkStateReader.REPLICA_TYPE, "NRT",
                 "id", "-1"
-            ),"collection1",-1l, "shard1", nodeName -> "http://" + nodeName
+            ),"collection1",-1l, "shard1", "http://nodeName"
         )
     );
     replicas.add(
@@ -136,7 +136,7 @@ public class NodePreferenceRulesComparatorTest extends SolrTestCaseJ4 {
                 ZkStateReader.CORE_NAME_PROP, "collection1",
                 ZkStateReader.REPLICA_TYPE, "TLOG",
                 "id", "-1"
-            ),"collection1",-1l, "shard1", nodeName -> "http://" + nodeName
+            ),"collection1",-1l, "shard1", "http://nodeName"
         )
     );
     replicas.add(
@@ -147,7 +147,7 @@ public class NodePreferenceRulesComparatorTest extends SolrTestCaseJ4 {
                 ZkStateReader.CORE_NAME_PROP, "collection1",
                 ZkStateReader.REPLICA_TYPE, "PULL",
                 "id", "-1"
-            ),"collection1",-1l, "shard1", nodeName -> "http://" + nodeName
+            ),"collection1",-1l, "shard1", "http://nodeName"
         )
     );
     return replicas;

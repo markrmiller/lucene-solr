@@ -19,6 +19,7 @@ package org.apache.solr.servlet;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.management.ManagementFactory;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -28,6 +29,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.solr.common.ParWork;
+import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.util.SysStats;
 import org.eclipse.jetty.servlets.QoSFilter;
 import org.slf4j.Logger;
@@ -45,6 +47,9 @@ public class SolrQoSFilter extends QoSFilter {
 
   private static SysStats sysStats = ParWork.getSysStats();
   private volatile long lastUpdate;
+  private volatile long highLoadAt;
+  private volatile long offHighLoadAt;
+  private volatile long lastCheckLoad;
 
   @Override
   public void init(FilterConfig filterConfig) {
@@ -60,32 +65,43 @@ public class SolrQoSFilter extends QoSFilter {
   // allow the user to select and configure one
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
     chain.doFilter(request, response);
-//    HttpServletRequest req = (HttpServletRequest) request;
-//    String source = req.getHeader(QoSParams.REQUEST_SOURCE);
-//    boolean imagePath = req.getPathInfo() != null && req.getPathInfo().startsWith("/img/");
-//    boolean externalRequest = !imagePath && (source == null || !source.equals(QoSParams.INTERNAL));
-//    if (log.isDebugEnabled()) log.debug("SolrQoSFilter {} {} {}", sysStats.getSystemLoad(), sysStats.getTotalUsage(), externalRequest);
-//    //log.info("SolrQoSFilter {} {} {}", sysStats.getSystemLoad(), sysStats.getTotalUsage(), externalRequest);
-//
-//    if (externalRequest) {
-//      if (log.isDebugEnabled()) {
-//        log.debug("external request"); //MRM TODO:: remove when testing is done
-//      }
-//      checkLoad();
-//
-//      //chain.doFilter(req, response);
-//      super.doFilter(req, response, chain);
-//
-//    } else {
-//      if (log.isDebugEnabled()) {
-//        log.debug("internal request, allow");
-//      }
-//      chain.doFilter(req, response);
-//    }
+    HttpServletRequest req = (HttpServletRequest) request;
+    String source = req.getHeader(QoSParams.REQUEST_SOURCE);
+    boolean imagePath = req.getPathInfo() != null && req.getPathInfo().startsWith("/img/");
+    boolean externalRequest = !imagePath && (source == null || !source.equals(QoSParams.INTERNAL));
+    if (log.isDebugEnabled()) log.debug("SolrQoSFilter {} {} {}", sysStats.getSystemLoad(), sysStats.getTotalUsage(), externalRequest);
+    //log.info("SolrQoSFilter {} {} {}", sysStats.getSystemLoad(), sysStats.getTotalUsage(), externalRequest);
+
+    if (externalRequest) {
+      if (log.isDebugEnabled()) {
+        log.debug("external request"); //MRM TODO:: remove when testing is done
+      }
+
+      if (highLoadAt == 0 && (offHighLoadAt == 0 || System.nanoTime() - offHighLoadAt > TimeUnit.NANOSECONDS.convert(10, TimeUnit.SECONDS))
+        && (lastCheckLoad == 0 || System.nanoTime() - lastCheckLoad > TimeUnit.NANOSECONDS.convert(10, TimeUnit.SECONDS))) {
+        lastCheckLoad = System.nanoTime();
+        checkLoad();
+      } else {
+        if (highLoadAt > 0 && System.nanoTime() - highLoadAt > TimeUnit.NANOSECONDS.convert(10, TimeUnit.SECONDS)) {
+          updateMaxRequests(_origMaxRequests, sysStats.getSystemLoad(), 0);
+          highLoadAt = 0;
+          offHighLoadAt = System.nanoTime();
+        }
+      }
+
+      //chain.doFilter(req, response);
+      super.doFilter(req, response, chain);
+
+    } else {
+      if (log.isDebugEnabled()) {
+        log.debug("internal request, allow");
+      }
+      chain.doFilter(req, response);
+    }
   }
 
   private void checkLoad() {
-    double ourLoad = sysStats.getTotalUsage();
+    double ourLoad = 0; //sysStats.getTotalUsage();
     int currentMaxRequests = getMaxRequests();
     if (log.isDebugEnabled()) {
       log.debug("Our individual load is {}", ourLoad);
@@ -93,22 +109,22 @@ public class SolrQoSFilter extends QoSFilter {
     double sLoad = sysStats.getSystemLoad();
 
 
-    if (lowStateLoad(sLoad, currentMaxRequests)) {
-//      if (log.isDebugEnabled()) log.debug("set max concurrent requests to orig value {}", _origMaxRequests);
-//      updateMaxRequests(_origMaxRequests, sLoad, ourLoad);
+//    if (lowStateLoad(sLoad, currentMaxRequests)) {
+////      if (log.isDebugEnabled()) log.debug("set max concurrent requests to orig value {}", _origMaxRequests);
+////      updateMaxRequests(_origMaxRequests, sLoad, ourLoad);
+////    } else {
+//      updateMaxRequests(Math.min(_origMaxRequests, _origMaxRequests), sLoad, ourLoad);
 //    } else {
-      updateMaxRequests(Math.min(_origMaxRequests, _origMaxRequests), sLoad, ourLoad);
-    } else {
 
       if (hiLoadState(sLoad, currentMaxRequests)) {
 
         if (currentMaxRequests == _origMaxRequests) {
-          updateMaxRequests(200, sLoad, ourLoad);
-        } else {
-          updateMaxRequests(100, sLoad, ourLoad);
+          updateMaxRequests(20, sLoad, ourLoad);
+          offHighLoadAt = 0;
+          highLoadAt = System.nanoTime();
         }
       }
-    }
+  //  }
       // MRM TODO: - deal with no supported, use this as a fail safe with high and low watermark?
   }
 
@@ -117,17 +133,17 @@ public class SolrQoSFilter extends QoSFilter {
   }
 
   private boolean hiLoadState(double sLoad, int currentMaxRequests) {
-    return sLoad > 0.95d;
+    return sLoad > 1.1d;
   }
 
   private void updateMaxRequests(int max, double sLoad, double ourLoad) {
     int currentMax = getMaxRequests();
     if (max < currentMax) {
-      if (System.currentTimeMillis() - lastUpdate > 500) {
-        log.warn("Set max request to {} sload={} ourload={}", max, sLoad, ourLoad);
-        lastUpdate = System.currentTimeMillis();
-        setMaxRequests(max);
-      }
+
+      log.warn("Set max request to {} sload={} ourload={}", max, sLoad, ourLoad);
+      lastUpdate = System.currentTimeMillis();
+      setMaxRequests(max);
+
     } else if (max > currentMax) {
 
       log.warn("Set max request to {} sload={} ourload={}", max, sLoad, ourLoad);

@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
@@ -64,13 +63,13 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   private final Integer numPullReplicas;
   private final Integer maxShardsPerNode;
   private final Boolean readOnly;
-  private volatile ConcurrentHashMap stateUpdates;
+  private final Map stateUpdates;
   private final Long id;
 
   private AtomicInteger sliceAssignCnt = new AtomicInteger();
 
   public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router) {
-    this(name, slices, props, router, 0,  new ConcurrentHashMap());
+    this(name, slices, props, router, 0, new HashMap());
   }
 
   /**
@@ -79,16 +78,18 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
    * @param props  The properties of the slice.  This is used directly and a copy is not made.
    * @param zkVersion The version of the Collection node in Zookeeper (used for conditional updates).
    */
-  public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router, int zkVersion, ConcurrentHashMap stateUpdates) {
+  public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router, int zkVersion, Map stateUpdates) {
     super(props==null ? props = new HashMap<>() : props);
 
     this.znodeVersion = zkVersion;
     this.name = name;
+
     if (stateUpdates == null) {
-      this.stateUpdates = new ConcurrentHashMap();
+      this.stateUpdates = Collections.emptyMap();
     } else {
       this.stateUpdates = stateUpdates;
     }
+
     this.slices = slices;
     this.replicationFactor = (Integer) verifyProp(props, REPLICATION_FACTOR);
     this.numNrtReplicas = (Integer) verifyProp(props, NRT_REPLICAS, 0);
@@ -137,10 +138,13 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     return new DocCollection(getName(), slices, propMap, router, znodeVersion, stateUpdates);
   }
 
-  public DocCollection copy(){
-    return new DocCollection(getName(), slices, propMap, router, znodeVersion, stateUpdates);
+  public DocCollection copyWithSlices(Map<String, Slice> slices, Map docCollProperties){
+    return new DocCollection(getName(), slices, docCollProperties, router, znodeVersion, stateUpdates);
   }
 
+  public DocCollection copy(){
+    return new DocCollection(getName(), getSlicesCopy(), new HashMap<>(propMap), router, znodeVersion, new HashMap(0));
+  }
 
   /**
    * Return collection name.
@@ -271,7 +275,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
 
   @Override
   public String toString() {
-    return "DocCollection("+name+":" + ":v=" + znodeVersion + " u=" + stateUpdates + ")=" + toJSONString(this);
+    return "DocCollection(" + id + "_" + name + ":" + ":v=" + znodeVersion + " u=" + stateUpdates + ")=" + toJSONString(this);
   }
 
   @Override
@@ -450,7 +454,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   }
 
   public boolean hasStateUpdates() {
-    return stateUpdates != null;
+    return stateUpdates != null && !stateUpdates.isEmpty();
   }
 
 //  public void setStateUpdates(ConcurrentHashMap stateUpdates) {
@@ -469,11 +473,37 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     return stateUpdates;
   }
 
+  public int getStateUpdatesZkVersion() {
+    Integer ver = (Integer) stateUpdates.get("_ver_");
+    if (ver == null) return -1;
+    return ver;
+  }
+
+  public int getStateUpdatesCSVersion() {
+    String ver = (String) stateUpdates.get("_cs_ver_");
+    if (ver == null) return -1;
+    return Integer.parseInt(ver);
+  }
+
   public void setZnodeVersion(int version) {
     this.znodeVersion = version;
   }
 
   public Map<String, Slice> getSlicesCopy() {
+
+    LinkedHashMap<Object,Object> sliceMap = new LinkedHashMap<>(slices.size());
+    for (Slice slice : slices.values()) {
+      Map<String,Replica> replicasCopy = new HashMap<>(slice.getReplicasMap().size());
+
+      for (Replica replica : slice.getReplicas()) {
+        Replica r = new Replica(replica.getName(), new HashMap<>(replica.getProperties()), getName(), getId(), slice.getName(), replica.getBaseUrl());
+        replicasCopy.put(r.getName(), r);
+      }
+
+      Slice s = new Slice(name, replicasCopy, new HashMap(propMap),getName(),getId());
+      sliceMap.put(slice.getName(), s);
+    }
+
     return new LinkedHashMap<>(slices);
   }
 }

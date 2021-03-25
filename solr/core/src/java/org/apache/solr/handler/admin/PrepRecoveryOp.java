@@ -59,7 +59,7 @@ public class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
       waitForState = Replica.State.getState(state);
     }
 
-    log.info(
+    log.debug(
         "Going to wait for core: {}, state: {}: params={}",
         cname, waitForState, params);
 
@@ -70,7 +70,7 @@ public class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
     }
 
     if (waitForState == null) {
-      log.info("Done checking leader:", leaderName);
+      log.debug("Done checking leader:", leaderName);
       return;
     }
 
@@ -82,9 +82,11 @@ public class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
 
     try {
       Replica.State finalWaitForState = waitForState;
-      Replica.State finalWaitForState1 = waitForState;
       coreContainer.getZkController().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (n, c) -> {
         if (c == null) {
+          errorMessage.set(
+              "Timeout waiting to see " + finalWaitForState + " state replica=" + cname
+                  + " waitForState=" + finalWaitForState);
           return false;
         }
 
@@ -93,6 +95,9 @@ public class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
         final Replica replica = c.getReplica(cname);
         boolean isLive = false;
         if (replica == null) {
+          errorMessage.set(
+              "Timeout waiting to see " + finalWaitForState + " state replica=" + cname + " state=" + (replica == null ? "(null replica)" : replica.getState())
+                  + " waitForState=" + finalWaitForState + " isLive=" + isLive);
           return false;
         }
 
@@ -111,14 +116,14 @@ public class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
 
         errorMessage.set(
             "Timeout waiting to see " + finalWaitForState + " state replica=" + cname + " state=" + (replica == null ? "(null replica)" : replica.getState())
-                + " waitForState=" + finalWaitForState1 + " isLive=" + isLive);
+                + " waitForState=" + finalWaitForState + " isLive=" + isLive);
         return false;
       });
 
     } catch (TimeoutException | InterruptedException e) {
       ParWork.propagateInterrupt(e);
       String error = errorMessage.get();
-      log.error(error);
+      log.error("", error);
     }
   }
 

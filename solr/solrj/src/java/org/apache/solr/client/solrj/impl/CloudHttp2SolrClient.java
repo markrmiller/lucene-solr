@@ -110,7 +110,8 @@ public class CloudHttp2SolrClient extends BaseCloudSolrClient {
     } else {
       this.stateProvider = builder.stateProvider;
     }
-    this.myClient = (builder.httpClient == null) ? new Http2SolrClient.Builder().withHeaders(builder.headers).build() : builder.httpClient;
+    this.myClient = (builder.httpClient == null) ? new Http2SolrClient.Builder().withHeaders(builder.headers)
+        .idleTimeout(120000).connectionTimeout(2000).build() : builder.httpClient;
     this.lbClient = new LBHttp2SolrClient(myClient);
     assert ObjectReleaseTracker.track(this);
   }

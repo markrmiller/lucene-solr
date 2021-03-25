@@ -20,21 +20,14 @@ import org.apache.lucene.util.Constants;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrQueuedThreadPool;
 import org.apache.solr.common.util.SolrScheduledExecutorScheduler;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.servlet.SolrDispatchFilter;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.data.Stat;
+import org.apache.solr.servlet.SolrQoSFilter;
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
@@ -49,7 +42,6 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
-import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -83,9 +75,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -311,11 +301,11 @@ public class JettySolrRunner implements Closeable {
       HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(configuration);
 
       if (config.onlyHttp1 || !Constants.JRE_IS_MINIMUM_JAVA9) {
-        connector = new ServerConnector(server, qtp, scheduler, null, 1, 2, new SslConnectionFactory(sslcontext, http1ConnectionFactory.getProtocol()), http1ConnectionFactory);
+        connector = new ServerConnector(server, qtp, scheduler, null, 6, 16, new SslConnectionFactory(sslcontext, http1ConnectionFactory.getProtocol()), http1ConnectionFactory);
       } else {
         sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
 
-        connector = new ServerConnector(server, qtp, scheduler, null, 1, 2);
+        connector = new ServerConnector(server, qtp, scheduler, null, 6, 16);
         SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
         connector.addConnectionFactory(sslConnectionFactory);
         connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
@@ -334,9 +324,9 @@ public class JettySolrRunner implements Closeable {
       }
     } else {
       if (config.onlyHttp1) {
-        connector = new ServerConnector(server, qtp, scheduler, null, 1, 2, new HttpConnectionFactory(configuration));
+        connector = new ServerConnector(server, qtp, scheduler, null, 6, 16, new HttpConnectionFactory(configuration));
       } else {
-        connector = new ServerConnector(server, qtp, scheduler, null, 1, 2, new HttpConnectionFactory(configuration), new HTTP2CServerConnectionFactory(configuration));
+        connector = new ServerConnector(server, qtp, scheduler, null, 6, 16, new HttpConnectionFactory(configuration), new HTTP2CServerConnectionFactory(configuration));
       }
     }
     connector.setIdleTimeout(TimeUnit.MINUTES.toMillis(10));
@@ -399,9 +389,9 @@ public class JettySolrRunner implements Closeable {
               root.addServlet(entry.getKey(), entry.getValue());
             }
 
-           // qosFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
-           // qosFilter.setHeldClass(SolrQoSFilter.class);
-           // qosFilter.setAsyncSupported(true);
+            qosFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
+            qosFilter.setHeldClass(SolrQoSFilter.class);
+            qosFilter.setAsyncSupported(true);
 
             dispatchFilter = root.getServletHandler().newFilterHolder(Source.EMBEDDED);
             dispatchFilter.setHeldClass(SolrDispatchFilter.class);
@@ -442,16 +432,16 @@ public class JettySolrRunner implements Closeable {
       rwh.addRule(new RewritePatternRule("/api/*", "/solr/____v2"));
       chain = rwh;
     }
-    GzipHandler gzipHandler = new GzipHandler();
-    gzipHandler.setHandler(chain);
-
-    gzipHandler.setMinGzipSize(23); // https://github.com/eclipse/jetty.project/issues/4191
-    gzipHandler.setCheckGzExists(false);
-    gzipHandler.setCompressionLevel(-1);
-    gzipHandler.setExcludedAgentPatterns(".*MSIE.6\\.0.*");
-    gzipHandler.setIncludedMethods("GET");
-
-    server.setHandler(gzipHandler);
+//    GzipHandler gzipHandler = new GzipHandler();
+//    gzipHandler.setHandler(chain);
+//
+//    gzipHandler.setMinGzipSize(23); // https://github.com/eclipse/jetty.project/issues/4191
+//    gzipHandler.setCheckGzExists(false);
+//    gzipHandler.setCompressionLevel(-1);
+//    gzipHandler.setExcludedAgentPatterns(".*MSIE.6\\.0.*");
+//    gzipHandler.setIncludedMethods("GET");
+//
+     server.setHandler(chain);
     // ShutdownThread.deregister(server);
   }
 
@@ -556,42 +546,6 @@ public class JettySolrRunner implements Closeable {
         }
       }
 
-      if (getCoreContainer() != null && System.getProperty("zkHost") != null && wait) {
-        SolrZkClient zkClient = getCoreContainer().getZkController().getZkClient();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        ClusterReadyWatcher watcher = new ClusterReadyWatcher(latch, zkClient);
-        try {
-          Stat stat = zkClient.exists(ZkStateReader.COLLECTIONS_ZKNODE, watcher);
-          if (stat == null) {
-            log.info("Collections znode not found, waiting on latch");
-            try {
-              success = latch.await(10000, TimeUnit.MILLISECONDS);
-              if (!success) {
-                log.warn("Timedout waiting to see {} node in zk", ZkStateReader.COLLECTIONS_ZKNODE);
-              }
-              if (log.isDebugEnabled()) log.debug("Done waiting on latch");
-            } catch (InterruptedException e) {
-              ParWork.propagateInterrupt(e);
-              throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, e);
-            }
-          }
-        } catch (KeeperException e) {
-          throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, e);
-        } catch (InterruptedException e) {
-          ParWork.propagateInterrupt(e);
-          throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, e);
-        } finally {
-          IOUtils.closeQuietly(watcher);
-        }
-// if we need this, us client, not reader
-//        log.info("waitForNode: {}", getNodeName());
-//
-//        ZkStateReader reader = getCoreContainer().getZkController().getZkStateReader();
-//
-//        reader.waitForLiveNodes(30, TimeUnit.SECONDS, (n) -> n != null && getNodeName() != null && n.contains(getNodeName()));
-      }
-
     } finally {
       started  = true;
 
@@ -693,30 +647,6 @@ public class JettySolrRunner implements Closeable {
         SolrZkClient.checkInterrupted(e);
         log.error("Interrupted waiting to stop", e);
         throw new RuntimeException(e);
-      }
-
-      if (wait && coreContainer != null && coreContainer
-          .isZooKeeperAware()) {
-        log.info("waitForJettyToStop: {}", getLocalPort());
-        String nodeName = getNodeName();
-        if (nodeName == null) {
-          log.info("Cannot wait for Jetty with null node name");
-        } else {
-
-          log.info("waitForNode: {}", getNodeName());
-
-          ZkStateReader reader = coreContainer.getZkController().getZkStateReader();
-
-          try {
-            if (reader != null && !reader.isClosed() && reader.getZkClient().isConnected()) {
-              reader.waitForLiveNodes(10, TimeUnit.SECONDS, (n) -> !n.contains(nodeName));
-            }
-          } catch (InterruptedException e) {
-            ParWork.propagateInterrupt(e);
-          } catch (TimeoutException e) {
-            log.error("Timeout waiting for live node");
-          }
-        }
       }
 
     } catch (Exception e) {
@@ -917,48 +847,4 @@ public class JettySolrRunner implements Closeable {
     return proxy;
   }
 
-  private static class ClusterReadyWatcher implements Watcher, Closeable {
-
-    private final CountDownLatch latch;
-    private final SolrZkClient zkClient;
-
-    public ClusterReadyWatcher(CountDownLatch latch, SolrZkClient zkClient) {
-      this.latch = latch;
-      this.zkClient = zkClient;
-    }
-
-    @Override
-    public void process(WatchedEvent event) {
-      if (Event.EventType.None.equals(event.getType())) {
-        return;
-      }   log.info("Got event on live node watcher {}", event.toString());
-      if (event.getType() == Event.EventType.NodeCreated) {
-        latch.countDown();
-      } else {
-        try {
-          Stat stat = zkClient.exists(ZkStateReader.COLLECTIONS_ZKNODE, this);
-          if (stat != null) {
-            latch.countDown();
-          }
-        } catch (KeeperException e) {
-          SolrException.log(log, e);
-          return;
-        } catch (InterruptedException e) {
-          log.info("interrupted");
-          return;
-        }
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      try {
-        zkClient.removeWatches(ZkStateReader.COLLECTIONS_ZKNODE, this, WatcherType.Any, true);
-      } catch (KeeperException.NoWatcherException | AlreadyClosedException e) {
-
-      } catch (Exception e) {
-        if (log.isDebugEnabled()) log.debug("could not remove watch {} {}", e.getClass().getSimpleName(), e.getMessage());
-      }
-    }
-  }
 }

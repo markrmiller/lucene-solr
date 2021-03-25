@@ -85,7 +85,7 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
     }
 
     // create shard
-    clusterState = new CollectionMutator(ocmh.cloudManager).createShard(clusterState, message);
+    clusterState = new CollectionMutator(ocmh.cloudManager, ocmh.zkStateReader).createShard(clusterState, message);
 
     log.info("After create shard {}", clusterState);
 
@@ -183,7 +183,7 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
       }
       //  MRM TODO: - put this in finalizer and finalizer after all calls to allow parallel and forward momentum
       try {
-        overseer.getZkStateWriter().enqueueUpdate(resp.clusterState.getCollection(collection), null, false);
+        overseer.getZkStateWriter().enqueueStructureChange(resp.clusterState.getCollection(collection));
       } catch (Exception e) {
         log.error("failure", e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);

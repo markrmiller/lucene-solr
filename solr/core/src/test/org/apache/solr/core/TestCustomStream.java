@@ -19,6 +19,7 @@ package org.apache.solr.core;
 
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.util.RestTestHarness;
@@ -28,6 +29,8 @@ import org.junit.Test;
 /**
  * Created by caomanhdat on 6/3/16.
  */
+@LuceneTestCase.Nightly
+@Ignore
 public class TestCustomStream extends AbstractFullDistribZkTestBase {
 
   @Test

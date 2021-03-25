@@ -85,6 +85,8 @@ public final class CoreSorter implements Comparator<CoreDescriptor> {
   public static List<CoreDescriptor> sortCores(CoreContainer coreContainer, List<CoreDescriptor> descriptors) {
     //sort the cores if it is in SolrCloud. In standalone mode the order does not matter
     if (coreContainer.isZooKeeperAware()) {
+      descriptors.sort(Comparator.comparing(o -> o.getCloudDescriptor().getShardId()));
+
       return descriptors.stream()
           .sorted(new CoreSorter().init(coreContainer.getZkController(), descriptors))
           .collect(toList()); // new list

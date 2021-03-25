@@ -35,7 +35,7 @@ public class ModifyCollectionCmd implements OverseerCollectionMessageHandler.Cmd
   @Override
   public CollectionCmdResponse.Response call(ClusterState clusterState, ZkNodeProps message, NamedList results) throws Exception {
 
-    clusterState = new CollectionMutator(ocmh.cloudManager).modifyCollection(clusterState, message);
+    clusterState = new CollectionMutator(ocmh.cloudManager, ocmh.zkStateReader).modifyCollection(clusterState, message);
 
     CollectionCmdResponse.Response response = new CollectionCmdResponse.Response();
     response.clusterState = clusterState;

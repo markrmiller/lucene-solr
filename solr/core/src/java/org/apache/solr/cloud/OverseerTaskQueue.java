@@ -18,14 +18,12 @@ package org.apache.solr.cloud;
 
 import com.codahale.metrics.Timer;
 import org.apache.solr.common.AlreadyClosedException;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.TimeOut;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
-import org.apache.zookeeper.AddWatchMode;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -53,7 +51,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class OverseerTaskQueue extends ZkDistributedQueue {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  static final String RESPONSE_PREFIX = "qnr-" ;
+  public static final String RESPONSE_PREFIX = "qnr-" ;
   public static final byte[] BYTES = new byte[0];
 
   private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
@@ -126,7 +124,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
   /**
    * Watcher that blocks until a WatchedEvent occurs for a znode.
    */
-  static final class LatchWatcher implements Watcher, Closeable {
+  static final class LatchWatcher implements Watcher, Closeable, DoNotWrap {
 
     private final Lock lock;
     private final Condition eventReceived;
@@ -135,7 +133,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
     private volatile WatchedEvent event;
 
     LatchWatcher(String path, SolrZkClient zkClient) {
-      this.lock = new ReentrantLock(true);
+      this.lock = new ReentrantLock(false);
       this.eventReceived = lock.newCondition();
       this.path = path;
       this.zkClient = zkClient;
@@ -144,22 +142,40 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
 
     @Override
     public void process(WatchedEvent event) {
-      // session events are not change events, and do not remove the watcher
       if (Event.EventType.None.equals(event.getType())) {
+        return;
+      }
+
+      // session events are not change events, and do not remove the watcher
+      if (!Event.EventType.NodeDataChanged.equals(event.getType())) {
+        try {
+          Stat stat = zkClient.exists(path, this);
+          if (stat != null && stat.getDataLength() > 0) {
+            lock.lock();
+            try {
+              this.event = event;
+              eventReceived.signalAll();
+            } finally {
+              lock.unlock();
+            }
+          }
+        } catch (Exception e) {
+          log.error("", e);
+        }
         return;
       }
 
       if (log.isDebugEnabled()) log.debug("{} fired on path {} state {} latchEventType {}", event.getType(), event.getPath(), event.getState());
 
-      Stat stat = null;
-      try {
-        stat = zkClient.exists(path, null, true);
-      } catch (KeeperException e) {
-        log.error("exists failed", e);
-      } catch (InterruptedException e) {
-        log.error("interrupted", e);
-      }
-      if (stat != null && stat.getDataLength() > 0) {
+//      Stat stat = null;
+//      try {
+//        stat = zkClient.exists(path, null, true);
+//      } catch (KeeperException e) {
+//        log.error("exists failed", e);
+//      } catch (InterruptedException e) {
+//        log.error("interrupted", e);
+//      }
+   //   if (stat != null && stat.getDataLength() > 0) {
         lock.lock();
         try {
           this.event = event;
@@ -167,16 +183,20 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
         } finally {
           lock.unlock();
         }
-      }
+    //  }
     }
 
-    public void await(long timeoutMs) {
+    public void await(long timeoutMs) throws KeeperException, InterruptedException {
 
       if (event != null) {
         return;
       }
 
-      createWatch();
+      Stat stat = zkClient.exists(path, this);
+
+      if (stat.getDataLength() > 0) {
+        return;
+      }
 
       TimeOut timeout = new TimeOut(timeoutMs, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
 
@@ -191,19 +211,10 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
         }
 
         if (timeout.hasTimedOut()) {
-          log.warn("Timeout waiting for response after {}ms", timeout.timeElapsed(TimeUnit.MILLISECONDS));
+          log.error("Timeout waiting for response after {}ms", timeout.timeElapsed(TimeUnit.MILLISECONDS));
         }
       } finally {
         lock.unlock();
-      }
-    }
-
-    private void createWatch() {
-      try {
-        zkClient.addWatch(path, this, AddWatchMode.PERSISTENT);
-      } catch (Exception e) {
-        log.error("could not add watch", e);
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
     }
 
@@ -214,7 +225,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
     @Override
     public void close() {
       try {
-        zkClient.removeWatches(path, this, WatcherType.Any, true);
+        zkClient.removeAllWatches(path);
       }  catch (KeeperException.NoWatcherException | AlreadyClosedException e) {
 
       } catch (Exception e) {
@@ -285,6 +296,7 @@ public class OverseerTaskQueue extends ZkDistributedQueue {
 
       QueueEvent event =  new QueueEvent(watchID, bytes, watcher.getWatchedEvent());
 
+      log.debug("deleting response node and returning {}", watchID);
       zookeeper.delete(watchID,-1, true, false);
 
       return event;

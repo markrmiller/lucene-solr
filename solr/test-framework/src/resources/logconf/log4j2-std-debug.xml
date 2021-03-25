@@ -27,12 +27,12 @@
         =>%ex{short}}}{10240}%n"/>
         </Console>
 
-        <File name="FILE" fileName="${sys:user.home}/solr-test.log" immediateFlush="false" append="false">
+        <File name="FILE" fileName="${sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%maxLen{%t}{8})}{yellow,bold} [%style{%X{node_name} %X{core}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m %notEmpty{%ex}}\n"/>
         </File>
         <RollingRandomAccessFile
                 name="SkyHookLogFile"
-                fileName="${sys:user.home}/solr_skyhook.log"
+                fileName="${sys:user.home}/solr-test-logs/solr_skyhook.log"
                 filePattern="${sys:user.home}/solr_skyhook.log.%i">
             <PatternLayout>
                 <Pattern>

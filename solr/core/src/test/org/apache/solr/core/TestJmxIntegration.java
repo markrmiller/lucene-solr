@@ -17,6 +17,7 @@
 package org.apache.solr.core;
 
 import com.codahale.metrics.MetricRegistry;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricReporter;
@@ -53,6 +54,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @since solr 1.3
  */
+@LuceneTestCase.Nightly
 public class TestJmxIntegration extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

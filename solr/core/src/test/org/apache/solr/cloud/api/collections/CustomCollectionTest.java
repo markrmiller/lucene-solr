@@ -17,6 +17,7 @@
 package org.apache.solr.cloud.api.collections;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
@@ -28,6 +29,7 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Slice;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -189,16 +191,26 @@ public class CustomCollectionTest extends SolrCloudTestCase {
   @Test
   public void testCreateShardRepFactor() throws Exception  {
     final String collectionName = "testCreateShardRepFactor";
-    CollectionAdminRequest.createCollectionWithImplicitRouter(collectionName, "conf", "a,b", 1).waitForFinalState(true)
+    CollectionAdminRequest.createCollectionWithImplicitRouter(collectionName, "conf", "a,b", 1)
         .process(cluster.getSolrClient());
 
     CollectionAdminRequest.CreateShard req = CollectionAdminRequest.createShard(collectionName, "x");
     req.process(cluster.getSolrClient());
 
-    waitForState("Not enough active replicas in shard 'x'", collectionName, (n, c) -> {
-      return c.getSlice("x").getReplicas().size() == 1;
-    });
+    cluster.getSolrClient().getZkStateReader().waitForState(collectionName, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      Slice slice = collectionState.getSlice("x");
+      if (slice == null) {
+        return false;
+      }
 
+      if (slice.getReplicas().size() == 1) {
+        return true;
+      }
+      return false;
+    });
   }
 
 }

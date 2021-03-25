@@ -153,6 +153,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
   // these are setup at the start of each request processing
   // method in this update processor
   protected volatile boolean isLeader = true;
+
   protected volatile boolean forwardToLeader = false;
   protected volatile boolean isSubShardLeader = false;
   protected volatile boolean isIndexChanged = false;

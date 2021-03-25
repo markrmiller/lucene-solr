@@ -55,7 +55,6 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
     CollectionAdminRequest
         .createCollection(COLLECTION, "config", 1,3)
         .setMaxShardsPerNode(100)
-        .waitForFinalState(true)
         .process(cluster.getSolrClient());
   }
 
@@ -239,7 +238,6 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
 
     cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
     Thread.sleep(250);
-    cluster.getSolrClient().getZkStateReader().getZkClient().printLayout();
 
     cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 10, TimeUnit.SECONDS, false, 1, 3, true, true);
 

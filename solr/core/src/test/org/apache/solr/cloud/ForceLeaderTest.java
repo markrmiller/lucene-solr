@@ -242,6 +242,8 @@ public class ForceLeaderTest extends HttpPartitionTest {
       proxy.reopen();
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, shard, cloudClient.getZkStateReader().getZkClient())) {
+      zkShardTerms.createWatcher();
+
       for (Replica notLeader : notLeaders) {
         assertTrue(zkShardTerms.getTerm(leader.getName()) > zkShardTerms.getTerm(notLeader.getName()));
       }

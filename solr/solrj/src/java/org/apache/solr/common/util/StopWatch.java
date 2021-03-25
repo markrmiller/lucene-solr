@@ -27,19 +27,25 @@ public class StopWatch {
 
 
   public final static ThreadLocal<StopWatch> STOP_WATCH = ThreadLocal.withInitial(StopWatch::new);
-
+  private final boolean nonDebugActive;
 
   private long start;
   private String name;
+  private volatile long time;
 
   public StopWatch(String name) {
     if (log.isDebugEnabled()) {
       this.name = "StopWatch-" + name;
     }
+    this.nonDebugActive = false;
   }
 
   public StopWatch() {
+    this.nonDebugActive = false;
+  }
 
+  public StopWatch(boolean nonDebugActive) {
+    this.nonDebugActive = nonDebugActive;
   }
 
   public static StopWatch getStopWatch(String name) {
@@ -49,15 +55,19 @@ public class StopWatch {
   }
 
   public void start(String name) {
-    if (log.isDebugEnabled()) {
+    if (log.isDebugEnabled() || nonDebugActive) {
       this.name = name;
       start = System.nanoTime();
     }
   }
 
+  public long getTime() {
+    return time;
+  }
+
   public void done() {
-    if (log.isDebugEnabled()) {
-      long time = TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+    if (log.isDebugEnabled() || nonDebugActive) {
+      time = TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
       log.debug("Time taken for {}={}ms", name, time);
     }
   }

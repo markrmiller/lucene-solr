@@ -63,7 +63,7 @@ public final class CommitTracker implements Runnable, Closeable {
   private long timeUpperBound;
   private long tLogFileSizeUpperBound;
 
-  private ReentrantLock lock = new ReentrantLock(true);
+  private ReentrantLock lock = new ReentrantLock(false);
 
   // note: can't use ExecutorsUtil because it doesn't have a *scheduled* ExecutorService.
   //  Not a big deal but it means we must take care of MDC logging here.

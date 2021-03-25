@@ -20,13 +20,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -39,12 +37,11 @@ import static org.apache.solr.common.util.Utils.toJSONString;
  */
 public class Slice extends ZkNodeProps implements Iterable<Replica> {
   public final String collection;
-  public Replica.NodeNameToBaseUrl nodeNameToBaseUrl;
   private final HashMap<String,Replica> idToReplica;
-  private final Long collectionId;
+  private Long collectionId;
 
   /** Loads multiple slices into a Map from a generic Map that probably came from deserialized JSON. */
-  public static Map<String,Slice> loadAllFromMap(Replica.NodeNameToBaseUrl nodeNameToBaseUrl, String collection, long id, Map<String, Object> genericSlices) {
+  public static Map<String,Slice> loadAllFromMap(String collection, long id, Map<String, Object> genericSlices) {
     if (genericSlices == null) return Collections.emptyMap();
     Map<String, Slice> result = new LinkedHashMap<>(genericSlices.size());
     for (Map.Entry<String, Object> entry : genericSlices.entrySet()) {
@@ -53,7 +50,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
       if (val instanceof Slice) {
         result.put(name, (Slice) val);
       } else if (val instanceof Map) {
-        result.put(name, new Slice(name, null, (Map<String, Object>) val, collection, id, nodeNameToBaseUrl));
+        result.put(name, new Slice(name, null, (Map<String, Object>) val, collection, id));
       }
     }
     return result;
@@ -72,50 +69,23 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
     return idToReplica;
   }
 
-  public Slice update(Slice currentSlice) {
-    Set<String> remove = new HashSet<>();
-    Map<String,Replica> replicas = new HashMap<>();
-    for (Replica replica : this.replicas.values()) {
+  public Slice copy() {
+    return copy(Collections.emptyMap());
+  }
 
-      if (replica.get("remove") != null) {
-        remove.add(replica.getName());
-      } else {
+  public Slice copy(Map properties) {
+    Map<String,Replica> replicasCopy = new HashMap<>(getReplicasMap().size());
 
-        Replica currentReplica = currentSlice.getReplica(replica.getName());
-        if (currentReplica != null) {
-          if (currentReplica.getBool("remove", false)) {
-            continue;
-          }
-          replica.getProperties().put(ZkStateReader.STATE_PROP, currentReplica.getState().toString().toLowerCase(Locale.ROOT));
-          if (Boolean.parseBoolean((String) currentReplica.getProperties().get("leader"))) {
-            replica.propMap.put("leader", "true");
-          } else {
-            replica.propMap.remove("leader");
-          }
-          Replica newReplica = new Replica(replica.getName(), replica.getProperties(), replica.collection, replica.collectionId, replica.slice,
-              nodeNameToBaseUrl);
-          replicas.put(replica.getName(), newReplica);
-        } else {
-          replicas.put(replica.getName(), replica);
-        }
-      }
-
-      Object removed = replica.getProperties().remove("numShards");
+    for (Replica replica : getReplicas()) {
+      Replica r = replica.copy();
+      replicasCopy.put(r.getName(), r);
     }
 
-    for (Replica replica : currentSlice.getReplicas()) {
-      if (!replicas.containsKey(replica.getName())) {
-        replicas.put(replica.getName(), replica);
-      }
-    }
+     Map newProps = new HashMap(propMap);
+     newProps.putAll(properties);
 
-    for (String removeReplica : remove) {
-      replicas.remove(removeReplica);
-    }
-
-    Slice newSlice = new Slice(currentSlice.name, replicas, currentSlice.propMap, currentSlice.collection, collectionId, nodeNameToBaseUrl);
-    newSlice.setLeader(currentSlice.getLeader());
-    return newSlice;
+    Slice s = new Slice(name, replicasCopy, newProps, getName(), collectionId);
+    return s;
   }
 
   /** The slice's state. */
@@ -187,11 +157,10 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
    * @param replicas The replicas of the slice.  This is used directly and a copy is not made.  If null, replicas will be constructed from props.
    * @param props  The properties of the slice - a shallow copy will always be made.
    */
-  public Slice(String name, Map<String,Replica> replicas, Map<String,Object> props, String collection, Long collectionId, Replica.NodeNameToBaseUrl nodeNameToBaseUrl) {
+  public Slice(String name, Map<String,Replica> replicas, Map<String,Object> props, String collection, Long collectionId) {
     super( props==null ? new LinkedHashMap<String,Object>(2) : new LinkedHashMap<>(props));
     this.name = name;
     this.collection = collection;
-    this.nodeNameToBaseUrl = nodeNameToBaseUrl;
     Object rangeObj = propMap.get(RANGE);
     if (propMap.get(ZkStateReader.STATE_PROP) != null) {
       this.state = State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
@@ -254,6 +223,16 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
       this.routingRules = null;
     }
     this.collectionId = collectionId;
+
+    if (this.collectionId == null) {
+      Object collId = props.get("collId");
+      if (collId != null) {
+        this.collectionId = Long.parseLong((String) collId);
+      }
+    } else {
+      props.put("collId", Long.toString(collectionId));
+    }
+
     leader = findLeader();
   }
 
@@ -268,7 +247,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
       if (val instanceof Replica) {
         r = (Replica)val;
       } else {
-        r = new Replica(name, (Map<String,Object>)val, collection, collectionId, slice, nodeNameToBaseUrl);
+        r = new Replica(name, (Map<String,Object>)val, collection, collectionId, slice, (String) ((Map<String,Object>)val).get("baseUrl"));
       }
       result.put(name, r);
     }

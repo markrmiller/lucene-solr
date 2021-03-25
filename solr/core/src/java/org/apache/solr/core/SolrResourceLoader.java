@@ -179,7 +179,8 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
       this.configXpathExpressions = new ConfigXpathExpressions();
       cl = getClass().getClassLoader();
     } else {
-      this.configXpathExpressions = parent.configXpathExpressions;
+      //this.configXpathExpressions = parent.configXpathExpressions;
+      this.configXpathExpressions = new ConfigXpathExpressions();
       cl = parent.getClassLoader();
     }
     this.classLoader = URLClassLoader.newInstance(EMPTY_URL_ARRAY, cl);

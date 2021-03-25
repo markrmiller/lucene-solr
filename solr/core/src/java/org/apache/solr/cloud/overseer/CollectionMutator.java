@@ -16,11 +16,9 @@
  */
 package org.apache.solr.cloud.overseer;
 
-import org.apache.solr.client.solrj.cloud.AlreadyExistsException;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
-import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
@@ -28,7 +26,6 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.NRT_REPLICAS;
 import static org.apache.solr.common.cloud.ZkStateReader.REPLICATION_FACTOR;
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,10 +45,12 @@ public class CollectionMutator {
 
   protected final SolrCloudManager cloudManager;
   protected final DistribStateManager stateManager;
+  private final ZkStateReader reader;
 
-  public CollectionMutator(SolrCloudManager cloudManager) {
+  public CollectionMutator(SolrCloudManager cloudManager, ZkStateReader reader) {
     this.cloudManager = cloudManager;
     this.stateManager = cloudManager.getDistribStateManager();
+    this.reader = reader;
   }
 
   public ClusterState createShard(final ClusterState clusterState, ZkNodeProps message) {
@@ -79,28 +77,23 @@ public class CollectionMutator {
       if (shardParentNode != null)  {
         sliceProps.put("shard_parent_node", shardParentNode);
       }
-      collection = updateSlice(collectionName, collection, new Slice(shardId, replicas, sliceProps, collectionName, collection.getId(), (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider()));
+      collection = updateSlice(collectionName, collection, new Slice(shardId, replicas, sliceProps, collectionName, collection.getId()));
 
+      Map<String,byte[]> paths = new HashMap<>();
 
-      // TODO - fix, no makePath (ensure every path part exists), async, single node
+        try {
+       //   paths.put(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leader_elect", null);
+          paths.put(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leader_elect/" +  shardId + "/election", null);
+       //   paths.put(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leaders/", null);
+          paths.put(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leaders/" +  shardId, null);
+      //    paths.put(ZkStateReader.COLLECTIONS_ZKNODE  + "/" + collectionName + "/terms", null);
+          paths.put(ZkStateReader.COLLECTIONS_ZKNODE  + "/" + collectionName + "/terms/" + shardId, ZkStateReader.emptyJson);
+        } catch (Exception e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        }
       try {
-
-       // stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/" +  shardId, null, CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leader_elect/" +  shardId, null, CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leader_elect/" +  shardId + "/election", null, CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collectionName + "/leaders/" +  shardId, null, CreateMode.PERSISTENT, false);
-
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE  + "/" + collectionName + "/terms", null, CreateMode.PERSISTENT, false);
-        stateManager.makePath(ZkStateReader.COLLECTIONS_ZKNODE  + "/" + collectionName + "/terms/" + shardId, ZkStateReader.emptyJson, CreateMode.PERSISTENT, false);
-
-      } catch (AlreadyExistsException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-      } catch (IOException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        reader.getZkClient().mkdirs(paths, 3);
       } catch (KeeperException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-      } catch (InterruptedException e) {
-        ParWork.propagateInterrupt(e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
 

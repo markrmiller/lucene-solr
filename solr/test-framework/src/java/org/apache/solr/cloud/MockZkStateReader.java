@@ -26,13 +26,13 @@ import org.apache.solr.common.cloud.ZkStateReader;
 public class MockZkStateReader extends ZkStateReader {
 
   private final Set<String> liveNodes;
+  private final ClusterState clusterState;
   private Set<String> collections;
 
   public MockZkStateReader(ClusterState clusterState, Set<String> liveNodes, Set<String> collections) {
     super(new MockSolrZkClient());
 
-
-    this.clusterState.putAll(clusterState.getCollectionStates());
+    this.clusterState = clusterState;
     this.collections = collections;
     this.liveNodes = liveNodes;
   }
@@ -49,6 +49,6 @@ public class MockZkStateReader extends ZkStateReader {
   public void registerDocCollectionWatcher(String collection, DocCollectionWatcher docCollectionWatcher) {
     // the doc collection will never be changed by this mock
     // so we just call onStateChanged once with the existing DocCollection object an return
-    docCollectionWatcher.onStateChanged(clusterState.get(collection).get());
+    docCollectionWatcher.onStateChanged(clusterState.getCollection(collection));
   }
 }

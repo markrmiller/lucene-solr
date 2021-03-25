@@ -65,7 +65,7 @@ class RequestSyncShardOp implements CoreAdminHandler.CoreAdminOp {
         String collection = params.get("collection");
         String shard = params.get("shard");
 
-        Replica replica = new Replica(cname, props, collection, Long.parseLong(core.getCoreDescriptor().getCoreProperty("collId", "-1")), shard, zkController.zkStateReader);
+        Replica replica = new Replica(cname, props, collection, Long.parseLong(core.getCoreDescriptor().getCoreProperty("collId", "-1")), shard, zkController.getBaseUrl());
 
         boolean success = syncStrategy.sync(zkController, core, replica, true).isSuccess();
         // solrcloud_debug

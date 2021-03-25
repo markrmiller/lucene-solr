@@ -52,7 +52,7 @@ public class DeleteNodeTest extends SolrCloudTestCase {
   public void test() throws Exception {
     CloudHttp2SolrClient cloudClient = cluster.getSolrClient();
     String coll = "deletenodetest_coll";
-    cloudClient.getZkStateReader().forciblyRefreshAllClusterStateSlow();
+
     ClusterState state = cloudClient.getZkStateReader().getClusterState();
     Set<String> liveNodes =  cloudClient.getZkStateReader().getLiveNodes();
     ArrayList<String> l = new ArrayList<>(liveNodes);
@@ -66,7 +66,7 @@ public class DeleteNodeTest extends SolrCloudTestCase {
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 2, 0, 0),
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 2, 1, 0)
         );
-    create = create.setCreateNodeSet(StrUtils.join(l, ',')).setMaxShardsPerNode(20).waitForFinalState(true);
+    create = create.setCreateNodeSet(StrUtils.join(l, ',')).setMaxShardsPerNode(20);
     cloudClient.request(create);
     state = cloudClient.getZkStateReader().getClusterState();
     String node2bdecommissioned = l.get(0);

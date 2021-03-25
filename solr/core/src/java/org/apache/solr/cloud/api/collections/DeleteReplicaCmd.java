@@ -20,10 +20,10 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -198,7 +198,7 @@ public class DeleteReplicaCmd implements Cmd {
 
           if (waitForFinalState) {
             try {
-              ocmh.overseer.getZkStateWriter().enqueueUpdate(finalClusterState.getCollection(finalCollectionName1), null, false);
+              ocmh.overseer.getZkStateWriter().enqueueStructureChange(finalClusterState.getCollection(finalCollectionName1));
               ocmh.overseer.writePendingUpdates(finalCollectionName1);
               waitForCoreNodeGone(finalCollectionName1, shard, replicaName, 5000); // MRM TODO: timeout
             } catch (Exception e) {
@@ -266,7 +266,7 @@ public class DeleteReplicaCmd implements Cmd {
         clusterState = resp.clusterState;
         if (clusterState != null) {
           try {
-            ocmh.overseer.getZkStateWriter().enqueueUpdate(clusterState.getCollection(collectionName), null, false);
+            ocmh.overseer.getZkStateWriter().enqueueStructureChange(clusterState.getCollection(collectionName));
           } catch (Exception e) {
             log.error("failed sending update to zkstatewriter", e);
             throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
@@ -300,22 +300,39 @@ public class DeleteReplicaCmd implements Cmd {
   /**
    * Pick replicas to be deleted. Avoid picking the leader.
    */
-  private Set<String> pickReplicasTobeDeleted(Slice slice, String shard, String collectionName, int count) {
-    validateReplicaAvailability(slice, shard, collectionName, count);
-    Collection<Replica> allReplicas = slice.getReplicas();
-    Set<String> replicasToBeRemoved = new HashSet<String>();
-    Replica leader = slice.getLeader();
-    for (Replica replica: allReplicas) {
-      if (count == 0) {
-        break;
-      }
-      //Try avoiding to pick up the leader to minimize activity on the cluster.
-      if (leader.getName().equals(replica.getName())) {
-        continue;
-      }
-      replicasToBeRemoved.add(replica.getName());
-      count --;
+  private Set<String> pickReplicasTobeDeleted(Slice s, String shard, String collectionName, int count) {
+   // validateReplicaAvailability(slice, shard, collectionName, count);
+   // Collection<Replica> allReplicas = slice.getReplicas();
+    Set<String> replicasToBeRemoved = ConcurrentHashMap.newKeySet(count);
+
+    try {
+      ocmh.zkStateReader.waitForState(collectionName,5,TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+        if (collectionState == null) {
+          return false;
+        }
+        Slice slice = collectionState.getSlice(s.getName());
+        Replica leader = slice.getLeader();
+        Collection<Replica> allReplicas = slice.getReplicas();
+        int cnt = count;
+        for (Replica replica: allReplicas) {
+          if (cnt == 0) {
+            break;
+          }
+          //Try avoiding to pick up the leader to minimize activity on the cluster.
+          if (leader != null && leader.getName().equals(replica.getName())) {
+            continue;
+          }
+          replicasToBeRemoved.add(replica.getName());
+          cnt--;
+        }
+        return true;
+      });
+    } catch (InterruptedException e) {
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+    } catch (TimeoutException e) {
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }
+
     if (log.isDebugEnabled()) log.debug("Found replicas to be removed {}", replicasToBeRemoved);
     return replicasToBeRemoved;
   }

@@ -158,12 +158,7 @@ public class ReplicaListTransformerTest extends SolrTestCase {
         propMap.put("type", "NRT");
         propMap.put("id", String.valueOf(ii));
         // a skeleton replica, good enough for this test's purposes
-        final Replica replica = new Replica(name, propMap, "c1",-1l,"s1", new Replica.NodeNameToBaseUrl() {
-          @Override
-          public String getBaseUrlForNodeName(String nodeName) {
-            return Utils.getBaseUrlForNodeName(name, "http");
-          }
-        });
+        final Replica replica = new Replica(name, propMap, "c1",-1l,"s1", "baseUrl");
 
         inputs.add(replica);
         final String coreUrl = replica.getCoreUrl();

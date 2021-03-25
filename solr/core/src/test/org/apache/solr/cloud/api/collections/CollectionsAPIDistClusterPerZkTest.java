@@ -72,7 +72,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -430,18 +429,7 @@ public class CollectionsAPIDistClusterPerZkTest extends SolrCloudTestCase {
     Collections.shuffle(nodeList, random());
 
     CollectionAdminRequest.AddReplica req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1").setNode(nodeList.get(0));
-    req.setWaitForFinalState(true);
     CollectionAdminResponse response = req.process(cluster.getSolrClient());
-    Replica newReplica = grabNewReplica(response, getCollectionState(collectionName));
-
-    assertEquals("Replica should be created on the right node",
-        cluster.getSolrClient().getZkStateReader().getBaseUrlForNodeName(nodeList.get(0)),
-        newReplica.getBaseUrl());
-
-    Path instancePath = SolrTestUtil.createTempDir();
-     req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1").withProperty(CoreAdminParams.INSTANCE_DIR, instancePath.toString());
-    req.setWaitForFinalState(true);
-    response = req.process(cluster.getSolrClient());
     String replicaName = response.getCollectionCoresStatus().keySet().iterator().next();
     AtomicReference<Replica> theReplica = new AtomicReference<>();
     try {
@@ -461,50 +449,69 @@ public class CollectionsAPIDistClusterPerZkTest extends SolrCloudTestCase {
       throw new TimeoutException("timeout waiting to see " + replicaName);
     }
 
-    newReplica = theReplica.get();
-    assertNotNull(newReplica);
+    Replica newReplica = theReplica.get();
 
-    try (Http2SolrClient coreclient = SolrTestCaseJ4.getHttpSolrClient(newReplica.getBaseUrl())) {
-      CoreAdminResponse status = CoreAdminRequest.getStatus(newReplica.getName(), coreclient);
-      NamedList<Object> coreStatus = status.getCoreStatus(newReplica.getName());
+    assertEquals("Replica should be created on the right node",
+        cluster.getSolrClient().getZkStateReader().getBaseUrlForNodeName(nodeList.get(0)),
+        newReplica.getBaseUrl());
+
+    Path instancePath = SolrTestUtil.createTempDir();
+     req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1").withProperty(CoreAdminParams.INSTANCE_DIR, instancePath.toString());
+    req.setWaitForFinalState(true);
+    response = req.process(cluster.getSolrClient());
+    String replicaName2 = response.getCollectionCoresStatus().keySet().iterator().next();
+    AtomicReference<Replica> theReplica2 = new AtomicReference<>();
+    try {
+      cluster.getSolrClient().getZkStateReader().waitForState(collectionName, 15, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+        if (collectionState == null) {
+          return false;
+        }
+        Replica replica = collectionState.getReplica(replicaName2);
+        if (replica != null) {
+          theReplica2.set(replica);
+          return true;
+        }
+        return false;
+      });
+    } catch (TimeoutException e) {
+      log.error("timeout",e);
+      throw new TimeoutException("timeout waiting to see " + replicaName);
+    }
+
+    Replica newReplica2 = theReplica2.get();
+    assertNotNull(newReplica2);
+
+    try (Http2SolrClient coreclient = SolrTestCaseJ4.getHttpSolrClient(newReplica2.getBaseUrl())) {
+      CoreAdminResponse status = CoreAdminRequest.getStatus(newReplica2.getName(), coreclient);
+      NamedList<Object> coreStatus = status.getCoreStatus(newReplica2.getName());
       String instanceDirStr = (String) coreStatus.get("instanceDir");
       assertEquals(instanceDirStr, instancePath.toString());
     }
 
     // Check that specifying property.name works. DO NOT remove this when the "name" property is deprecated
     // for ADDREPLICA, this is "property.name". See SOLR-7132
-    req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1")
-        .withProperty(CoreAdminParams.NAME, "propertyDotName");
-    req.setWaitForFinalState(true);
-    response =  req.process(cluster.getSolrClient());
+    // do we really want to support this propertyDotName anymore?
+//    req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1")
+//        .withProperty(CoreAdminParams.NAME, "propertyDotName");
+//    req.setWaitForFinalState(true);
+//    response =  req.process(cluster.getSolrClient());
 
-    AtomicReference<Replica> theReplica2 = new AtomicReference<>();
+    AtomicReference<Replica> theReplica3 = new AtomicReference<>();
     cluster.getSolrClient().getZkStateReader().waitForState(collectionName, 15, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
       if (collectionState == null) {
         return false;
       }
       Replica replica = collectionState.getReplica(replicaName);
       if (replica != null) {
-        theReplica2.set(replica);
+        theReplica3.set(replica);
         return true;
       }
       return false;
     });
 
-    newReplica = theReplica2.get();
-    assertNotNull(theReplica2);
+    newReplica = theReplica3.get();
+    assertNotNull(newReplica);
     // MRM TODO: do we really want to support this anymore? We really should control core names for cloud
     // assertEquals("'core' should be 'propertyDotName' " + newReplica.getName(), "propertyDotName", newReplica.getName());
-  }
-
-  private Replica grabNewReplica(CollectionAdminResponse response, DocCollection docCollection) {
-    String replicaName = response.getCollectionCoresStatus().keySet().iterator().next();
-    Optional<Replica> optional = docCollection.getReplicas().stream()
-        .filter(replica -> replicaName.equals(replica.getName()))
-        .findAny();
-    if (optional.isPresent()) {
-      return optional.get();
-    }
-    throw new AssertionError("Can not find " + replicaName + " from " + docCollection);
   }
 }

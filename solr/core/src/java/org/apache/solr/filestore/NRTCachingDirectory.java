@@ -116,12 +116,15 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized String[] listAll() throws IOException {
-    final Set<String> files = new HashSet<>();
-    for (String f : cacheDirectory.listAll()) {
+  public String[] listAll() throws IOException {
+    String[] cFiles = cacheDirectory.listAll();
+    String[] inFiles = in.listAll();
+
+    final Set<String> files = new HashSet<>(cFiles.length + inFiles.length);
+    for (String f : cFiles) {
       files.add(f);
     }
-    for (String f : in.listAll()) {
+    for (String f : inFiles) {
       files.add(f);
     }
     String[] result = files.toArray(new String[files.size()]);
@@ -130,7 +133,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized void deleteFile(String name) throws IOException {
+  public void deleteFile(String name) throws IOException {
     if (VERBOSE) {
       System.out.println("nrtdir.deleteFile name=" + name);
     }
@@ -142,7 +145,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized long fileLength(String name) throws IOException {
+  public long fileLength(String name) throws IOException {
     if (cacheDirectory.fileExists(name)) {
       return cacheDirectory.fileLength(name);
     } else {
@@ -202,11 +205,16 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized IndexInput openInput(String name, IOContext context) throws IOException {
+  public IndexInput openInput(String name, IOContext context) throws IOException {
     if (VERBOSE) {
       System.out.println("nrtdir.openInput name=" + name);
     }
-    if (cacheDirectory.fileExists(name)) {
+    boolean inCache;
+    synchronized (this) {
+      inCache = cacheDirectory.fileExists(name);
+    }
+
+    if (inCache) {
       if (VERBOSE) {
         System.out.println("  from cache");
       }

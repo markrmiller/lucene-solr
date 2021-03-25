@@ -375,7 +375,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
   public void testSplitShard() throws Exception {
 
     final String collectionName = "solrj_test_splitshard";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1).waitForFinalState(true)
+    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
         .process(cluster.getSolrClient());
 
     CollectionAdminResponse response = CollectionAdminRequest.splitShard(collectionName)
@@ -874,17 +874,24 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
   }
 
   @Test
-  public void testModifyCollectionAttribute() throws IOException, SolrServerException {
+  public void testModifyCollectionAttribute() throws Exception {
     final String collection = "testAddAndDeleteCollectionAttribute";
-    CollectionAdminRequest.createCollection(collection, "conf", 1, 1).waitForFinalState(true)
+    CollectionAdminRequest.createCollection(collection, "conf", 1, 1)
         .process(cluster.getSolrClient());
 
     CollectionAdminRequest.modifyCollection(collection, null)
         .unsetAttribute("router")
         .process(cluster.getSolrClient());
 
-    waitForState("Expecting attribute 'router' to be deleted", collection,
-        (n, c) -> null == c.get("router"));
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      if (collectionState.get("router") != null) {
+        return false;
+      }
+      return true;
+    });
 
     LuceneTestCase.expectThrows(IllegalArgumentException.class,
         "An attempt to set unknown collection attribute should have failed",

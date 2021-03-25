@@ -818,8 +818,8 @@ public class IndexFetcher {
    */
   private void terminateAndWaitFsyncService() throws Exception {
     fsyncService.shutdown();
-    // give a long wait say 1 hr
-    fsyncService.awaitTermination(3600, TimeUnit.SECONDS);
+
+    fsyncService.awaitTermination(5, TimeUnit.SECONDS);
     // if any fsync failed, throw that exception back
     Exception fsyncExceptionCopy = fsyncException;
     if (fsyncExceptionCopy != null) throw fsyncExceptionCopy;

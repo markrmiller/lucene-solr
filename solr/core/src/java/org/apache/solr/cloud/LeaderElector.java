@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -84,6 +85,8 @@ public class LeaderElector implements Closeable {
   private volatile boolean isClosed;
   private volatile Future<?> joinFuture;
   private volatile boolean isCancelled;
+
+  private volatile boolean disableRemoveWatches = false;
 
   private final ExecutorService executor = ParWork.getExecutorService(1);
 
@@ -144,6 +147,7 @@ public class LeaderElector implements Closeable {
         return true;
       } catch (KeeperException.NoNodeException e) {
         log.info("the election node disappeared");
+        IOUtils.closeQuietly(watcher);
         state = OUT_OF_ELECTION;
         return false;
       } catch (KeeperException e) {
@@ -191,7 +195,19 @@ public class LeaderElector implements Closeable {
 //          }
 
           state = POT_LEADER;
-          runIamLeaderProcess(context, replacement);
+          ParWork.getRootSharedExecutor().submit(() -> {
+            try {
+              runIamLeaderProcess(context, replacement);
+            } catch (AlreadyClosedException e) {
+              state = OUT_OF_ELECTION;
+
+            } catch (Exception e) {
+              log.error("Exception running I am leader process", e);
+              state = OUT_OF_ELECTION;
+              retryElection(false);
+            }
+          });
+
           return false;
 
         } else {
@@ -254,10 +270,6 @@ public class LeaderElector implements Closeable {
           }
         }
 
-      } catch (KeeperException.SessionExpiredException e) {
-        log.error("ZooKeeper session has expired");
-        state = OUT_OF_ELECTION;
-        return true;
       } catch (AlreadyClosedException e) {
         state = OUT_OF_ELECTION;
         return false;
@@ -273,7 +285,6 @@ public class LeaderElector implements Closeable {
   }
 
 
-  // TODO: get this core param out of here
   protected synchronized void runIamLeaderProcess(final ElectionContext context, boolean weAreReplacement) throws KeeperException,
           InterruptedException, IOException {
     if (state == CLOSED || isClosed) {
@@ -377,6 +388,12 @@ public class LeaderElector implements Closeable {
 
     isCancelled = false;
 
+    try {
+      zkClient.getConnectionManager().waitForConnected(60000);
+    } catch (TimeoutException e) {
+      log.warn("timeout waiting for zkclient to connect");
+    }
+
     ParWork.getRootSharedExecutor().submit(context::joinedElectionFired);
 
     final String shardsElectZkPath = context.electionPath + LeaderElector.ELECTION_NODE;
@@ -422,7 +439,7 @@ public class LeaderElector implements Closeable {
         }
 
         // we don't know if we made our node or not...
-        List<String> entries = zkClient.getChildren(shardsElectZkPath, null, true);
+        List<String> entries = zkClient.getChildren(shardsElectZkPath, null, null, true, true);
 
         for (String entry : entries) {
           String nodeId = getNodeId(entry);
@@ -457,7 +474,7 @@ public class LeaderElector implements Closeable {
   }
 
   private boolean shouldRejectJoins() {
-    return zkController.getCoreContainer().isShutDown() || zkController.isDcCalled() || zkClient.isClosed();
+    return zkController.getCoreContainer().isShutDown() || zkController.isDcCalled();
   }
 
   @Override
@@ -552,38 +569,45 @@ public class LeaderElector implements Closeable {
         if (log.isDebugEnabled()) log.debug("This watcher is not active anymore {} isCancelled={} isClosed={}", myNode, isCancelled, isClosed);
         return;
       }
-      try {
-        if (event.getType() == EventType.NodeDeleted) {
-          // am I the next leader?
-          state = CHECK_IF_LEADER;
-          boolean tryagain = true;
-          while (tryagain) {
-            tryagain = checkIfIamLeader(context, true);
-          }
-        } else {
 
-          Stat exists = zkClient.exists(watchedNode, this);
-          if (exists == null) {
-            close();
+      executor.submit(() -> {
+        try {
+          if (event.getType() == EventType.NodeDeleted) {
+            // am I the next leader?
+            state = CHECK_IF_LEADER;
             boolean tryagain = true;
-
             while (tryagain) {
               tryagain = checkIfIamLeader(context, true);
             }
-          }
+          } else {
 
+            Stat exists = zkClient.exists(watchedNode, this);
+            if (exists == null) {
+              close();
+              boolean tryagain = true;
+
+              while (tryagain) {
+                tryagain = checkIfIamLeader(context, true);
+              }
+            }
+
+          }
+          // we don't kick off recovery here, the leader sync will do that if necessary for its replicas
+        } catch (AlreadyClosedException | InterruptedException e) {
+          log.info("Already shutting down");
+        } catch (Exception e) {
+          log.error("Exception in election", e);
         }
-        // we don't kick off recovery here, the leader sync will do that if necessary for its replicas
-      } catch (AlreadyClosedException | InterruptedException e) {
-        log.info("Already shutting down");
-      } catch (Exception e) {
-        log.error("Exception in election", e);
-      }
+      });
+
     }
 
     @Override
     public void close() throws IOException {
       this.closed = true;
+      if (disableRemoveWatches) {
+        return;
+      }
       try {
         zkClient.removeWatches(watchedNode, this, WatcherType.Any, true);
       } catch (KeeperException.NoWatcherException | AlreadyClosedException e) {
@@ -592,6 +616,10 @@ public class LeaderElector implements Closeable {
         log.info("could not remove watch {} {}", e.getClass().getSimpleName(), e.getMessage());
       }
     }
+  }
+
+  public void disableRemoveWatches() {
+    this.disableRemoveWatches = true;
   }
 
   /**

@@ -345,7 +345,7 @@ public class SolrCloudTestCase extends SolrTestCase {
     AtomicReference<DocCollection> state = new AtomicReference<>();
     AtomicReference<Set<String>> liveNodesLastSeen = new AtomicReference<>();
     try {
-      cluster.getSolrClient().waitForState(collection, timeout, timeUnit, (n, c) -> {
+      cluster.getSolrClient().getZkStateReader().waitForState(collection, timeout, timeUnit, (n, c) -> {
         state.set(c);
         liveNodesLastSeen.set(n);
         return predicate.matches(n, c);

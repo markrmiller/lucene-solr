@@ -42,10 +42,10 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
 import org.apache.solr.cloud.ZkController;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Replica;
@@ -728,6 +728,9 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
         try {
           if (ulog != null) ulog.preSoftCommit(cmd);
           if (cmd.openSearcher) {
+            if (core.getCoreContainer().isShutDown()) {
+              throw new AlreadyClosedException();
+            }
             core.getSearcher(true, false, waitSearcher);
           } else {
             // force open a new realtime searcher so realtime-get and versioning code can see the latest
@@ -883,8 +886,8 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
       solrCoreState.getCommitLock().lock();
       try {
         try {
-          if (log.isInfoEnabled()) {
-            log.info("Committing on IndexWriter.close() {}.",
+          if (log.isDebugEnabled()) {
+            log.debug("Committing on IndexWriter.close() {}.",
                 (tryToCommit ? "" : " ... SKIPPED (unnecessary)"));
           }
           if (tryToCommit) {

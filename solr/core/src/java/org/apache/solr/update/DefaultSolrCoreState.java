@@ -16,9 +16,12 @@
  */
 package org.apache.solr.update;
 
+import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.index.IndexDeletionPolicy;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.search.Sort;
+import org.apache.lucene.store.Directory;
 import org.apache.solr.cloud.ActionThrottle;
 import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.common.AlreadyClosedException;
@@ -31,6 +34,7 @@ import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.index.SortingMergePolicy;
 import org.apache.solr.logging.MDCLoggingContext;
+import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.util.RefCounted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -290,7 +294,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   protected SolrIndexWriter createMainIndexWriter(SolrCore core, boolean createIndex, String name) throws IOException {
     SolrIndexWriter iw;
     try {
-      iw = SolrIndexWriter.buildIndexWriter(core, name, core.getNewIndexDir(), core.getDirectoryFactory(), createIndex, core.getLatestSchema(),
+      iw = buildIndexWriter(core, name, core.getNewIndexDir(), core.getDirectoryFactory(), createIndex, core.getLatestSchema(),
               core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec(), false);
     } catch (Exception e) {
       ParWork.propagateInterrupt(e);
@@ -298,6 +302,65 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     }
 
     return iw;
+  }
+
+  public SolrIndexWriter buildIndexWriter(SolrCore core, String name, String path, DirectoryFactory directoryFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy, Codec codec, boolean commitOnClose) {
+    SolrIndexWriter iw = null;
+    Directory dir = null;
+    try {
+      dir = getDir(directoryFactory, path, config);
+      iw = new SolrIndexWriter(core, name, directoryFactory, dir, create, schema, config, delPolicy, codec, commitOnClose);
+    } catch (Throwable e) {
+      ParWork.propagateInterrupt(e);
+      SolrException exp = new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+
+      if (iw != null) {
+        try {
+          iw.close();
+        } catch (Exception e1) {
+          if (dir != null) {
+            try {
+              directoryFactory.release(dir);
+            } catch (IOException e2) {
+              exp.addSuppressed(e2);
+            }
+          }
+          exp.addSuppressed(e1);
+        }
+      } else {
+        if (dir != null) {
+          try {
+            directoryFactory.release(dir);
+          } catch (IOException e1) {
+            exp.addSuppressed(e1);
+          }
+        }
+      }
+      if (e instanceof  Error) {
+        log.error("Exception constructing SolrIndexWriter", exp);
+        throw (Error) e;
+      }
+      throw exp;
+    }
+
+    return iw;
+  }
+
+  public Directory getDir(DirectoryFactory directoryFactory, String path, SolrIndexConfig config) {
+    Directory dir = null;
+    try {
+      dir = directoryFactory.get(path, DirectoryFactory.DirContext.DEFAULT, config.lockType);
+    } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
+      SolrException exp = new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+      if (dir != null) try {
+        directoryFactory.release(dir);
+      } catch (IOException e1) {
+        exp.addSuppressed(e1);
+      }
+      throw exp;
+    }
+    return dir;
   }
 
   public Sort getMergePolicySort() throws IOException {
@@ -335,7 +398,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   @Override
   public void doRecovery(SolrCore core) {
 
-    log.info("Do recovery for core {}", core.getName());
+    log.debug("Do recovery for core {}", core.getName());
     CoreContainer corecontainer = core.getCoreContainer();
     if (prepForClose || closed || corecontainer.isShutDown()) {
       log.warn("Skipping recovery because Solr is shutdown");

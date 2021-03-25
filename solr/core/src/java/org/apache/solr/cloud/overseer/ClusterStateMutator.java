@@ -18,14 +18,12 @@ package org.apache.solr.cloud.overseer;
 
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
-import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.ImplicitDocRouter;
-import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -68,17 +66,17 @@ public class ClusterStateMutator {
 
     Map<String, Slice> slices;
     if (messageShardsObj instanceof Map) { // we are being explicitly told the slice data (e.g. coll restore)
-      slices = Slice.loadAllFromMap((Replica.NodeNameToBaseUrl) dataProvider.getClusterStateProvider(), cName,-1l,  (Map<String, Object>)messageShardsObj);
+      slices = Slice.loadAllFromMap(cName,-1l,  (Map<String, Object>)messageShardsObj);
     } else {
       List<String> shardNames = new ArrayList<>();
 
       if (router instanceof ImplicitDocRouter) {
-        BaseCloudSolrClient.getShardNames(shardNames, message.getStr("shards", DocRouter.DEFAULT_NAME));
+        getShardNames(shardNames, message.getStr("shards", DocRouter.DEFAULT_NAME));
       } else {
         int numShards = message.getInt(ZkStateReader.NUM_SHARDS_PROP, -1);
         if (numShards < 1)
           throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "numShards is a required parameter for 'compositeId' router");
-        BaseCloudSolrClient.getShardNames(numShards, shardNames);
+        getShardNames(numShards, shardNames);
       }
       List<DocRouter.Range> ranges = router.partitionRange(shardNames.size(), router.fullRange());//maybe null
 
@@ -89,7 +87,7 @@ public class ClusterStateMutator {
         Map<String, Object> sliceProps = new LinkedHashMap<>(1);
         sliceProps.put(Slice.RANGE, ranges == null ? null : ranges.get(i));
 
-        slices.put(sliceName, new Slice(sliceName, null, sliceProps,cName, -1l, (Replica.NodeNameToBaseUrl) dataProvider.getClusterStateProvider()));
+        slices.put(sliceName, new Slice(sliceName, null, sliceProps,cName, -1l));
       }
     }
 
@@ -133,6 +131,27 @@ public class ClusterStateMutator {
       newClusterState = state.copyWith(name, collection);
     }
     return newClusterState;
+  }
+
+  public static void getShardNames(Integer numShards, List<String> shardNames) {
+    if (numShards == null)
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "numShards" + " is a required param");
+    for (int i = 0; i < numShards; i++) {
+      final String sliceName = "s" + (i + 1);
+      shardNames.add(sliceName);
+    }
+
+  }
+
+  public static void getShardNames(List<String> shardNames, String shards) {
+    if (shards == null)
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "shards" + " is a required param");
+    for (String s : shards.split(",")) {
+      if (s == null || s.trim().isEmpty()) continue;
+      shardNames.add(s.trim());
+    }
+    if (shardNames.isEmpty())
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "shards" + " is a required param");
   }
 
   /*

@@ -97,25 +97,6 @@
       "class": "solr.ShowFileRequestHandler",
       "useParams":"_ADMIN_FILE"
     },
-    "/export": {
-      "class": "solr.ExportHandler",
-      "useParams":"_EXPORT",
-      "components": [
-        "query"
-      ],
-      "invariants": {
-        "rq": "{!xport}",
-        "distrib": false
-      }
-    },
-    "/graph": {
-      "class": "solr.GraphHandler",
-      "useParams":"_ADMIN_GRAPH",
-      "invariants": {
-        "wt": "graphml",
-        "distrib": false
-      }
-    },
     "/stream": {
       "class": "solr.StreamHandler",
       "useParams":"_STREAM",

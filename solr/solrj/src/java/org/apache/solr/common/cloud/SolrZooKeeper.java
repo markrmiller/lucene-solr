@@ -114,7 +114,16 @@ public class SolrZooKeeper extends ZooKeeperAdmin {
         // ignore, close the send/event threads
       } finally {
         ZooKeeperExposed zk = new ZooKeeperExposed(this, cnxn);
-        zk.closeCnxn();
+        try (ParWork work = new ParWork(this, true, false)) {
+          work.collect("", ()->{
+            zk.closeCnxn();
+          });
+          work.collect("", ()->{
+            zk.interruptSendThread();
+            zk.interruptSendThread();
+          });
+        }
+
       }
     } catch (Exception e) {
       log.warn("Exception closing zookeeper client", e);

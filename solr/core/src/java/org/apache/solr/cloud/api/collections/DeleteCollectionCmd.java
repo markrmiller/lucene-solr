@@ -18,7 +18,6 @@
 
 package org.apache.solr.cloud.api.collections;
 
-import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.overseer.ClusterStateMutator;
 import org.apache.solr.common.NonExistentCoreException;
 import org.apache.solr.common.SolrException;
@@ -36,7 +35,6 @@ import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.core.snapshots.SolrSnapshotManager;
 import org.apache.solr.handler.admin.MetricsHistoryHandler;
-import org.apache.solr.handler.component.ShardHandler;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +60,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   static Set<String> okayExceptions = new HashSet<>(1);
+
   static {
     okayExceptions.add(NonExistentCoreException.class.getName());
   }
@@ -75,16 +74,15 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
   }
 
   @Override
-  public CollectionCmdResponse.Response call(ClusterState clusterState, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results) throws Exception {
+  public CollectionCmdResponse.Response call(ClusterState clusterState, ZkNodeProps message, @SuppressWarnings({"rawtypes"}) NamedList results) throws Exception {
     log.info("delete collection called {}", message);
     Object o = message.get(MaintainRoutedAliasCmd.INVOKED_BY_ROUTED_ALIAS);
     if (o != null) {
-      ((Runnable)o).run(); // this will ensure the collection is removed from the alias before it disappears.
+      ((Runnable) o).run(); // this will ensure the collection is removed from the alias before it disappears.
     }
     final String extCollection = message.getStr(NAME);
     ZkStateReader zkStateReader = ocmh.zkStateReader;
-    ShardHandler shardHandler = null;
-    OverseerCollectionMessageHandler.ShardRequestTracker shardRequestTracker = null;
+
     boolean skipFinalStateWork = false;
 
     message.getProperties().put(WAIT_FOR_FINAL_STATE, "true");
@@ -106,11 +104,11 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     }
 
     log.info("Check if collection exists in zookeeper {}", collection);
-    CountDownLatch latch = new CountDownLatch(1);
-    zkStateReader.getZkClient().getConnectionManager().getKeeper().sync(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection,  (rc, path, ctx) -> {
-      latch.countDown();
-    }, null);
-    latch.await(10, TimeUnit.SECONDS);
+        CountDownLatch latch = new CountDownLatch(1);
+        zkStateReader.getZkClient().getConnectionManager().getKeeper().sync(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection,  (rc, path, ctx) -> {
+          latch.countDown();
+        }, null);
+        latch.await(10, TimeUnit.SECONDS);
     if (!zkStateReader.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection)) {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Could not find collection " + collection);
     }
@@ -138,6 +136,7 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
       params.set(CoreAdminParams.DELETE_INSTANCE_DIR, true);
       params.set(CoreAdminParams.DELETE_DATA_DIR, true);
       params.set(CoreAdminParams.DELETE_METRICS_HISTORY, deleteHistory);
+      params.set("removeFromZk", false);
 
       //params.set("idleTimeout", 8000);
 
@@ -145,18 +144,15 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
       ZkNodeProps internalMsg = message.plus(NAME, collection);
 
-      clusterState = new ClusterStateMutator(ocmh.cloudManager).deleteCollection(clusterState, collection);
+      log.info("Send unload cmd to replicas, {}", collection);
+      @SuppressWarnings({"unchecked"}) List<Replica> notLifeReplicas = ocmh.collectionCmd(internalMsg, params, results, null, asyncId, okayExceptions, null, null, false);
 
-      shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseerLbClient);
-
-      shardRequestTracker = new OverseerCollectionMessageHandler.ShardRequestTracker(asyncId, message.getStr(Overseer.QUEUE_OPERATION), ocmh.adminPath, zkStateReader, ocmh.shardHandlerFactory, ocmh.overseer);
-
-      @SuppressWarnings({"unchecked"}) List<Replica> notLifeReplicas = ocmh.collectionCmd(internalMsg, params, results, null, asyncId, okayExceptions, shardHandler, shardRequestTracker);
-
-      if (notLifeReplicas == null) {
+      if (notLifeReplicas != null) {
         // TODO: handle this in any special way? more logging?
         log.warn("The following replicas where not live to receive an unload command {}", notLifeReplicas);
       }
+
+      clusterState = new ClusterStateMutator(ocmh.cloudManager).deleteCollection(clusterState, collection);
 
     } finally {
 
@@ -169,48 +165,27 @@ public class DeleteCollectionCmd implements OverseerCollectionMessageHandler.Cmd
           return a;
         });
       }
-    }
 
-    CollectionCmdResponse.Response response = new CollectionCmdResponse.Response();
+      results.add("collection", collection);
 
+      try {
+        ocmh.overseer.getZkStateWriter().removeCollection(collection);
+        // was there a race? let's get after it
 
-    //if (results.get("failure") == null && results.get("exception") == null) {
-
-    ShardHandler finalShardHandler = shardHandler;
-    OverseerCollectionMessageHandler.ShardRequestTracker finalShardRequestTracker = shardRequestTracker;
-    response.asyncFinalRunner = new OverseerCollectionMessageHandler.Finalize() {
-      @Override
-      public CollectionCmdResponse.Response call() {
-        try {
-          results.add("collection", collection);
-          if (finalShardHandler != null && finalShardRequestTracker != null) {
-            try {
-              finalShardRequestTracker.processResponses(results, finalShardHandler, false, null, okayExceptions);
-
-            } catch (Exception e) {
-              log.error("Exception waiting for results of delete collection cmd", e);
-            }
-          }
-        } finally {
-          try {
-            ocmh.overseer.getZkStateWriter().removeCollection(collection);
-            // was there a race? let's get after it
-            while (zkStateReader.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection)) {
-              zkStateReader.getZkClient().clean(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection);
-            }
-          } catch (Exception e) {
-            log.error("Exception while trying to remove collection zknode", e);
-          }
+        while (zkStateReader.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection)) {
+          zkStateReader.getZkClient().clean(ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection);
         }
 
-        CollectionCmdResponse.Response response = new CollectionCmdResponse.Response();
-        return response;
+      } catch (Exception e) {
+        log.error("Exception while trying to remove collection zknode", e);
       }
-    };
-    //}
-    response.clusterState = clusterState;
-    return response;
+
+    }
+    CollectionCmdResponse.Response resp = new CollectionCmdResponse.Response();
+    resp.clusterState = clusterState;
+    return resp;
   }
+
 
   // This method returns the single collection aliases to delete, if present, or null
   private List<String> checkAliasReference(ZkStateReader zkStateReader, String extCollection, boolean followAliases) throws Exception {

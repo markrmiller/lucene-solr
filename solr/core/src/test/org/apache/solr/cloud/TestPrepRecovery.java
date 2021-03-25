@@ -59,7 +59,6 @@ public class TestPrepRecovery extends SolrCloudTestCase {
 
     String collectionName = "testLeaderUnloaded";
     CollectionAdminRequest.createCollection(collectionName, 1, 2)
-        .waitForFinalState(true)
         .setMaxShardsPerNode(100)
         .process(solrClient);
 
@@ -69,7 +68,6 @@ public class TestPrepRecovery extends SolrCloudTestCase {
 
     // add a replica to the new node so that it starts watching the collection
     CollectionAdminRequest.AddReplica req = CollectionAdminRequest.addReplicaToShard(collectionName, "s1").setNode(newNodeName);
-    req.setWaitForFinalState(true);
     req.process(solrClient);
 
     cluster.waitForActiveCollection(collectionName, 1, 3);

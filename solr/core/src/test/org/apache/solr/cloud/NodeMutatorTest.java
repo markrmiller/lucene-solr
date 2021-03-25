@@ -42,12 +42,12 @@ public class NodeMutatorTest extends SolrTestCaseJ4 {
     //We use 2 nodes with maxShardsPerNode as 1
     //Collection1: 2 shards X 1 replica = replica1 on node1 and replica2 on node2
     //Collection2: 1 shard X 1 replica = replica1 on node2
-    ZkStateReader reader = ClusterStateMockUtil.buildClusterState("csrr2rDcsr2", 1, 1, NODE1, NODE2);
-    ClusterState clusterState = reader.getClusterState();
-    assertEquals(clusterState.getCollection("collection1").getReplica("replica1").getBaseUrl(), NODE1_URL);
-    assertEquals(clusterState.getCollection("collection1").getReplica("replica2").getBaseUrl(), NODE2_URL);
-    assertEquals(clusterState.getCollection("collection2").getReplica("replica4").getBaseUrl(), NODE2_URL);
-    reader.close();
+    try (ZkStateReader reader = ClusterStateMockUtil.buildClusterState("csrr2rDcsr2", 1, 1, NODE1, NODE2)) {
+      ClusterState clusterState = reader.getClusterState();
+      assertEquals(clusterState.getCollection("collection1").getReplica("replica1").getBaseUrl(), NODE1_URL);
+      assertEquals(clusterState.getCollection("collection1").getReplica("replica2").getBaseUrl(), NODE2_URL);
+      assertEquals(clusterState.getCollection("collection2").getReplica("replica4").getBaseUrl(), NODE2_URL);
+    }
 
     // TODO update
 //    ZkNodeProps props = new ZkNodeProps(ZkStateReader.NODE_NAME_PROP, NODE1);
@@ -62,17 +62,17 @@ public class NodeMutatorTest extends SolrTestCaseJ4 {
     //Collection1: 2 shards X 1 replica = replica1 on node1 and replica2 on node2
     //Collection2: 1 shard X 1 replica = replica1 on node2
     //Collection3: 1 shard X 3 replica = replica1 on node1 , replica2 on node2, replica3 on node3
-    reader = ClusterStateMockUtil.buildClusterState("csrr2rDcsr2csr1r2r3", 1, 1, NODE1, NODE2, NODE3);
-    clusterState = reader.getClusterState();
-    assertEquals(clusterState.getCollection("collection1").getReplica("replica1").getBaseUrl(), NODE1_URL);
-    assertEquals(clusterState.getCollection("collection1").getReplica("replica2").getBaseUrl(), NODE2_URL);
+    try (ZkStateReader reader = ClusterStateMockUtil.buildClusterState("csrr2rDcsr2csr1r2r3", 1, 1, NODE1, NODE2, NODE3)){
+      ClusterState clusterState = reader.getClusterState();
+      assertEquals(clusterState.getCollection("collection1").getReplica("replica1").getBaseUrl(), NODE1_URL);
+      assertEquals(clusterState.getCollection("collection1").getReplica("replica2").getBaseUrl(), NODE2_URL);
 
-    assertEquals(clusterState.getCollection("collection2").getReplica("replica4").getBaseUrl(), NODE2_URL);
+      assertEquals(clusterState.getCollection("collection2").getReplica("replica4").getBaseUrl(), NODE2_URL);
 
-    assertEquals(clusterState.getCollection("collection3").getReplica("replica5").getBaseUrl(), NODE1_URL);
-    assertEquals(clusterState.getCollection("collection3").getReplica("replica6").getBaseUrl(), NODE2_URL);
-    assertEquals(clusterState.getCollection("collection3").getReplica("replica7").getBaseUrl(), NODE3_URL);
-    reader.close();
+      assertEquals(clusterState.getCollection("collection3").getReplica("replica5").getBaseUrl(), NODE1_URL);
+      assertEquals(clusterState.getCollection("collection3").getReplica("replica6").getBaseUrl(), NODE2_URL);
+      assertEquals(clusterState.getCollection("collection3").getReplica("replica7").getBaseUrl(), NODE3_URL);
+    }
     // TODO update
 //    writes = nm.downNode(clusterState, props);
 //    assertEquals(writes.size(), 2);

@@ -36,11 +36,11 @@ public class ZooKeeperExposed {
     }
 
     public void interruptSendThread() {
-        try {
-            clientCnxn.sendThread.join(10);
-        } catch (InterruptedException e) {
-            // okay
-        }
+//        try {
+//            clientCnxn.sendThread.join(10);
+//        } catch (InterruptedException e) {
+//            // okay
+//        }
         clientCnxn.sendThread.interrupt();
     }
 
@@ -56,17 +56,17 @@ public class ZooKeeperExposed {
     }
 
     public void closeCnxn() {
-        if (!clientCnxn.getState().isAlive()) {
-            LOG.debug("Close called on already closed client");
-            return;
-        }
+//        if (!clientCnxn.getState().isAlive()) {
+//            LOG.debug("Close called on already closed client");
+//            return;
+//        }
 
         clientCnxn.sendThread.close();
 
-        try {
-            clientCnxn.sendThread.join(50);
-        } catch (InterruptedException e) {
-        }
+//        try {
+//            clientCnxn.sendThread.join(100);
+//        } catch (InterruptedException e) {
+//        }
 
         clientCnxn.eventThread.queueEventOfDeath();
 

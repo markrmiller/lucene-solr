@@ -79,7 +79,7 @@ public class CloudExitableDirectoryReaderTest extends SolrCloudTestCase {
   private static SolrClient client;
   
   @BeforeClass
-  public static void setupCluster() throws Exception {
+  public static void beforeCloudExitableDirectoryReaderTest() throws Exception {
     NUM_DOCS_PER_TYPE = TEST_NIGHTLY ? 20 : 10;
 
     // create one more node then shard, so that we also test the case of proxied requests.
@@ -92,7 +92,7 @@ public class CloudExitableDirectoryReaderTest extends SolrCloudTestCase {
     // pick an arbitrary node to use for our requests
     client = cluster.getRandomJetty(random()).newClient();
 
-    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1).waitForFinalState(true)
+    CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1)
         .process(cluster.getSolrClient());
 
     fiveHundredsByNode = new LinkedHashMap<>();

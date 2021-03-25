@@ -916,7 +916,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
         // the current transaction log.  This normally shouldn't happen
         // as DistributedUpdateProcessor will prevent this.  Commits
         // that don't use the processor are possible though.
-        log.info("Won't roll transaction log because not ACTIVE or a replay");
+        log.debug("Won't roll transaction log because not ACTIVE or a replay");
         return;
       }
 
@@ -1818,9 +1818,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
 
       recoveryInfo = new RecoveryInfo();
 
-      if (log.isInfoEnabled()) {
-        log.info("Starting to buffer updates. {}", this);
-      }
+      log.debug("Starting to buffer updates. {}", this);
 
       state = State.BUFFERING;
     } finally {

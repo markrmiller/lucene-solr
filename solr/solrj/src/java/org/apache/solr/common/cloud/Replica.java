@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +26,7 @@ import java.util.Set;
 import org.apache.solr.common.util.Utils;
 
 public class Replica extends ZkNodeProps {
+
 
   /**
    * The replica's state. In general, if the node the replica is hosted on is
@@ -144,9 +147,9 @@ public class Replica extends ZkNodeProps {
   private State state;
   private final Type type;
   public final String slice, collection;
-  private final String baseUrl;
+  private String baseUrl;
 
-  public Replica(String name, Map<String,Object> propMap, String collection, Long collectionId, String slice, NodeNameToBaseUrl nodeNameToBaseUrl) {
+  public Replica(String name, Map<String,Object> propMap, String collection, Long collectionId, String slice, String baseUrl) {
     super(propMap);
     this.collection = collection;
     this.slice = slice;
@@ -161,8 +164,23 @@ public class Replica extends ZkNodeProps {
     }
 
     this.collectionId = collectionId;
+    this.baseUrl = baseUrl;
 
-    this.baseUrl = nodeNameToBaseUrl.getBaseUrlForNodeName(this.nodeName);
+    if (this.baseUrl == null) {
+      this.baseUrl = (String) propMap.get(ZkStateReader.BASE_URL_PROP);
+    } else {
+      propMap.put(ZkStateReader.BASE_URL_PROP, baseUrl);
+    }
+
+    if (this.collectionId == null) {
+      Object collId = propMap.get("collId");
+      if (collId != null) {
+        this.collectionId = Long.parseLong((String) collId);
+      }
+    } else {
+      propMap.put("collId", Long.toString(collectionId));
+    }
+
     type = Type.get((String) propMap.get(ZkStateReader.REPLICA_TYPE));
     Objects.requireNonNull(this.collection, "'collection' must not be null");
     Objects.requireNonNull(this.slice, "'slice' must not be null");
@@ -170,34 +188,12 @@ public class Replica extends ZkNodeProps {
     Objects.requireNonNull(this.nodeName, "'node_name' must not be null");
     Objects.requireNonNull(this.type, "'type' must not be null");
     Objects.requireNonNull(this.collectionId, "'collectionId' must not be null");
+    Objects.requireNonNull(this.baseUrl, "'baseUrl' must not be null");
 
     if (propMap.get(ZkStateReader.STATE_PROP) != null) {
       if (propMap.get(ZkStateReader.STATE_PROP) instanceof State) {
         this.state = (State) propMap.get(ZkStateReader.STATE_PROP);
-      } else {
-        this.state = State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
-      }
-    } else {
-      this.state = State.DOWN;                         //Default to DOWN
-      propMap.put(ZkStateReader.STATE_PROP, state.toString());
-    }
-  }
-
-  public Replica(String name, Map<String,Object> propMap, String collection, Long collectionId, String slice, String baseUrl) {
-    super(propMap);
-    this.collection = collection;
-    this.slice = slice;
-    this.name = name;
-    this.nodeName = (String) propMap.get(ZkStateReader.NODE_NAME_PROP);
-    this.id = propMap.containsKey("id") ? Long.parseLong((String) propMap.get("id")) : null;
-    this.collectionId = collectionId;
-
-    Objects.requireNonNull(this.collectionId, "'collectionId' must not be null");
-    this.baseUrl =  baseUrl;
-    type = Type.get((String) propMap.get(ZkStateReader.REPLICA_TYPE));
-    if (propMap.get(ZkStateReader.STATE_PROP) != null) {
-      if (propMap.get(ZkStateReader.STATE_PROP) instanceof  State) {
-        this.state = (State) propMap.get(ZkStateReader.STATE_PROP);
+        propMap.put(ZkStateReader.STATE_PROP, state.toString());
       } else {
         this.state = State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
       }
@@ -208,14 +204,14 @@ public class Replica extends ZkNodeProps {
   }
 
   Long id;
-  final Long collectionId;
+  Long collectionId;
 
   public String getId() {
     return collectionId + "-" + (id == null ? null : id.toString());
   }
 
-  public String getInternalId() {
-    return id.toString();
+  public Long getInternalId() {
+    return id;
   }
 
   public Long getCollectionId() {
@@ -252,6 +248,7 @@ public class Replica extends ZkNodeProps {
   public String getCoreUrl() {
     return getCoreUrl(getBaseUrl(), name);
   }
+
   public String getBaseUrl() {
     return baseUrl;
   }
@@ -264,11 +261,6 @@ public class Replica extends ZkNodeProps {
   /** Returns the {@link State} of this replica. */
   public State getState() {
     return state;
-  }
-
-  // only to be used by ZkStateWriter currently
-  public void setState(State state) {
-    this.state = state;
   }
 
   public boolean isActive(Set<String> liveNodes) {
@@ -296,6 +288,17 @@ public class Replica extends ZkNodeProps {
     if (!baseUrl.endsWith("/")) sb.append("/");
     sb.append(coreName);
     return sb.toString();
+  }
+
+  public Replica copy() {
+    return copy(Collections.emptyMap());
+  }
+
+  public Replica copy(Map props) {
+    Map newProps = new HashMap(propMap);
+    newProps.putAll(props);
+    Replica r = new Replica(getName(), newProps, getName(), getCollectionId(), getName(), getBaseUrl());
+    return r;
   }
 
   @Override

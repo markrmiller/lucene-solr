@@ -163,7 +163,7 @@ public class HttpSolrCall {
   protected volatile Action action;
   protected volatile String coreUrl;
   protected SolrConfig config;
-  protected Map<String, Integer> invalidStates;
+  protected volatile Map<String,String> invalidStates;
 
   //The states of client that is invalid in this request
   protected String origCorename; // What's in the URL path; might reference a collection/alias or a Solr core name
@@ -266,7 +266,7 @@ public class HttpSolrCall {
       }
 
       if (core == null && log.isDebugEnabled()) {
-        log.debug("tried to get core by name {} got {}, existing cores {} loading={} found={}", origCorename, core, cores.getAllCoreNames(), cores.getLoadedCoreNames(), core != null);
+        log.debug("tried to get core by name {} got {}, existing cores {} loaded={} found={} isLoading={}", origCorename, core, cores.getAllCoreNames(), cores.getLoadedCoreNames(), core != null, cores.isCoreLoading(origCorename));
       }
 
       if (core != null) {
@@ -468,7 +468,8 @@ public class HttpSolrCall {
 
     coreUrl = getRemoteCoreUrl(collectionName);
     // don't proxy for internal update requests
-//    Map<String,Integer> invalidStates = checkStateVersionsAreValid(getCollectionsList(), queryParams.get(CloudSolrClient.STATE_VERSION));
+    invalidStates = checkStateVersionsAreValid(getCollectionsList(), queryParams.get(CloudSolrClient.STATE_VERSION));
+
     if (coreUrl != null
         && queryParams.get(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM) == null) {
 //      if (invalidStates != null) {
@@ -619,13 +620,14 @@ public class HttpSolrCall {
               resp.addHeader(entry.getKey(), entry.getValue());
             }
             QueryResponseWriter responseWriter = getResponseWriter();
-            //if (invalidStates != null) solrReq.getContext().put(CloudSolrClient.STATE_VERSION, invalidStates);
+            if (invalidStates != null) solrReq.getContext().put(CloudSolrClient.STATE_VERSION, invalidStates);
             writeResponse(solrRsp, responseWriter, reqMethod);
           }
           return RETURN;
         default: return action;
       }
     } catch (Throwable ex) {
+      log.error("ERROR", ex);
       if (!(ex instanceof PrepRecoveryOp.NotValidLeader) && shouldAudit(EventType.ERROR)) {
         cores.getAuditLoggerPlugin().doAudit(new AuditEvent(EventType.ERROR, ex, req));
       }
@@ -846,6 +848,7 @@ public class HttpSolrCall {
 
   protected void sendError(Throwable ex) throws IOException {
     Exception exp = null;
+    SolrCore localCore = null;
     try {
       SolrQueryResponse solrResp = new SolrQueryResponse();
       if (ex instanceof Exception) {
@@ -853,6 +856,7 @@ public class HttpSolrCall {
       } else {
         solrResp.setException(new RuntimeException(ex));
       }
+      localCore = core;
       if (solrReq == null) {
         final SolrParams solrParams;
         if (req != null) {
@@ -870,20 +874,24 @@ public class HttpSolrCall {
     } catch (Exception e) { // This error really does not matter
       exp = e;
     } finally {
-
-      if (exp != null) {
-        SimpleOrderedMap info = new SimpleOrderedMap();
-        int code = ResponseUtils.getErrorInfo(ex, info, log);
-        sendError(code, info.toString());
+      try {
+        if (exp != null) {
+          SimpleOrderedMap info = new SimpleOrderedMap();
+          int code = ResponseUtils.getErrorInfo(ex, info, log);
+          sendError(code, info.toString());
+        }
+      } finally {
+        if (core == null && localCore != null) {
+          localCore.close();
+        }
       }
-
     }
   }
 
   protected void sendError(int code, String message) throws IOException {
     try {
       response.sendError(code, message);
-    } catch (Exception e) {
+    } catch (EOFException e) {
       log.info("Unable to write error response, client closed connection or we are shutting down", e);
     }
   }
@@ -901,7 +909,7 @@ public class HttpSolrCall {
     SolrCore.preDecorateResponse(solrReq, solrResp);
     handleAdmin(solrResp);
     SolrCore.postDecorateResponse(handler, solrReq, solrResp);
-    if (log.isInfoEnabled() && solrResp.getToLog().size() > 0) {
+    if (log.isInfoEnabled() && solrResp.getToLog().size() > 0 && !path.startsWith("/admin/metrics")) {
       log.info(solrResp.getToLogAsString("[admin]"));
     }
     QueryResponseWriter respWriter = SolrCore.DEFAULT_RESPONSE_WRITERS.get(solrReq.getParams().get(CommonParams.WT));
@@ -967,11 +975,13 @@ public class HttpSolrCall {
   private void writeResponse(SolrQueryResponse solrRsp, QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
-      Object invalidStates = solrReq.getContext().get(CloudSolrClient.STATE_VERSION);
+      Map invalidStates = (Map) solrReq.getContext().get(CloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
       //If that assumption is changed , it would fail. This is done to avoid an O(n) scan on
       // the response for each request
-      if (invalidStates != null) solrRsp.add(CloudSolrClient.STATE_VERSION, invalidStates);
+      if (invalidStates != null && invalidStates.size() > 0) {
+        solrRsp.add(CloudSolrClient.STATE_VERSION, invalidStates);
+      }
       // Now write it out
       final String ct = responseWriter.getContentType(solrReq, solrRsp);
       // don't call setContentType on null
@@ -995,8 +1005,8 @@ public class HttpSolrCall {
   }
 
   /** Returns null if the state ({@link CloudSolrClient#STATE_VERSION}) is good; otherwise returns state problems. */
-  private Map<String, Integer> checkStateVersionsAreValid(List<String> collectionsList, String stateVer) {
-    Map<String, Integer> result = null;
+  private Map<String, String> checkStateVersionsAreValid(List<String> collectionsList, String stateVer) {
+    Map<String, String> result = null;
     String[] pairs;
     if (stateVer != null && !stateVer.isEmpty() && cores.isZooKeeperAware()) {
       // many have multiple collections separated by |
@@ -1009,39 +1019,13 @@ public class HttpSolrCall {
           int version = Integer.parseInt(versionAndUpdatesHash[0]);
           int updateHash = Integer.parseInt(versionAndUpdatesHash[1]);
 
-          Integer status = cores.getZkController().getZkStateReader().compareStateVersions(pcs[0], version, updateHash);
+          String status = cores.getZkController().getZkStateReader().compareStateVersions(pcs[0], version, updateHash);
           if (status != null) {
             if (result == null) result = new HashMap<>();
             result.put(pcs[0], status);
           }
         }
       }
-    }
-    return result;
-  }
-
-  private Map<String, Integer> getStateVersions(String stateVer) {
-    // TODO: for collections that are local and watched, we should just wait for the right min state, not eager fetch everything
-    Map<String, Integer> result = null;
-    String[] pairs;
-    if (stateVer != null && !stateVer.isEmpty() && cores.isZooKeeperAware()) {
-      // many have multiple collections separated by |
-      pairs = StringUtils.split(stateVer, '|');
-      for (String pair : pairs) {
-        String[] pcs = StringUtils.split(pair, ':');
-        if (pcs.length == 2 && !pcs[0].isEmpty() && !pcs[1].isEmpty()) {
-          if (log.isDebugEnabled()) {
-            log.debug("compare version states {} {}", pcs[0], Integer.parseInt(pcs[1]));
-          }
-
-          if (result == null) result = new HashMap<>();
-          result.put(pcs[0], Integer.parseInt(pcs[1]));
-
-        }
-      }
-    }
-    if (log.isTraceEnabled()) {
-      log.trace("compare version states result {} {}", stateVer, result);
     }
     return result;
   }

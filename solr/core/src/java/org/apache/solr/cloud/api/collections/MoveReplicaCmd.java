@@ -168,7 +168,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     OverseerCollectionMessageHandler.Finalize finalizer = resp.asyncFinalRunner;
     response.asyncFinalRunner = new MyFinalize(finalizer);
 
-    response.clusterState = null;
+    response.clusterState = resp.clusterState;
 
     return response;
   }
@@ -270,6 +270,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
   private CollectionCmdResponse.Response moveNormalReplica(ClusterState clusterState, @SuppressWarnings({"rawtypes"}) NamedList results, String targetNode, String async, DocCollection coll,
       Replica replica, Slice slice, int timeout, boolean waitForFinalState) throws Exception {
     String newCoreName = Assign.buildSolrCoreName(coll, slice.getName(), replica.getType(), ocmh.overseer).coreName;
+
     ZkNodeProps addReplicasProps = new ZkNodeProps(COLLECTION_PROP, coll.getName(), SHARD_ID_PROP, slice.getName(), CoreAdminParams.NODE, targetNode, CoreAdminParams.NAME, newCoreName,
         ZkStateReader.REPLICA_TYPE, replica.getType().name(), WAIT_FOR_FINAL_STATE, "true");
 
@@ -278,7 +279,6 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     SolrCloseableLatch countDownLatch = new SolrCloseableLatch(1, ocmh);
 
     CollectionCmdResponse.Response response = ocmh.addReplicaWithResp(clusterState, addReplicasProps, addResult);
-    ocmh.overseer.getZkStateWriter().enqueueUpdate(response.clusterState.getCollection(coll.getName()), null,false);
 
     // wait for the other replica to be active if the source replica was a leader
 
@@ -301,6 +301,21 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
         return response1;
       } else {
 
+        ocmh.zkStateReader.waitForState(coll.getName(), 1, TimeUnit.HOURS, (liveNodes, collectionState) -> {
+          if (collectionState == null) {
+            return false;
+          }
+          Replica rep = collectionState.getReplica(newCoreName);
+          if (rep == null) {
+            return false;
+          }
+
+          if (rep.getState() != Replica.State.ACTIVE) {
+            return false;
+          }
+          return true;
+        });
+
         CollectionCmdResponse.Response response1 = new CollectionCmdResponse.Response();
         CollectionCmdResponse.Response asyncResp = new CollectionCmdResponse.Response();
         ZkNodeProps removeReplicasProps = new ZkNodeProps(COLLECTION_PROP, coll.getName(), SHARD_ID_PROP, slice.getName(), REPLICA_PROP, replica.getName(), WAIT_FOR_FINAL_STATE, "true");
@@ -309,7 +324,7 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
         try {
           response1.clusterState = ocmh.deleteReplica(clusterState, removeReplicasProps, deleteResult).clusterState;
           String collection = response1.clusterState.getCollectionsMap().keySet().iterator().next();
-          ocmh.overseer.getZkStateWriter().enqueueUpdate( response1.clusterState.getCollection(collection), null,false);
+          ocmh.overseer.getZkStateWriter().enqueueStructureChange(response1.clusterState.getCollection(collection));
           asyncResp.writeFuture = ocmh.overseer.writePendingUpdates(collection);
         } catch (SolrException e) {
           deleteResult.add("failure", e.toString());

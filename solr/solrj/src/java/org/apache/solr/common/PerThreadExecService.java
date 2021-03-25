@@ -3,13 +3,18 @@ package org.apache.solr.common;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.solr.common.util.CloseTracker;
@@ -37,6 +42,8 @@ public class PerThreadExecService extends AbstractExecutorService {
   private final AtomicInteger running = new AtomicInteger();
 
   private CloseTracker closeTracker;
+
+  private Map<Runnable,Future> futureSet = new ConcurrentHashMap(128);
 
   private SysStats sysStats = ParWork.getSysStats();
   private volatile boolean closeLock;
@@ -89,15 +96,22 @@ public class PerThreadExecService extends AbstractExecutorService {
     synchronized (running) {
       running.notifyAll();
     }
+    futureSet.clear();
   }
 
   @Override
   public List<Runnable> shutdownNow() {
     shutdown = true;
+
+    for (Future future : futureSet.values()) {
+      future.cancel(true);
+    }
+
     running.decrementAndGet();
     synchronized (running) {
       running.notifyAll();
     }
+
     return Collections.emptyList();
   }
 
@@ -114,17 +128,28 @@ public class PerThreadExecService extends AbstractExecutorService {
   @Override
   public boolean awaitTermination(long l, TimeUnit timeUnit)
       throws InterruptedException {
-    TimeOut timeout = new TimeOut(10, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-    synchronized (running) {
 
+    TimeOut timeout = new TimeOut(l, timeUnit, TimeSource.NANO_TIME);
+
+    // MRM TODO timeout respect
+    for (Future future : futureSet.values()) {
+      try {
+        future.get(10, TimeUnit.SECONDS);
+      } catch (ExecutionException e) {
+        log.warn("", e);
+      } catch (TimeoutException e) {
+        log.warn("", e);
+      }
+    }
+
+    synchronized (running) {
       while (running.get() > 0) {
         if (timeout.hasTimedOut()) {
           log.error("return before reaching termination, wait for {} {}, running={}", l, timeout, running);
           return false;
         }
-
         // System.out.println("WAIT : " + workQueue.size() + " " + available.getQueueLength() + " " + workQueue.toString());
-        running.wait(500);
+        running.wait(150);
       }
     }
     if (isShutdown()) {
@@ -152,7 +177,7 @@ public class PerThreadExecService extends AbstractExecutorService {
         }
       }
       try {
-        service.submit(new MyThreadCallable(runnable, available, running, callerThreadUsesAvailableLimit));
+        futureSet.put(runnable, service.submit(new MyThreadCallable(runnable, available, running, callerThreadUsesAvailableLimit)));
       } catch (Exception e) {
         log.error("", e);
         if (callerThreadUsesAvailableLimit) {
@@ -175,7 +200,7 @@ public class PerThreadExecService extends AbstractExecutorService {
 
     Runnable finalRunnable = runnable;
     try {
-      service.submit(new MyThreadCallable(finalRunnable, available, running,true));
+      futureSet.put(finalRunnable, service.submit(new MyThreadCallable(finalRunnable, available, running,true)));
     } catch (Exception e) {
       log.error("Exception submitting", e);
       try {
@@ -190,7 +215,7 @@ public class PerThreadExecService extends AbstractExecutorService {
     }
   }
 
-  private static void runIt(Runnable runnable, Semaphore available, AtomicInteger running, boolean acquired) {
+  private void runIt(Runnable runnable, Semaphore available, AtomicInteger running, boolean acquired) {
     try {
       runnable.run();
     } finally {
@@ -199,10 +224,15 @@ public class PerThreadExecService extends AbstractExecutorService {
           available.release();
         }
       } finally {
-        running.decrementAndGet();
-        synchronized (running) {
-          running.notifyAll();
+        try {
+          futureSet.remove(runnable);
+        } finally {
+          running.decrementAndGet();
+          synchronized (running) {
+            running.notifyAll();
+          }
         }
+
       }
     }
   }
@@ -233,7 +263,7 @@ public class PerThreadExecService extends AbstractExecutorService {
     }
   }
 
-  public static class MyThreadCallable implements Callable<Object> {
+  public class MyThreadCallable implements Callable<Object> {
     private final Runnable runnable;
     private final boolean acquired;
     private final Semaphore available;

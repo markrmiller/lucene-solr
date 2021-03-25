@@ -286,11 +286,18 @@ public class PluginBag<T> implements AutoCloseable {
    */
   void init(Map<String, T> defaults, SolrCore solrCore, Collection<PluginInfo> infos) {
     core = solrCore;
-    try (ParWork parWork = new ParWork(this, false, false)) {
+   // try (ParWork parWork = new ParWork(this, false, true)) {
       for (PluginInfo info : infos) {
-        parWork.collect("", new CreateAndPutRequestHandler(info));
+      //  parWork.collect("", new CreateAndPutRequestHandler(info));
+        PluginHolder<T> o = createPlugin(info);
+        String name = info.name;
+        if (meta.clazz.equals(SolrRequestHandler.class)) name = RequestHandlers.normalize(info.name);
+        PluginHolder<T> old = put(name, o);
+        if (old != null) {
+          log.warn("Multiple entries of {} with name {}", meta.getCleanTag(), name);
+        }
       }
-    }
+   /// }
     if (infos.size() > 0) { // Aggregate logging
       if (log.isDebugEnabled()) {
         log.debug("[{}] Initialized {} plugins of type {}: {}", solrCore.getName(), infos.size(), meta.getCleanTag(),
@@ -332,14 +339,14 @@ public class PluginBag<T> implements AutoCloseable {
    */
   @Override
   public void close() {
-    try (ParWork worker = new ParWork(this, false, false)) {
+    try (ParWork worker = new ParWork(this, false, true)) {
       registry.forEach((s, tPluginHolder) -> {
         worker.collect(tPluginHolder);
       });
     }
   }
 
-  public static void closeQuietly(Object inst)  {
+  public void closeQuietly(Object inst)  {
     try {
       if (inst != null && inst instanceof AutoCloseable) ((AutoCloseable) inst).close();
     } catch (Exception e) {

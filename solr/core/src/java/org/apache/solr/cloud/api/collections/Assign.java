@@ -347,7 +347,8 @@ public class Assign {
             Replica.Type.PULL, assignRequest.numPullReplicas
         ).entrySet()) {
           for (int j = 0; j < e.getValue(); j++) {
-            result.add(new ReplicaPosition(aShard, j, e.getKey(), nodeList.get(i % nodeList.size())));
+            String node = nodeList.get(i % nodeList.size());
+            result.add(new ReplicaPosition(aShard, j, e.getKey(), node, ((Replica.NodeNameToBaseUrl) solrCloudManager.getClusterStateProvider()).getBaseUrlForNodeName(node)));
             i++;
           }
         }

@@ -85,8 +85,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
 
     final ZkStateReader stateReader = cluster.getSolrClient().getZkStateReader();
 
-
-    final Replica leader = stateReader.getLeaderRetry(COLLECTION, shardId);
+    final Replica leader = stateReader.getLeaderRetry(COLLECTION, shardId, 1000, true);
 
     // start by reloading the empty collection so we try to calculate the max from an empty index
     reloadCollection(leader, COLLECTION);

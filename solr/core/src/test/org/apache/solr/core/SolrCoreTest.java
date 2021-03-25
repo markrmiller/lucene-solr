@@ -99,14 +99,14 @@ public class SolrCoreTest extends SolrTestCaseJ4 {
       ++ihCount; assertEquals(pathToClassMap.get("/admin/system"), "solr.SystemInfoHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/admin/threads"), "solr.ThreadDumpHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/config"), "solr.SolrConfigHandler");
-      ++ihCount; assertEquals(pathToClassMap.get("/export"), "solr.ExportHandler");
+      //++ihCount; assertEquals(pathToClassMap.get("/export"), "solr.ExportHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/terms"), "solr.SearchHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/get"), "solr.RealTimeGetHandler");
       ++ihCount; assertEquals(pathToClassMap.get(ReplicationHandler.PATH), "solr.ReplicationHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/schema"), "solr.SchemaHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/sql"), "solr.SQLHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/stream"), "solr.StreamHandler");
-      ++ihCount; assertEquals(pathToClassMap.get("/graph"), "solr.GraphHandler");
+     // ++ihCount; assertEquals(pathToClassMap.get("/graph"), "solr.GraphHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/update"), "solr.UpdateRequestHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/update/csv"), "solr.UpdateRequestHandler");
       ++ihCount; assertEquals(pathToClassMap.get("/update/json"), "solr.UpdateRequestHandler");

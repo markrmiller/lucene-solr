@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestUtil;
@@ -151,7 +152,17 @@ public class DeleteShardTest extends SolrCloudTestCase {
     req.process(cluster.getSolrClient());
 
     coreStatus = getCoreStatus(leader);
-    assertEquals(2, getCollectionState(collection).getActiveSlices().size());
+
+
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      if (collectionState.getActiveSlices().size() != 2) {
+        return false;
+      }
+      return true;
+    });
 
     // MRM TODO:
     if (coreStatus != null && coreStatus.getResponse() != null) {
@@ -159,15 +170,41 @@ public class DeleteShardTest extends SolrCloudTestCase {
       assertFalse("Data directory still exists", FileUtils.fileExists(coreStatus.getDataDirectory()));
     }
 
-    leader = getCollectionState(collection).getLeader("b");
-    coreStatus = getCoreStatus(leader);
+    AtomicReference<Replica> leaderRef = new AtomicReference();
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      Slice slice = collectionState.getSlice("b");
+      if (slice == null) {
+        return false;
+      }
+      Replica leaderReplia = slice.getLeader();
+      if (leaderReplia == null) {
+        return false;
+      }
+      leaderRef.set(leaderReplia);
+      return true;
+    });
+
+    coreStatus = getCoreStatus(leaderRef.get());
 
     // Delete shard 'b'
     req = CollectionAdminRequest.deleteShard(collection, "b");
     req.setWaitForFinalState(true);
     req.process(cluster.getSolrClient());
 
-    assertEquals(1, getCollectionState(collection).getActiveSlices().size());
+
+
+    cluster.getSolrClient().getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+      if (collectionState == null) {
+        return false;
+      }
+      if (collectionState.getActiveSlices().size() != 1) {
+        return false;
+      }
+      return true;
+    });
 
     if (FileUtils.fileExists(coreStatus.getInstanceDirectory())) {
       Thread.sleep(250);

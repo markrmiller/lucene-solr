@@ -74,7 +74,7 @@ public class ReplicaMutator {
     Map<String, Object> replicaProps = new LinkedHashMap<>(replica.getProperties());
     replicaProps.put(key, value);
     replicaProps.put(key2, value2);
-    return new Replica(replica.getName(), replicaProps, replica.getCollection(), replica.getCollectionId(), replica.getSlice(), (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider());
+    return new Replica(replica.getName(), replicaProps, replica.getCollection(), replica.getCollectionId(), replica.getSlice(), replica.getBaseUrl());
   }
 
   protected Replica unsetProperty(Replica replica, String key) {
@@ -83,7 +83,7 @@ public class ReplicaMutator {
     if (!replica.containsKey(key)) return replica;
     Map<String, Object> replicaProps = new LinkedHashMap<>(replica.getProperties());
     replicaProps.remove(key);
-    return new Replica(replica.getName(), replicaProps, replica.getCollection(), replica.getCollectionId(), replica.getSlice(), (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider());
+    return new Replica(replica.getName(), replicaProps, replica.getCollection(), replica.getCollectionId(), replica.getSlice(), replica.getBaseUrl());
   }
 
   protected Replica setLeader(Replica replica) {
@@ -163,7 +163,7 @@ public class ReplicaMutator {
       }
     }
     Slice newSlice = new Slice(sliceName, replicas, collection.getSlice(sliceName).shallowCopy(), collectionName,
-        replica.getCollectionId(), (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider());
+        replica.getCollectionId());
     DocCollection newCollection = CollectionMutator.updateSlice(collectionName, collection,
         newSlice);
     return clusterState.copyWith(collectionName, newCollection);
@@ -326,7 +326,7 @@ public class ReplicaMutator {
     String shardParent = (String) replicaProps.remove(ZkStateReader.SHARD_PARENT_PROP);
 
 
-    Replica replica = new Replica(coreName, replicaProps, collectionName, id, sliceName, (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider());
+    Replica replica = new Replica(coreName, replicaProps, collectionName, id, sliceName, (String) replicaProps.get(ZkStateReader.BASE_URL_PROP));
 
     log.debug("Will update state for replica: {}", replica);
 
@@ -341,7 +341,7 @@ public class ReplicaMutator {
       replicas = slice.getReplicasCopy();
 
     replicas.put(replica.getName(), replica);
-    slice = new Slice(sliceName, replicas, sliceProps, collectionName, collection.getId(), (Replica.NodeNameToBaseUrl) cloudManager.getClusterStateProvider());
+    slice = new Slice(sliceName, replicas, sliceProps, collectionName, collection.getId());
 
     DocCollection newCollection = CollectionMutator.updateSlice(collectionName, collection, slice);
     log.debug("Collection is now: {}", newCollection);

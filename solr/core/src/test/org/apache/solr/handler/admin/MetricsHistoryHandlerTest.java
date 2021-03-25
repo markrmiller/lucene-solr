@@ -126,7 +126,7 @@ public class MetricsHistoryHandlerTest extends SolrCloudTestCase {
 
     assertEquals(list.toString(), 2, list.size());
     for (Pair<String, Long> p : list) {
-      RrdDb db = RrdDb.getBuilder().setPath(MetricsHistoryHandler.URI_PREFIX + p.first()).setReadOnly(true).setBackendFactory( handler.getFactory()).setUsePool(true).build();
+      RrdDb db = RrdDb.getBuilder().setPath(MetricsHistoryHandler.URI_PREFIX + p.first()).setReadOnly(true).setBackendFactory( handler.getFactory()).build();
       int dsCount = db.getDsCount();
       int arcCount = db.getArcCount();
       assertTrue("dsCount should be > 0, was " + dsCount, dsCount > 0);

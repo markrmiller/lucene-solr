@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ObjectReleaseTracker {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static Map<Object,ObjectTrackerException> OBJECTS = new ConcurrentHashMap<>(128, 0.75f, 5);
-
+  private static final boolean DISABLED = Boolean.getBoolean("disableCloseTracker");
 
   protected final static ThreadLocal<StringBuilder> THREAD_LOCAL_SB = new ThreadLocal<>();
 
@@ -46,12 +46,14 @@ public class ObjectReleaseTracker {
   }
 
   public static boolean track(Object object) {
+    if (DISABLED) return true;
     ObjectTrackerException ote = new ObjectTrackerException(object.getClass().getName() + "@" + Integer.toHexString(object.hashCode()));
     OBJECTS.put(object.getClass().getName() + "@" + Integer.toHexString(object.hashCode()), ote);
     return true;
   }
   
   public static boolean release(Object object) {
+    if (DISABLED) return true;
     OBJECTS.remove(object.getClass().getName() + "@" + Integer.toHexString(object.hashCode()));
     return true;
   }

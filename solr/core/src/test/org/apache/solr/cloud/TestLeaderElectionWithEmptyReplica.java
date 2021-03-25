@@ -87,8 +87,6 @@ public class TestLeaderElectionWithEmptyReplica extends SolrCloudTestCase {
     // bring the old leader node back up
     replicaJetty.start();
 
-    cluster.getZkClient().printLayout();
-
     cluster.waitForActiveCollection(COLLECTION_NAME, 1, 2);
 
     // now query each replica and check for consistency

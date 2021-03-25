@@ -131,6 +131,8 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     cluster.getSolrClient().commit(collectionName);
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "s1", cluster.getZkClient())) {
+      zkShardTerms.createWatcher();
+
       assertEquals(1, zkShardTerms.getTerms().size());
       assertEquals(1L, zkShardTerms.getHighestTerm());
     }
@@ -156,6 +158,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     });
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "s1", cluster.getZkClient())) {
+      zkShardTerms.createWatcher();
       Replica newLeader = getCollectionState(collectionName).getSlice("s1").getLeader();
       assertEquals(2, zkShardTerms.getTerms().size());
       assertEquals(1L, zkShardTerms.getTerm(newLeader.getName()));
@@ -211,6 +214,8 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     addDoc(collectionName, 3, cluster.getJettySolrRunner(0));
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "s1", cluster.getZkClient())) {
+      zkShardTerms.createWatcher();
+
       assertEquals(3, zkShardTerms.getTerms().size());
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(leader.getName()));
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(replica2.getName()));
@@ -221,6 +226,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     addDoc(collectionName, 4, cluster.getJettySolrRunner(0));
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "s1", cluster.getZkClient())) {
+      zkShardTerms.createWatcher();
       assertEquals(3, zkShardTerms.getTerms().size());
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(leader.getName()));
       assertTrue(zkShardTerms.getHighestTerm() + "," + zkShardTerms.getTerm(replica2.getName()), zkShardTerms.getHighestTerm() >= zkShardTerms.getTerm(replica2.getName()));

@@ -215,7 +215,7 @@ public class StatePublisher implements Closeable {
     }
 
     private void processMessage(ConcurrentHashMap message) throws KeeperException, InterruptedException {
-      log.info("Send state updates to Overseer {}", message);
+      log.debug("Send state updates to Overseer {}", message);
       byte[] updates = Utils.toJSON(message);
 
       zkStateReader.getZkClient().create("/overseer/queue" + "/" + PREFIX, updates, CreateMode.PERSISTENT_SEQUENTIAL, (rc, path, ctx, name, stat) -> {
@@ -255,9 +255,9 @@ public class StatePublisher implements Closeable {
 
           DocCollection coll = zkStateReader.getClusterState().getCollectionOrNull(collection);
 
-          if (coll == null) {
-            zkStateReader.waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> collectionState != null);
-          }
+//          if (coll == null) {
+//            zkStateReader.waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> collectionState != null);
+//          }
 
           if (coll != null) {
             Replica replica = coll.getReplica(core);

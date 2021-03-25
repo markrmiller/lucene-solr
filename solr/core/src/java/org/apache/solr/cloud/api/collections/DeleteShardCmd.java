@@ -146,7 +146,7 @@ public class DeleteShardCmd implements OverseerCollectionMessageHandler.Cmd {
 
       ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, DELETESHARD.toLower(), ZkStateReader.COLLECTION_PROP, collectionName, ZkStateReader.SHARD_ID_PROP, sliceId);
 
-      clusterState = new CollectionMutator(ocmh.cloudManager).deleteShard(clusterState, m);
+      clusterState = new CollectionMutator(ocmh.cloudManager, ocmh.zkStateReader).deleteShard(clusterState, m);
 
 
       log.info("Successfully deleted collection: {} , shard: {}", collectionName, sliceId);
@@ -177,7 +177,7 @@ public class DeleteShardCmd implements OverseerCollectionMessageHandler.Cmd {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
       if (waitForFinalState) {
-        ocmh.overseer.getZkStateWriter().enqueueUpdate(finalClusterState.getCollection(collectionName), null, false);
+        ocmh.overseer.getZkStateWriter().enqueueStructureChange(finalClusterState.getCollection(collectionName));
         ocmh.overseer.writePendingUpdates(collectionName).get();
         ocmh.overseer.getZkStateReader().waitForState(collectionName, 10, TimeUnit.SECONDS, (liveNodes, coll) -> {
           if (coll == null) {

@@ -88,6 +88,10 @@ enum CoreAdminOperation implements CoreAdminOp {
         Map<String,String> coreParams = buildCoreParams(params);
         CoreContainer coreContainer = it.handler.coreContainer;
 
+        if (coreContainer.isZooKeeperAware()) {
+          String collectionName = coreParams.get(CoreDescriptor.CORE_COLLECTION);
+          coreContainer.getZkController().getZkStateReader().registerCore(collectionName, coreName);
+        }
         coreContainer.markCoreAsLoading(coreName);
         Path instancePath;
 
@@ -107,14 +111,11 @@ enum CoreAdminOperation implements CoreAdminOp {
           throw new AlreadyClosedException("Will not create SolrCore, CoreContainer is shutdown");
         }
         long start = System.nanoTime();
-        coreContainer.create(coreName, instancePath, coreParams, newCollection);
+        coreContainer.create(coreName, instancePath, coreParams, newCollection, true);
         log().info("SolrCore {} created in {}ms", coreName, TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS));
 
         it.rsp.add("core", coreName);
       } finally {
-        if (it.handler.coreContainer.isCoreLoading(coreName)) {
-          it.handler.coreContainer.markCoreAsNotLoading(coreName);
-        }
         MDCLoggingContext.clear();
       }
     }
@@ -129,8 +130,9 @@ enum CoreAdminOperation implements CoreAdminOp {
       boolean deleteDataDir = params.getBool(CoreAdminParams.DELETE_DATA_DIR, true);
       boolean deleteInstanceDir = params.getBool(CoreAdminParams.DELETE_INSTANCE_DIR, true);
       boolean deleteMetricsHistory = params.getBool(CoreAdminParams.DELETE_METRICS_HISTORY, true);
+      boolean removeFromZk = params.getBool("removeFromZk", true);
       CoreDescriptor cdescr = it.handler.coreContainer.getCoreDescriptor(cname);
-      it.handler.coreContainer.unload(cname, deleteIndexDir, deleteDataDir, deleteInstanceDir);
+      it.handler.coreContainer.unload(cdescr, cname, deleteIndexDir, deleteDataDir, deleteInstanceDir, removeFromZk);
       if (deleteMetricsHistory) {
         MetricsHistoryHandler historyHandler = it.handler.coreContainer.getMetricsHistoryHandler();
         if (historyHandler != null) {

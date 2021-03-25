@@ -133,12 +133,13 @@ UpdateHandler implements SolrInfoBean, Closeable {
     boolean skipUpdateLog = core.getCoreDescriptor().getCloudDescriptor() != null && !core.getCoreDescriptor().getCloudDescriptor().requiresTransactionLog();
     if (updateLog == null && ulogPluginInfo != null && ulogPluginInfo.isEnabled() && !skipUpdateLog) {
       DirectoryFactory dirFactory = core.getDirectoryFactory();
-      if (dirFactory instanceof HdfsDirectoryFactory) {
-        ulog = new HdfsUpdateLog(((HdfsDirectoryFactory)dirFactory).getConfDir());
-      } else {
+      // MRM TODO
+//      if (dirFactory instanceof HdfsDirectoryFactory) {
+//        ulog = new HdfsUpdateLog(((HdfsDirectoryFactory)dirFactory).getConfDir());
+//      } else {
         String className = ulogPluginInfo.className == null ? UpdateLog.class.getName() : ulogPluginInfo.className;
         ulog = core.getResourceLoader().newInstance(className, UpdateLog.class);
-      }
+ //     }
 
       if (!core.isReloaded() && !dirFactory.isPersistent()) {
         ulog.clearLog(core, ulogPluginInfo);

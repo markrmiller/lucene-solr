@@ -27,13 +27,13 @@ import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
-import org.apache.solr.client.solrj.impl.ZkClientClusterStateProvider;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -56,10 +56,10 @@ public class XCJFQueryTest extends SolrCloudTestCase {
 
 
     CollectionAdminRequest.createCollection("products", "xcjf", NUM_SHARDS, NUM_REPLICAS)
-        .process(cluster.getSolrClient());
+        .waitForFinalState(true).process(cluster.getSolrClient());
 
     CollectionAdminRequest.createCollection("parts", "xcjf", NUM_SHARDS, NUM_REPLICAS)
-        .process(cluster.getSolrClient());
+        .waitForFinalState(true).process(cluster.getSolrClient());
 
   }
 
@@ -68,17 +68,14 @@ public class XCJFQueryTest extends SolrCloudTestCase {
     shutdownCluster();
   }
 
-//  @After
-//  public void tearDown() throws Exception {
-//    cluster.deleteAllCollections();
-//    cluster.deleteAllConfigSets();
-//    super.tearDown();
-//  }
+  @After
+  public void tearDown() throws Exception {
+    cluster.deleteAllCollections();
+    cluster.deleteAllConfigSets();
+    super.tearDown();
+  }
 
   public static void setupIndexes(boolean routeByKey) throws IOException, SolrServerException {
-    clearCollection("products");
-    clearCollection("parts");
-
     buildIndexes(routeByKey);
 
     assertResultCount("products", "*:*", NUM_PRODUCTS, true);

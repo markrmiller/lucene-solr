@@ -60,8 +60,7 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     String collection = "testschemaapi";
     CollectionAdminRequest.createCollection(collection, "conf1", 1, 2).process(cluster.getSolrClient());
 
-    cluster.getSolrClient().getZkStateReader().waitForActiveCollection(cluster.getSolrClient().getHttpClient(), collection, 5, TimeUnit.SECONDS, false, 1, 2, true, true);
-
+   // cluster.getSolrClient().getZkStateReader().waitForActiveCollection(cluster.getSolrClient().getHttpClient(), collection, 5, TimeUnit.SECONDS, false, 1, 2, true, true);
 
     testModifyField(collection);
     testReloadAndAddSimple(collection);

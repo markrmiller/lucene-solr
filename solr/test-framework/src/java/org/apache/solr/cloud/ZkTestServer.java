@@ -29,8 +29,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.AlreadyClosedException;
@@ -71,9 +74,13 @@ public class ZkTestServer implements Closeable {
     }
   }
 
+  private Timer timer;
+
   private volatile CloseTracker closeTracker;
 
-  private Path zkMonitoringFile;
+  private Path zkMonitoringDir;
+
+  private AtomicInteger zkMonFileCnt = new AtomicInteger();
 
   public static final int TIMEOUT = 45000;
   public static final int TICK_TIME = 1000;
@@ -170,7 +177,7 @@ public class ZkTestServer implements Closeable {
                 new ZKDatabase(ftxn), "");
         cnxnFactory = new NIOServerCnxnFactory(); // MRM TODO: look again at the netty impl
         cnxnFactory.configure(config.getClientPortAddress(),
-                config.getMaxClientCnxns());
+                0);
         cnxnFactory.startup(zooKeeperServer);
 
         startupWait.countDown();
@@ -234,10 +241,7 @@ public class ZkTestServer implements Closeable {
   public ZkTestServer(Path zkDir, int port) throws KeeperException, InterruptedException {
     this.zkDir = zkDir;
     this.clientPort = port;
-    String zkMonFile = System.getProperty("solr.tests.zkmonfile");
-    if (zkMonFile != null) {
-      zkMonitoringFile = Paths.get(System.getProperty("solr.tests.zkmonfile"));
-    }
+
     assert ObjectReleaseTracker.track(this);
   }
 
@@ -251,6 +255,18 @@ public class ZkTestServer implements Closeable {
         chRootClient.clean("/solr");
         makeSolrZkNode();
       }
+    }
+    String zkMonDir = System.getProperty("solr.tests.zkmondir");
+    if (zkMonDir != null) {
+      zkMonitoringDir = Paths.get(zkMonDir);
+      zkMonitoringDir.toFile().mkdirs();
+      timer = new Timer("zkmonfile");
+      timer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          writeZkMonitorFile(new File(zkMonitoringDir.toFile(), "zkmon" + "_" + zkMonFileCnt.incrementAndGet() + ".zk").toPath(), getZkClient());
+        }
+      }, 10, 2000);
     }
   }
 
@@ -390,9 +406,14 @@ public class ZkTestServer implements Closeable {
     } catch (Exception e) {
       ParWork.propagateInterrupt("Exception trying to print zk layout to log on shutdown", e);
     }
-    if (zkMonitoringFile != null && chRootClient != null && zkServer != null) {
+
+    if (timer != null) {
+      timer.cancel();
+    }
+
+    if (zkMonitoringDir != null && chRootClient != null && zkServer != null) {
       try {
-        writeZkMonitorFile(zkMonitoringFile, chRootClient);
+        writeZkMonitorFile(Paths.get(zkMonitoringDir.toString(), "zkmon.zk"), chRootClient);
       } catch (Exception e2) {
         ParWork.propagateInterrupt("Exception trying to write zk layout to file on shutdown", e2);
       }
@@ -434,13 +455,13 @@ public class ZkTestServer implements Closeable {
   }
 
   public static void main(String[] args) throws InterruptedException {
-    SolrZkClient zkClient = new SolrZkClient("127.0.0.1:2181", 30000);
-    zkClient.start();
-    Path outfile = Paths.get(System.getProperty("user.home"), "zkout.zk");
-    while (true) {
-      writeZkMonitorFile(outfile, zkClient);
-      Thread.sleep(1000);
-    }
+//    SolrZkClient zkClient = new SolrZkClient("127.0.0.1:2181", 30000);
+//    zkClient.start();
+//
+//    while (true) {
+//      writeZkMonitorFile(new File(z, "zkmon" + "_" + ".zk"), zkClient);
+//      Thread.sleep(1000);
+//    }
 
   }
 

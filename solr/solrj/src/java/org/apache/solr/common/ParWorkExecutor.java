@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.LongAdder;
 public class ParWorkExecutor extends ThreadPoolExecutor {
   private static final Logger log = LoggerFactory
       .getLogger(MethodHandles.lookup().lookupClass());
-  public static final int KEEP_ALIVE_TIME = 1000;
+  public static final int KEEP_ALIVE_TIME = 10000;
 
   private static LongAdder threadNumber = new LongAdder();
 

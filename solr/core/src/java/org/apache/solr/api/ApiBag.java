@@ -165,9 +165,9 @@ public class ApiBag {
       String cmd = req.getParams().get("command");
       ValidatingJsonMap result = null;
       if (cmd == null) {
-        result = isCoreSpecific ? ValidatingJsonMap.getDeepCopy(baseApi.getSpec(), 5, true) : baseApi.getSpec();
+        result = isCoreSpecific ? ValidatingJsonMap.getDeepCopy(baseApi.getSpec(), 3, true) : baseApi.getSpec();
       } else {
-        ValidatingJsonMap specCopy = ValidatingJsonMap.getDeepCopy(baseApi.getSpec(), 5, true);
+        ValidatingJsonMap specCopy = ValidatingJsonMap.getDeepCopy(baseApi.getSpec(), 3, true);
         ValidatingJsonMap commands = specCopy.getMap("commands", null);
         if (commands != null) {
           ValidatingJsonMap m = commands.getMap(cmd, null);
@@ -294,7 +294,7 @@ public class ApiBag {
     if (specObj == null) specObj = "emptySpec";
     if (specObj instanceof Map) {
       Map map = (Map) specObj;
-      return () -> ValidatingJsonMap.getDeepCopy(map, 4, false);
+      return () -> ValidatingJsonMap.getDeepCopy(map, 3, false);
     } else {
       return Utils.getSpec((String) specObj);
     }

@@ -124,7 +124,7 @@ public class CoreSorterTest extends SolrTestCaseJ4 {
           addNewReplica(replicas, collection, slice, downNodes);
         }
         Map<String, Replica> replicaMap = replicas.stream().collect(Collectors.toMap(Replica::getName, Function.identity()));
-        sliceMap.put(slice, new Slice(slice, replicaMap, map(), collection, -1l, nodeName -> "http://" + nodeName));
+        sliceMap.put(slice, new Slice(slice, replicaMap, map(), collection, -1l));
       }
       DocCollection col = new DocCollection(collection, sliceMap, map("id", id++), DocRouter.DEFAULT);
       collToState.put(collection, col);
@@ -197,7 +197,7 @@ public class CoreSorterTest extends SolrTestCaseJ4 {
   protected Replica addNewReplica(List<Replica> replicaList, String collection, String slice, List<String> possibleNodes) {
     String replica = "r" + replicaList.size();
     String node = possibleNodes.get(random().nextInt(possibleNodes.size())); // place on a random node
-    Replica r = new Replica(replica, map("core", replica, "node_name", node), collection, -1l, slice, nodeName -> "http://" + nodeName);
+    Replica r = new Replica(replica, map("core", replica, "node_name", node), collection, -1l, slice, "http://" + node);
     replicaList.add(r);
     return r;
   }

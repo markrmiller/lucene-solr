@@ -188,6 +188,7 @@ public class SolrTestCase extends Assert {
     }
   })
           .around(classEnvRule = new TestRuleSetupAndRestoreClassEnv()).around(new RevertDefaultThreadHandlerRule());
+  protected static volatile boolean checkInterruptsOnFinish = true;
   private final SolrTestUtil solrTestUtil = new SolrTestUtil();
 
   @Rule
@@ -295,6 +296,8 @@ public class SolrTestCase extends Assert {
     log.info("*******************************************************************");
     log.info("@BeforeClass ------------------------------------------------------");
 
+    checkInterruptsOnFinish = true;
+
     System.setProperty("org.eclipse.jetty.util.log.class", "org.apache.logging.log4j.appserver.jetty.Log4j2Logger");
 
     interruptThreadsOnTearDown(false, "SessionTracker");
@@ -330,11 +333,10 @@ public class SolrTestCase extends Assert {
     System.setProperty("useCompoundFile", "true");
     System.setProperty("solr.tests.maxBufferedDocs", "1000");
 
-    System.setProperty("solr.getleader.looptimeout", "1500");
-
     System.setProperty("pkiHandlerPrivateKeyPath", SolrTestCaseJ4.class.getClassLoader().getResource("cryptokeys/priv_key512_pkcs8.pem").toExternalForm());
     System.setProperty("pkiHandlerPublicKeyPath", SolrTestCaseJ4.class.getClassLoader().getResource("cryptokeys/pub_key512.der").toExternalForm());
 
+    System.setProperty("solr.rootSharedThreadPoolCoreSize", "16");
     System.setProperty("solr.createCollectionTimeout", "10000");
     System.setProperty("solr.enablePublicKeyHandler", "true");
     System.setProperty("solr.zkclienttimeout", "30000");
@@ -382,6 +384,9 @@ public class SolrTestCase extends Assert {
       Lucene86Codec codec = new Lucene86Codec(Lucene50StoredFieldsFormat.Mode.BEST_SPEED);
       //Codec.setDefault(codec);
       disableReuseOfCryptoKeys();
+
+      System.setProperty("solr.getleader.looptimeout", "1500");
+
       System.setProperty("solr.zkstatewriter.throttle", "0");
       System.setProperty("solr.stateworkqueue.throttle", "0");
 
@@ -461,7 +466,7 @@ public class SolrTestCase extends Assert {
       System.setProperty("solr.indexfetcher.sotimeout", "30000");
       System.setProperty("solr.indexfetch.so_timeout.default", "30000");
 
-      System.setProperty("prepRecoveryReadTimeoutExtraWait", "100");
+      System.setProperty("prepRecoveryReadTimeoutExtraWait", "1000");
       System.setProperty("validateAfterInactivity", "-1");
       System.setProperty("leaderVoteWait", "2500"); // this is also apparently controlling how long we wait for a leader on register MRM TODO:
       System.setProperty("leaderConflictResolveWait", "10000");
@@ -637,7 +642,9 @@ public class SolrTestCase extends Assert {
       log.info("*******************************************************************");
     }
 
-    checkForInterruptRequest();
+    if (checkInterruptsOnFinish) {
+      checkForInterruptRequest();
+    }
     interuptThreadWithNameContains.clear();
     StartupLoggingUtils.shutdown();
   }
@@ -822,7 +829,7 @@ public class SolrTestCase extends Assert {
         return testExecutor;
       }
       testExecutor = (ParWorkExecutor) ParWork.getParExecutorService(
-          "testExecutor", 5, 64, 500, new BlockingArrayQueue(12, 16));
+          "testExecutor", 5, 64, 10000, new BlockingArrayQueue(12, 16));
       testExecutor.prestartAllCoreThreads();
       ((ParWorkExecutor) testExecutor).enableCloseLock();
       return testExecutor;

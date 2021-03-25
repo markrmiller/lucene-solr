@@ -82,7 +82,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
   private final String shard;
   private volatile CountDownLatch latch;
   private volatile ReplicationHandler replicationHandler;
-  private volatile Http2SolrClient recoveryOnlyClient;
+  private final Http2SolrClient recoveryOnlyClient;
 
   public static class Builder implements NamedListInitializedPlugin {
     private NamedList args;
@@ -144,6 +144,9 @@ public class RecoveryStrategy implements Runnable, Closeable {
     zkController = cc.getZkController();
     zkStateReader = zkController.getZkStateReader();
     baseUrl = zkController.getBaseUrl();
+
+    recoveryOnlyClient = new Http2SolrClient.Builder().
+        withHttpClient(cc.getUpdateShardHandler().getRecoveryOnlyClient()).markInternalRequest().idleTimeout(60000).connectionTimeout(3000).build();
   }
 
   final public int getWaitForUpdatesWithStaleStatePauseMilliSeconds() {
@@ -327,7 +330,6 @@ public class RecoveryStrategy implements Runnable, Closeable {
         CoreDescriptor coreDescriptor = core.getCoreDescriptor();
         replicaType = coreDescriptor.getCloudDescriptor().getReplicaType();
 
-        recoveryOnlyClient = core.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient();
         SolrRequestHandler handler = core.getRequestHandler(ReplicationHandler.PATH);
         replicationHandler = (ReplicationHandler) handler;
 
@@ -689,9 +691,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
         // first thing we just try to sync
         if (firstTime) {
           firstTime = false; // only try sync the first time through the loop
-          if (log.isInfoEnabled()) {
-            log.info("Attempting to PeerSync from [{}] - recoveringAfterStartup=[{}]", leader.getCoreUrl(), recoveringAfterStartup);
-          }
+
+          log.debug("Attempting to PeerSync from [{}] - recoveringAfterStartup=[{}]", leader.getCoreUrl(), recoveringAfterStartup);
 
           // System.out.println("Attempting to PeerSync from " + leaderUrl
           // + " i am:" + zkController.getNodeName());
@@ -850,7 +851,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
       }
     }
 
-    log.info("Finished doSyncOrReplicateRecovery process, successful=[{}]", successfulRecovery);
+    log.debug("Finished doSyncOrReplicateRecovery process, successful=[{}]", successfulRecovery);
 
     if (successfulRecovery) {
       close = true;
@@ -916,7 +917,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
     Future<RecoveryInfo> future = core.getUpdateHandler().getUpdateLog().applyBufferedUpdates();
     if (future == null) {
       // no replay needed\
-      log.info("No replay needed.");
+      log.debug("No replay needed.");
       return;
     } else {
       log.info("Replaying buffered documents.");
@@ -969,7 +970,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
     return close || cc.isShutDown();
   }
 
-  final private void sendPrepRecoveryCmd(String leaderBaseUrl, String leaderCoreName, CoreDescriptor coreDescriptor) {
+  final private void sendPrepRecoveryCmd(String leaderBaseUrl, String leaderCoreName, CoreDescriptor coreDescriptor) throws IOException, SolrServerException {
 
     if (coreDescriptor.getCollectionName() == null) {
       throw new IllegalStateException("Collection name cannot be null");
@@ -1000,40 +1001,25 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
     log.info("Sending prep recovery command to {} for leader={} params={}", leaderBaseUrl, leaderCoreName, prepCmd.getParams());
 
-    int readTimeout = Integer.parseInt(System.getProperty("prepRecoveryReadTimeoutExtraWait", "5000"));
+    int readTimeout = Integer.parseInt(System.getProperty("prepRecoveryReadTimeoutExtraWait", "30000"));
 
     if (isClosed()) {
       throw new AlreadyClosedException();
     }
 
-    try (Http2SolrClient client = new Http2SolrClient.Builder(leaderBaseUrl).withHttpClient(cc.getUpdateShardHandler().
-        getRecoveryOnlyClient()).idleTimeout(readTimeout).markInternalRequest().build()) {
 
+      recoveryOnlyClient.setFakeAsync(true);
       prepCmd.setBasePath(leaderBaseUrl);
 
-      latch = new CountDownLatch(1);
-      Cancellable result = client.asyncRequest(prepCmd, null, new NamedListAsyncListener(latch, leaderCoreName));
+     // latch = new CountDownLatch(1);
+      Cancellable result = recoveryOnlyClient.asyncRequest(prepCmd, null, new NamedListAsyncListener(latch, leaderCoreName));
       try {
         prevSendPreRecoveryHttpUriRequest = result;
-        try {
 
-          boolean success = latch.await(readTimeout + 500, TimeUnit.MILLISECONDS);
-          if (!success) {
-            //result.cancel();
-            log.warn("Timeout waiting for prep recovery cmd on leader {}", leaderCoreName);
-            Thread.sleep(100);
-            throw new IllegalStateException("Timeout waiting for prep recovery cmd on leader " + leaderCoreName );
-          }
-        } catch (InterruptedException e) {
-          close = true;
-          ParWork.propagateInterrupt(e);
-        } finally {
-          latch = null;
-        }
       } finally {
-        client.waitForOutstandingRequests();
+        recoveryOnlyClient.waitForOutstandingRequests();
       }
-    }
+
   }
 
   private class NamedListAsyncListener implements AsyncListener<NamedList<Object>> {
@@ -1048,11 +1034,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
     @Override
     public void onSuccess(NamedList<Object> entries) {
-      try {
-        latch.countDown();
-      } catch (NullPointerException e) {
 
-      }
       prevSendPreRecoveryHttpUriRequest = null;
     }
 
@@ -1061,36 +1043,13 @@ public class RecoveryStrategy implements Runnable, Closeable {
       log.info("failed sending prep recovery cmd to leader response code={}", code, throwable);
 
       if (throwable != null && throwable.getMessage() != null && throwable.getMessage().contains("Not the valid leader")) {
+
         try {
-          try {
-            Thread.sleep(10);
-            cc.getZkController().getZkStateReader().waitForState(RecoveryStrategy.this.collection, 3, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
-              if (collectionState == null) {
-                return false;
-              }
-              Slice slice = collectionState.getSlice(shard);
-              if (slice == null) {
-                return false;
-              }
-              if (slice.getLeader() == null) {
-                return false;
-              }
-              if (slice.getLeader().getName() == leaderCoreName) {
-                return false;
-              }
-              return true;
-            });
-          } catch (Exception e) {
-
-          }
-        } finally {
-          try {
-            latch.countDown();
-          } catch (NullPointerException e) {
-
-          }
-          prevSendPreRecoveryHttpUriRequest = null;
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          ParWork.propagateInterrupt(e);
         }
+
       }
 
     }

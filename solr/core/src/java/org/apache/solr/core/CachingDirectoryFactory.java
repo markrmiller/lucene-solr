@@ -153,7 +153,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
     synchronized (this) {
       CacheValue cacheValue = byDirectoryCache.get(directory);
       if (cacheValue == null) {
-        log.warn("done with an unknown directory, {}", directory);
+        log.warn("done with an unknown directory, {}", directory, new IllegalArgumentException());
         org.apache.solr.common.util.IOUtils.closeQuietly(directory);
         return;
       }
@@ -478,7 +478,8 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
     if (log.isTraceEnabled()) log.trace("release(Directory directory={}) - start", directory);
 
     if (directory == null) {
-      throw new NullPointerException();
+      return;
+      //throw new NullPointerException();
     }
     synchronized (this) {
       // don't check if already closed here - we need to able to release

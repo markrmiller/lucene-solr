@@ -148,7 +148,7 @@ public class SyncSliceTest extends SolrCloudBridgeTestCase {
     while (deadJetty == leaderJetty) {
       //   updateMappingsFromZk(this.jettys, this.clients);
       try {
-        leaderJetty = getJettyOnPort(getReplicaPort(getShardLeader(COLLECTION, "s1", 1000)));
+        leaderJetty = getJettyOnPort(getReplicaPort(getShardLeader(COLLECTION, "s1", 5000)));
       } catch (SolrException e) {
         log.info("did not get leader", e);
       }

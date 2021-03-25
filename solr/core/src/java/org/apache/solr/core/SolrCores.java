@@ -283,7 +283,6 @@ class SolrCores implements Closeable {
   }
 
   protected SolrCore remove(String name) {
-    currentlyLoadingCores.remove(name);
 
     if (name == null) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Cannot unload non-existent core [null]");
@@ -293,6 +292,8 @@ class SolrCores implements Closeable {
 
     SolrCore ret = cores.remove(name);
     residentDesciptors.remove(name);
+
+    currentlyLoadingCores.remove(name);
     // It could have been a newly-created core. It could have been a transient core. The newly-created cores
     // in particular should be checked. It could have been a dynamic core.
     TransientSolrCoreCache transientHandler = getTransientCacheHandler();
@@ -391,8 +392,10 @@ class SolrCores implements Closeable {
   public void markCoreAsLoading(String name) {
     if (getAllCoreNames().contains(name)) {
       log.warn("Creating a core with existing name is not allowed {}", name);
-
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Core with name '" + name + "' already exists.");
+      if (getCoreFromAnyList(name) == null) {
+        log.error("The core is gone, but we are still tracking it's name {}", name);
+      }
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Core with name '" + name + "' already exists. registered=" + residentDesciptors.keySet() + " loading=" + currentlyLoadingCores);
     }
 
     currentlyLoadingCores.add(name);

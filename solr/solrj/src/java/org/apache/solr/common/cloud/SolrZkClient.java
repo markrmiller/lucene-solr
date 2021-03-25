@@ -18,6 +18,7 @@ package org.apache.solr.common.cloud;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.cloud.DoNotWrap;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
@@ -87,7 +88,7 @@ import java.util.regex.Pattern;
  *
  */
 public class SolrZkClient implements Closeable {
-  private static final int MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW = 750;
+  private static final int MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW = 150;
 
   static final String NEWL = System.getProperty("line.separator");
 
@@ -165,7 +166,7 @@ public class SolrZkClient implements Closeable {
       this.zkACLProvider = zkACLProvider;
     }
 
-    zkCmdExecutor = new ZkCmdExecutor(this, 15, new IsClosed() {
+    zkCmdExecutor = new ZkCmdExecutor(this, 30, new IsClosed() {
 
       @Override
       public boolean isClosed() {
@@ -288,6 +289,11 @@ public class SolrZkClient implements Closeable {
     } else {
       connManager.getKeeper().delete(path, version);
     }
+  }
+
+  public void deleteAsync(final String path, final int version, AsyncCallback.VoidCallback cb)
+      throws InterruptedException, KeeperException {
+    connManager.getKeeper().delete(path, version, cb, "");
   }
 
   public void deleteAsync(final String path, final int version)
@@ -497,6 +503,11 @@ public class SolrZkClient implements Closeable {
     return create(path, data, createMode, retryOnConnLoss, false);
   }
 
+
+  public void sync(String path, AsyncCallback.VoidCallback cb) {
+    connManager.getKeeper().sync(path, cb, "");
+  }
+
   /**
    * Returns path of created node
    */
@@ -691,6 +702,7 @@ public class SolrZkClient implements Closeable {
   }
 
   public void mkDirs(Map<String,byte[]> dataMap, Map<String,CreateMode> createModeMap, int pathsAlreadyCreated) throws KeeperException {
+
     Set<String> paths = dataMap.keySet();
 
     if (log.isDebugEnabled()) {
@@ -716,7 +728,11 @@ public class SolrZkClient implements Closeable {
         }
         sb.append("/" + subpath.replaceAll("\\/", ""));
         if (cnt > pathsAlreadyCreated) {
-          pathsToMake.add(sb.toString());
+          String path = sb.toString();
+          log.debug("path to make: {}", path);
+          if (!pathsToMake.contains(path)) {
+            pathsToMake.add(path);
+          }
         }
       }
     }
@@ -736,17 +752,16 @@ public class SolrZkClient implements Closeable {
 
       byte[] data = dataMap.get(makePath);
 
-      CreateMode createMode = createModeMap.getOrDefault(makePath, CreateMode.PERSISTENT);
 
-      if (!madePaths.add(makePath)) {
-        if (log.isDebugEnabled()) log.debug("skipping already made {}", makePath + " data: " + (data == null ? "none" : data.length + "b"));
-        // already made
-        latch.countDown();
-        continue;
+      CreateMode createMode;
+      if (createModeMap != null) {
+        createMode = createModeMap.getOrDefault(makePath, CreateMode.PERSISTENT);
+      } else {
+        createMode = CreateMode.PERSISTENT;
       }
+
       if (log.isDebugEnabled()) log.debug("makepath {}", makePath + " data: " + (data == null ? "none" : data.length + "b"));
 
-      assert getZkACLProvider() != null;
 
       connManager.getKeeper().create(makePath, data, getZkACLProvider().getACLsToAdd(makePath), createMode,
           new MkDirsCallback(nodeAlreadyExistsPaths, path, code, failed, nodata, data, latch), "");
@@ -763,7 +778,7 @@ public class SolrZkClient implements Closeable {
     }
 
     // MRM TODO:, still haackey, do fails right
-    if (code[0] != 0) {
+    if (code[0] != 0 && code[0] != KeeperException.Code.NODEEXISTS.intValue()) {
       KeeperException e = KeeperException.create(KeeperException.Code.get(code[0]), path[0]);
       throw e;
 //      if (e instanceof NodeExistsException && (nodata[0])) {
@@ -778,15 +793,16 @@ public class SolrZkClient implements Closeable {
     }
 
     if (!success) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Timeout waiting for operations to complete");
+      log.error("Timeout waiting for operations to complete count={}", latch);
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Timeout waiting for operations to complete count=" + latch);
     }
-    
+
     // we optimistically tried to create all the paths in dataMap, but that fails for existing znodes
     // so send updates to those paths instead (if any)
     if (!nodeAlreadyExistsPaths.isEmpty()) {
       updateExistingPaths(nodeAlreadyExistsPaths, dataMap);
     }
-    
+
     if (log.isDebugEnabled()) {
       log.debug("mkDirs(String) - end");
     }
@@ -800,21 +816,25 @@ public class SolrZkClient implements Closeable {
     for (String path : paths) {
 
       connManager.getKeeper().getData(path, false, (rc, path1, ctx, data, stat) -> {
-        if (rc != 0) {
-          final KeeperException.Code keCode = KeeperException.Code.get(rc);
-          if (keCode == KeeperException.Code.NONODE) {
-            if (log.isDebugEnabled()) log.debug("No node found for {}", path1);
+        try {
+          if (rc != 0) {
+            final KeeperException.Code keCode = KeeperException.Code.get(rc);
+            if (keCode == KeeperException.Code.NONODE) {
+              if (log.isDebugEnabled()) log.debug("No node found for {}", path1);
+            }
+          } else {
+            dataMap.put(path1, data);
           }
-        } else {
-          dataMap.put(path1, data);
+        } finally {
+          latch.countDown();
         }
-        latch.countDown();
+
       }, null);
     }
 
     boolean success;
     try {
-      success = latch.await(15, TimeUnit.SECONDS);
+      success = latch.await(30, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       ParWork.propagateInterrupt(e);
       log.error("mkDirs(String=" + paths + ")", e);
@@ -822,7 +842,7 @@ public class SolrZkClient implements Closeable {
     }
 
     if (!success) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Timeout waiting for operations to complete");
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Timeout waiting for operations to complete count=" + latch);
     }
 
     return dataMap;
@@ -835,27 +855,29 @@ public class SolrZkClient implements Closeable {
     KeeperException[] ke = new KeeperException[1];
     for (String path : paths) {
       if (log.isDebugEnabled()) log.debug("process path={} connManager={}", path, connManager);
-
-      connManager.getKeeper().delete(path, -1, (rc, path1, ctx) -> {
-        try {
-          // MRM TODO:
-          if (log.isDebugEnabled()) {
-            log.debug("async delete resp rc={}, path1={}, ctx={}", rc, path1, ctx);
-          }
-          if (rc != 0) {
-            log.error("got zk error deleting paths {}", rc);
-            KeeperException e = KeeperException.create(KeeperException.Code.get(rc), path1);
-            if (e instanceof NoNodeException) {
-              if (log.isDebugEnabled()) log.debug("Problem removing zk node {}", path1);
-            } else {
-              ke[0] = e;
+      try {
+        connManager.getKeeper().delete(path, -1, (rc, path1, ctx) -> {
+          try {
+            // MRM TODO:
+            if (log.isDebugEnabled()) {
+              log.debug("async delete resp rc={}, path1={}, ctx={}", rc, path1, ctx);
             }
+            if (rc != 0) {
+              log.error("got zk error deleting paths {}", rc);
+              KeeperException e = KeeperException.create(KeeperException.Code.get(rc), path1);
+              if (e instanceof NoNodeException) {
+                if (log.isDebugEnabled()) log.debug("Problem removing zk node {}", path1);
+              } else {
+                ke[0] = e;
+              }
+            }
+          } finally {
+            latch.countDown();
           }
-        } finally {
-          latch.countDown();
-        }
-      }, null);
-
+        }, null);
+      } catch (Exception e) {
+        latch.countDown();
+      }
     }
 
     if (log.isDebugEnabled()) {
@@ -923,7 +945,7 @@ public class SolrZkClient implements Closeable {
     if (log.isDebugEnabled()) log.debug("mkdir path={}", path);
     boolean retryOnConnLoss = true; // MRM TODO:
     if (retryOnConnLoss) {
-      ZkCmdExecutor.retryOperation(zkCmdExecutor, new CreateZkOperation(path, data, createMode));
+      ZkCmdExecutor.retryOperation(zkCmdExecutor, new CreateZkOperation(path, data, createMode), true);
     } else {
       String createdPath;
       try {
@@ -1007,9 +1029,9 @@ public class SolrZkClient implements Closeable {
       if (!path.trim().equals("/")) {
         byte[] data = EMPTY_BYTES;
         Stat stat = new Stat();
-
+        Stat dataStat = new Stat();
         try {
-          data = getData(path, null, stat, true);
+          dataStat = exists(path, null);
           children = getChildren(path, null, true);
           Collections.sort(children);
         } catch (Exception e1) {
@@ -1034,26 +1056,28 @@ public class SolrZkClient implements Closeable {
         output.append(dent.toString()).append(children.size() == 0 ? node : "+" + node).append(" [").append(childrenString).append("v=").append ((stat == null ? "?" : stat.getVersion()) + "]");
         StringBuilder dataBuilder = new StringBuilder();
         String dataString;
-        if (data != null && data.length > 0) {
+        if (dataStat != null && dataStat.getDataLength() > 0) {
 //          if (path.endsWith(".json")) {
 //            dataString = Utils.fromJSON(data).toString();
 //          } else {
-            dataString = new String(data, StandardCharsets.UTF_8);
-        //  }
-          int lines;
-          if (maxBytesBeforeSuppress != MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW) {
-            lines = 0;
-          } else {
-            lines = dataString.split("\\r\\n|\\r|\\n").length;
-          }
 
-          if ((stat != null && stat.getDataLength() < maxBytesBeforeSuppress && lines < 4) || path.endsWith("state.json") || path
+        //  }
+          int lines = 0;
+//          if (maxBytesBeforeSuppress != MAX_BYTES_FOR_ZK_LAYOUT_DATA_SHOW) {
+//            lines = 0;
+//          } else {
+//            lines = dataString.split("\\r\\n|\\r|\\n").length;
+//          }
+
+          if ((dataStat != null && dataStat.getDataLength() < maxBytesBeforeSuppress && lines < 4) || path.endsWith("state.json") || path
               .endsWith("security.json") || (path.endsWith("solrconfig.xml") && Boolean.getBoolean("solr.tests.printsolrconfig")) || path.endsWith("_statupdates")
               || path.contains("/terms/") || path.endsWith("leader")) {
             //        if (path.endsWith(".xml")) {
             //          // this is the cluster state in xml format - lets pretty print
             //          dataString = prettyPrint(path, dataString);
             //        }
+            data = getData(path, null, stat, true);
+            dataString = new String(data, StandardCharsets.UTF_8);
             dataString = dataString.replaceAll("\\n", "\n" + dent.toString() + INDENT);
 
             dataBuilder.append(" (" + (stat != null ? stat.getDataLength() : "?") + "b) : " + (lines > 1 ? "\n" + dent.toString() + INDENT : "") + dataString.trim()).append(NEWL);
@@ -1166,8 +1190,7 @@ public class SolrZkClient implements Closeable {
   }
 
   public boolean isClosed() {
-    ZooKeeper zk = connManager.getKeeper();
-    return zk == null || !zk.getState().isAlive();
+    return isClosed;
   }
 
   /**
@@ -1329,11 +1352,15 @@ public class SolrZkClient implements Closeable {
   }
 
   public void addWatch(String basePath, Watcher watcher, AddWatchMode mode, boolean retryOnConnLoss) throws KeeperException, InterruptedException {
+    addWatch(basePath, watcher, mode, retryOnConnLoss, false);
+  }
+
+  public void addWatch(String basePath, Watcher watcher, AddWatchMode mode, boolean retryOnConnLoss, boolean retryOnSessionExp) throws KeeperException, InterruptedException {
     if (retryOnConnLoss) {
       ZkCmdExecutor.retryOperation(zkCmdExecutor, () ->  {
         connManager.getKeeper().addWatch(basePath, watcher == null ? null : wrapWatcher(watcher), mode);
         return null;
-      }, false);
+      }, retryOnSessionExp);
     } else {
       connManager.getKeeper().addWatch(basePath, watcher == null ? null : wrapWatcher(watcher), mode);
     }
@@ -1350,6 +1377,10 @@ public class SolrZkClient implements Closeable {
 
   public void removeWatches(String path, Watcher watcher, Watcher.WatcherType watcherType, boolean local) throws KeeperException, InterruptedException {
     connManager.getKeeper().removeWatches(path, watcher, watcherType, local);
+  }
+
+  public void removeAllWatches(String path) throws KeeperException, InterruptedException {
+    connManager.getKeeper().removeAllWatches(path, Watcher.WatcherType.Any, true);
   }
 
   public long getSessionId() {
@@ -1375,15 +1406,18 @@ public class SolrZkClient implements Closeable {
 
     @Override
     public void process(final WatchedEvent event) {
+      if (solrZkClient.isClosed) {
+        return;
+      }
       try {
         if (watcher instanceof ConnectionManager) {
           solrZkClient.zkConnManagerCallbackExecutor.submit(() -> watcher.process(event));
         } else {
           if (event.getType() != Event.EventType.None) {
-            solrZkClient.zkCallbackExecutor.submit(new ParWork.SolrFutureTask("ZkSolrEventThread", () -> {
+            solrZkClient.zkCallbackExecutor.submit(new ParWork.SolrFutureTask(() -> {
               watcher.process(event);
               return null;
-            }));
+            }, false));
           }
         }
       } catch (RejectedExecutionException e) {
@@ -1455,25 +1489,28 @@ public class SolrZkClient implements Closeable {
 
     @Override
     public void processResult(int rc, String zkpath, Object ctx, String name, Stat stat) {
-      if (rc != 0) {
-        final KeeperException.Code keCode = KeeperException.Code.get(rc);
-        if (keCode == KeeperException.Code.NODEEXISTS) {
-          nodeAlreadyExistsPaths.add(zkpath);
-        } else {
-          log.warn("create znode {} failed due to: {}", zkpath, keCode);
-          if (path[0] == null) {
-            // capture the first error for reporting back
-            code[0] = rc;
-            failed[0] = true;
-            path[0] = "" + zkpath;
-            nodata[0] = data == null;
+      log.debug("got result in mkdirs callback {} {} {} {} {}", rc, zkpath, ctx, name, stat);
+      try {
+        if (rc != 0) {
+          final KeeperException.Code keCode = KeeperException.Code.get(rc);
+          if (keCode == KeeperException.Code.NODEEXISTS) {
+            nodeAlreadyExistsPaths.add(zkpath);
+          } else {
+            log.warn("create znode {} failed due to: {}", zkpath, keCode);
+            if (path[0] == null) {
+              // capture the first error for reporting back
+              code[0] = rc;
+              failed[0] = true;
+              path[0] = "" + zkpath;
+              nodata[0] = data == null;
+            }
           }
+        } else {
+          log.debug("Created znode at path: {}", zkpath);
         }
-      } else {
-        log.debug("Created znode at path: {}", zkpath);
+      } finally {
+        latch.countDown();
       }
-
-      latch.countDown();
     }
   }
 
