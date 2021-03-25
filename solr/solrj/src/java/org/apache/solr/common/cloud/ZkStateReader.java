@@ -1032,7 +1032,7 @@ public class ZkStateReader implements SolrCloseable, Replica.NodeNameToBaseUrl {
 
     TimeOut leaderVerifyTimeout = new TimeOut(timeout, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
     while (true && !closed && !higherLevelClosed()) {
-
+      returnLeader.set(null);
       try {
         waitForState(collection, timeout, TimeUnit.MILLISECONDS, (n, c) -> {
           if (c == null) return false;
@@ -1987,7 +1987,7 @@ public class ZkStateReader implements SolrCloseable, Replica.NodeNameToBaseUrl {
         version = Integer.parseInt((String) csVer);
       }
 
-      log.info("Got additional state updates with znode version {} for cs version {} updates={}", stat2.getVersion(), version, m);
+      log.info("Got additional state updates [live={}] for {} with znode version {} for cs version {} updates={}", live, coll, stat2.getVersion(), version, m);
 
       //m.remove("_cs_ver_");
       m.put("_ver_", stat2.getVersion());

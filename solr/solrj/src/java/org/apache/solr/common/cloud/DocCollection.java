@@ -69,7 +69,11 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   private AtomicInteger sliceAssignCnt = new AtomicInteger();
 
   public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router) {
-    this(name, slices, props, router, 0, new HashMap());
+    this(name, slices, props, router, 0, Collections.emptyMap());
+  }
+
+  public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router, int zkVersion) {
+    this(name, slices, props, router, zkVersion, Collections.emptyMap());
   }
 
   /**
@@ -85,7 +89,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     this.name = name;
 
     if (stateUpdates == null) {
-      this.stateUpdates = Collections.emptyMap();
+      throw new IllegalArgumentException("Null stateupdates");
     } else {
       this.stateUpdates = stateUpdates;
     }
@@ -275,7 +279,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
 
   @Override
   public String toString() {
-    return "DocCollection(" + id + "_" + name + ":" + ":v=" + znodeVersion + " u=" + stateUpdates + ")=" + toJSONString(this);
+    return "DocCollection(" + id + ":" + name + ":" + "v=" + znodeVersion + " u=" + stateUpdates + ")=" + toJSONString(this);
   }
 
   @Override

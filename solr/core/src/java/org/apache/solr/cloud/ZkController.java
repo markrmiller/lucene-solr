@@ -1157,7 +1157,7 @@ public class ZkController implements Closeable, Runnable {
       log.debug("Wait to see leader for {}, {}", collection, shardId);
       String leaderName = null;
 
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 30; i++) {
         if (isClosed() || isDcCalled() || cc.isShutDown()) {
           throw new AlreadyClosedException();
         }

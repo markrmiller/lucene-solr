@@ -637,7 +637,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     }
 
     DocCollection newCollection = new DocCollection(cName,
-            slices, collectionProps, router, 0, null);
+            slices, collectionProps, router, 0);
 
     return newCollection;
   }

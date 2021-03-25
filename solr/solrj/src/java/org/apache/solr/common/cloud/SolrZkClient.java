@@ -63,6 +63,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -79,6 +80,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -1014,6 +1016,8 @@ public class SolrZkClient implements Closeable {
     }
   }
 
+  private static Pattern ENDS_WITH_INT_SORT = Pattern.compile(".*?(\\d+)");
+
   /**
    * Fills string with printout of current ZooKeeper layout.
    */
@@ -1034,6 +1038,14 @@ public class SolrZkClient implements Closeable {
           dataStat = exists(path, null);
           children = getChildren(path, null, true);
           Collections.sort(children);
+          Collections.sort(children, Comparator.comparingInt(s -> {
+            Matcher m = ENDS_WITH_INT_SORT.matcher(s);
+            if (m.matches()) {
+              String endingInt = m.group(1);
+              return Integer.parseInt(endingInt);
+            }
+            return 0;
+          }));
         } catch (Exception e1) {
           if (e1 instanceof KeeperException.NoNodeException) {
             // things change ...
@@ -1076,7 +1088,12 @@ public class SolrZkClient implements Closeable {
             //          // this is the cluster state in xml format - lets pretty print
             //          dataString = prettyPrint(path, dataString);
             //        }
-            data = getData(path, null, stat, true);
+            try {
+              data = getData(path, null, stat, true);
+            } catch (NoNodeException e) {
+              // things change
+              return;
+            }
             dataString = new String(data, StandardCharsets.UTF_8);
             dataString = dataString.replaceAll("\\n", "\n" + dent.toString() + INDENT);
 

@@ -20,14 +20,18 @@ import javax.management.JMException;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -44,6 +48,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.CloseTracker;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.core.CoreContainer;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.jmx.ManagedUtil;
@@ -259,6 +264,13 @@ public class ZkTestServer implements Closeable {
     String zkMonDir = System.getProperty("solr.tests.zkmondir");
     if (zkMonDir != null) {
       zkMonitoringDir = Paths.get(zkMonDir);
+      while (Files.exists(zkMonitoringDir)) {
+        try {
+          Files.walk(zkMonitoringDir).sorted(Comparator.reverseOrder()).forEach(new CoreContainer.FileConsumer());
+        } catch (NoSuchFileException | UncheckedIOException e) {
+
+        }
+      }
       zkMonitoringDir.toFile().mkdirs();
       timer = new Timer("zkmonfile");
       timer.schedule(new TimerTask() {

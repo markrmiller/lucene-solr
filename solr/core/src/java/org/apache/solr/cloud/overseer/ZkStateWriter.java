@@ -56,6 +56,7 @@ public class ZkStateWriter {
   // private static final long MAX_FLUSH_INTERVAL = TimeUnit.NANOSECONDS.convert(Overseer.STATE_UPDATE_DELAY, TimeUnit.MILLISECONDS);
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  public static final String CS_VER_ = "_cs_ver_";
   private final ZkStateReader reader;
   private final Overseer overseer;
 
@@ -533,8 +534,8 @@ public class ZkStateWriter {
           Map updates = stateUpdates.get(collection.getId());
           if (updates != null) {
             // TODO: clearing these correctly is tricky
-            updates.clear();
-            writeStateUpdates(collection, Collections.emptyMap());
+//            updates.clear();
+//            writeStateUpdates(collection, Collections.emptyMap());
           }
 
         } else if (dirtyState.contains(collection.getName())) {
@@ -573,7 +574,7 @@ public class ZkStateWriter {
       return;
     }
     String stateUpdatesPath = ZkStateReader.getCollectionStateUpdatesPath(collection.getName());
-    log.trace("write state updates for collection {} ver={} {}", collection.getName(), updates.get("_cs_ver_"), updates);
+    log.trace("write state updates for collection {} ver={} {}", collection.getName(), updates.get(CS_VER_), updates);
     try {
       reader.getZkClient().setData(stateUpdatesPath, Utils.toJSON(updates), -1, true, false);
     } catch (KeeperException.NoNodeException e) {
@@ -723,16 +724,26 @@ public class ZkStateWriter {
 
           stateUpdates.compute(docCollection.getId(), (k,v) -> {
             if (v == null) {
-              return latestStateUpdates;
+              log.debug("map impl is zkreader {}", latestStateUpdates.getClass().getName());
+              Map newUpdates = new ConcurrentHashMap();
+              newUpdates.putAll(latestStateUpdates);
+              newUpdates.remove(CS_VER_);
+              return newUpdates;
             }
-
+            log.debug("map impl is existing {} zkreader {}", v.getClass().getName(), latestStateUpdates.getClass().getName());
             Integer zkVersion = (Integer) v.get("_ver_");
             if (zkVersion == null) {
               zkVersion = -1;
             }
             if (docCollection.getStateUpdatesZkVersion() > zkVersion) {
-              return latestStateUpdates;
+              Map newUpdates = new ConcurrentHashMap();
+              newUpdates.putAll(latestStateUpdates);
+              newUpdates.remove(CS_VER_);
+              return newUpdates;
             }
+//            Map newUpdates = new ConcurrentHashMap();
+//            newUpdates.putAll(latestStateUpdates);
+//            newUpdates.remove(CS_VER_);
             return v;
           });
 
@@ -783,7 +794,7 @@ public class ZkStateWriter {
     for (Long collId : collIds) {
       String collection = idToCollection.get(collId);
       if (collection != null) {
-        log.debug("Write out state updates for {} updates={}", collection, stateUpdates);
+        log.debug("Write out state updates for {} updates={}", collection, stateUpdates.get(collId));
         String stateUpdatesPath = ZkStateReader.getCollectionStateUpdatesPath(collection);
         try {
           reader.getZkClient().setData(stateUpdatesPath, Utils.toJSON(stateUpdates.get(collId)), -1, (rc, path1, ctx, stat) -> {
