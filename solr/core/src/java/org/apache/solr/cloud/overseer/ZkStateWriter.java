@@ -735,16 +735,16 @@ public class ZkStateWriter {
             if (zkVersion == null) {
               zkVersion = -1;
             }
-            if (docCollection.getStateUpdatesZkVersion() > zkVersion) {
+         //   if (docCollection.getStateUpdatesZkVersion() > zkVersion) {
               Map newUpdates = new ConcurrentHashMap();
               newUpdates.putAll(latestStateUpdates);
               newUpdates.remove(CS_VER_);
               return newUpdates;
-            }
+        //    }
 //            Map newUpdates = new ConcurrentHashMap();
 //            newUpdates.putAll(latestStateUpdates);
 //            newUpdates.remove(CS_VER_);
-            return v;
+        ///    return v;
           });
 
           cs.put(collectionName, docCollection);

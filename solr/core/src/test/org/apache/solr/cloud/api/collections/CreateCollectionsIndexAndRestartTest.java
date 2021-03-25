@@ -58,7 +58,7 @@ public class CreateCollectionsIndexAndRestartTest extends SolrCloudTestCase {
     System.setProperty("zookeeper.skipACL", "true");
     System.setProperty("zookeeper.nio.directBufferBytes", Integer.toString(128000));
     System.setProperty("solr.zkclienttimeout", "45000");
-    System.setProperty("solr.getleader.looptimeout", "20000");
+    System.setProperty("solr.getleader.looptimeout", "5000");
     System.setProperty("disableCloseTracker", "true");
     System.setProperty("solr.rootSharedThreadPoolCoreSize", "256");
     System.setProperty("solr.v2RealPath", "false");
@@ -77,7 +77,7 @@ public class CreateCollectionsIndexAndRestartTest extends SolrCloudTestCase {
 
   @Test
   public void start() throws Exception {
-    int collectionCnt = 20;
+    int collectionCnt = 10;
     int numShards = 2;
     int numReplicas = 2;
     System.err.println(new Date() + " ********* CREATING " + collectionCnt + " 4x4 COLLECTIONS");
@@ -135,7 +135,7 @@ public class CreateCollectionsIndexAndRestartTest extends SolrCloudTestCase {
 
     stopWatch.done();
 
-    System.err.println(new Date() + " ********* DONE RANDOMLY STOPING JETTY INSTANCES: " + stopWatch.getTime() + "ms");
+    System.err.println(new Date() + " ********* DONE RANDOMLY STOPPING JETTY INSTANCES: " + stopWatch.getTime() + "ms");
 
     stopWatch.start("Starting Jetty instances");
 

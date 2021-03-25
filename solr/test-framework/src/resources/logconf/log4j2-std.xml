@@ -24,8 +24,10 @@
         </Console>
 
         <Console name="STDERR" target="SYSTEM_ERR">
-            <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %c{1.} %m%notEmpty{
-        =>%ex{short}}}{10240}%n"/>
+            <Pattern>
+                %maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %c{1.} %m%notEmpty{
+                =>%ex{short}}}{10240}%n
+            </Pattern>
         </Console>
 
         <File name="FILE_COLOR" fileName="${sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
